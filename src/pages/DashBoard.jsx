@@ -16,7 +16,7 @@ const DashBoard = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedPlace, setSelectedPlace] = useState(null); 
   const {clickedPlace,setClickedPlaceHandler} = useContext(PlaceContext); // State to track selected place
-  console.log("Clicked Place in Dashboard:", clickedPlace);
+  // console.log("Clicked Place in Dashboard:", clickedPlace);
 
 
   // Example alert data

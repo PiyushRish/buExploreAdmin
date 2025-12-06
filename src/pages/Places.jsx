@@ -3,6 +3,7 @@ import { Heart, MapPin, Star, Share2 } from 'lucide-react';
 import { useContext } from "react";
 import { PlaceContext } from "../contextApi/places.jsx";
 import Navbar from '../components/Navbar.jsx';
+import { usePlacesQuery } from '../queries/placeQueries.js';
 
 // Mock Data for the Places
 const placesData = [
@@ -70,35 +71,44 @@ const placesData = [
 
 // Single Card Component
 const PlaceCard = ({ place }) => {
+  const { data, loading, error } = usePlacesQuery();
+  console.log(data, loading, error, "api data");
+
+  console.log(data, "place data");
+
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(place.likes);
-  const {clickedPlace,setClickedPlaceHandler} = useContext(PlaceContext);
+
+  const { clickedPlace, setClickedPlaceHandler } = useContext(PlaceContext);
 
   const handleLike = () => {
     setIsLiked(!isLiked);
-    setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
+    setLikeCount(prev => (isLiked ? prev - 1 : prev + 1));
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 flex flex-col h-full" onClick={()=>{
-        setClickedPlaceHandler(place);
-
-    }}>
+    <div
+      className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 flex flex-col h-full"
+      onClick={() => setClickedPlaceHandler(place)}
+    >
       {/* Image Section */}
       <div className="relative h-56 overflow-hidden">
-        <img 
-          src={place.imageUrl} 
-          alt={place.title} 
+        <img
+          src={place.photos[0]?.url || "https://via.placeholder.com/400x300"}
+          alt={place.name }
           className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
         />
+
         <div className="absolute top-3 right-3 flex gap-2">
-           <button className="p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors text-gray-700">
+          <button className="p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors text-gray-700">
             <Share2 size={18} />
           </button>
         </div>
+
         <div className="absolute bottom-3 left-3">
           <span className="bg-black/60 backdrop-blur-md text-white text-xs px-2 py-1 rounded-md flex items-center gap-1">
-             <Star size={12} className="text-yellow-400 fill-yellow-400" /> {place.rating}
+            {/* rating not in API, so removed */}
+            Pilgrimage
           </span>
         </div>
       </div>
@@ -107,10 +117,13 @@ const PlaceCard = ({ place }) => {
       <div className="p-5 flex flex-col flex-grow">
         <div className="flex justify-between items-start mb-2">
           <div>
-            <h3 className="font-bold text-xl text-gray-800 line-clamp-1">{place.title}</h3>
+            <h3 className="font-bold text-xl text-gray-800 line-clamp-1">
+              {place.name}
+            </h3>
+
             <div className="flex items-center text-gray-500 text-sm mt-1">
               <MapPin size={14} className="mr-1" />
-              {place.location}
+              {place.location.address}
             </div>
           </div>
         </div>
@@ -119,23 +132,28 @@ const PlaceCard = ({ place }) => {
           {place.description}
         </p>
 
-        {/* Footer with Price and Likes */}
+        {/* Footer */}
         <div className="pt-4 border-t border-gray-100 flex items-center justify-between mt-auto">
-          <span className="font-bold text-lg text-indigo-600">{place.price}</span>
-          
-          <button 
+          {/* price removed */}
+          <span className="font-semibold text-sm text-gray-500">
+            {place.city}
+          </span>
+
+          <button
             onClick={handleLike}
             className={`flex items-center space-x-1 px-3 py-1.5 rounded-full transition-colors ${
-              isLiked 
-                ? 'bg-red-50 text-red-500' 
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+              isLiked
+                ? "bg-red-50 text-red-500"
+                : "bg-gray-50 text-gray-600 hover:bg-gray-100"
             }`}
           >
-            <Heart 
-              size={18} 
-              className={`transition-all duration-300 ${isLiked ? 'fill-red-500 scale-110' : ''}`} 
+            <Heart
+              size={18}
+              className={`transition-all duration-300 ${
+                isLiked ? "fill-red-500 scale-110" : ""
+              }`}
             />
-            <span className="text-sm font-medium">{likeCount.toLocaleString()}</span>
+            <span className="text-sm font-medium">{likeCount}</span>
           </button>
         </div>
       </div>
@@ -143,8 +161,18 @@ const PlaceCard = ({ place }) => {
   );
 };
 
+
 // Main Grid Component
 const Places = () => {
+  const { data, isLoading, isError } = usePlacesQuery();
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (isError) {
+    return <div className="flex items-center justify-center min-h-screen">Error loading places.</div>;
+  } 
   return (
 
     
@@ -161,7 +189,7 @@ const Places = () => {
 
         {/* The Grid: 1 col mobile, 2 cols tablet, 3 cols desktop */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {placesData.map((place) => (
+          {data.places.map((place) => (
             <PlaceCard key={place.id} place={place}  />
           ))}
         </div>
