@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Heart, MapPin, Star, Share2 } from 'lucide-react';
 import { useContext } from "react";
 import { PlaceContext } from "../contextApi/places.jsx";
+import Navbar from '../components/Navbar.jsx';
 
 // Mock Data for the Places
 const placesData = [
@@ -145,7 +146,10 @@ const PlaceCard = ({ place }) => {
 // Main Grid Component
 const Places = () => {
   return (
+
+    
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <Navbar/>
       <div className="max-w-7xl mx-auto">
         <div className="mb-10 text-center">
           <h1 className="text-4xl font-extrabold text-gray-900 mb-4">Popular Destinations</h1>

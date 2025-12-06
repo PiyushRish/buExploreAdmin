@@ -85,8 +85,8 @@ const DashBoard = () => {
       </div>
       
       {/* Main Content */}
-      <div className="flex-1 p-6 overflow-auto">
-        <Navbar/>
+      <div className="flex-1 p-5 overflow-auto">
+        {/* <Navbar/> */}
         {activeTab === "dashboard" && (
           <>
             {/* Top Section with 3 Components */}
