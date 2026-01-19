@@ -1,34 +1,21 @@
 import React, { useState, useRef, useEffect, useContext } from "react";
 import {
-  MapPin, Star, Heart, DollarSign, Play, Pause,
-  Volume2, VolumeX, Save, Edit2, Share2, ArrowLeft
+  MapPin, Heart, Play, Volume2, VolumeX, Save, Edit2, ArrowLeft, Share2
 } from "lucide-react";
 
-// import { PlaceContext } from "../contextApi/places.jsx";
 import { PlaceContext } from "../contextApi/places.jsx";
 
 const PlaceDetails = () => {
-
   const { clickedPlace, setClickedPlaceHandler } = useContext(PlaceContext);
 
-  // -------------------------------
-  // SAFETY: If no place selected → return nothing
-  // -------------------------------
   if (!clickedPlace) return null;
 
-  // A copy of clickedPlace to allow editing
+  // Local editable copy
   const [data, setData] = useState(clickedPlace);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Update values
   const handleChange = (e) => {
     setData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  };
-
-  const handleAmenityChange = (i, value) => {
-    const updated = [...data.amenities];
-    updated[i] = value;
-    setData((prev) => ({ ...prev, amenities: updated }));
   };
 
   const toggleEdit = () => {
@@ -37,13 +24,11 @@ const PlaceDetails = () => {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      
       {/* LEFT SIDE */}
       <div className="w-[70%] h-full flex flex-col bg-white border-r">
 
         {/* HEADER */}
         <div className="h-16 border-b px-8 flex items-center justify-between">
-          
           <button
             onClick={() => setClickedPlaceHandler(null)}
             className="flex items-center text-gray-600 hover:text-black"
@@ -69,7 +54,6 @@ const PlaceDetails = () => {
               </>
             )}
           </button>
-
         </div>
 
         {/* SCROLL AREA */}
@@ -79,8 +63,8 @@ const PlaceDetails = () => {
           {isEditing ? (
             <div className="space-y-4">
               <input
-                name="title"
-                value={data.title}
+                name="name"
+                value={data.name}
                 onChange={handleChange}
                 className="w-full text-4xl font-extrabold border-b"
               />
@@ -89,62 +73,65 @@ const PlaceDetails = () => {
                 <MapPin size={20} className="text-blue-500" />
                 <input
                   name="location"
-                  value={data.location}
-                  onChange={handleChange}
+                  value={data.location.address}
+                  onChange={(e) =>
+                    setData(prev => ({
+                      ...prev,
+                      location: { ...prev.location, address: e.target.value }
+                    }))
+                  }
                   className="w-full border-b"
                 />
               </div>
             </div>
           ) : (
             <div>
-              <h1 className="text-4xl font-extrabold">{data.title}</h1>
-              {/* <div className="flex items-center text-gray-500 mt-1">
+              <h1 className="text-4xl font-extrabold">{data.name}</h1>
+              <div className="flex items-center text-gray-500 mt-1">
                 <MapPin size={20} className="mr-2 text-blue-600" />
-                {data.location}
-              </div> */}
+                {data.location.address}
+              </div>
             </div>
           )}
 
-          {/* STAT CARDS */}
-          <div className="grid grid-cols-3 gap-6 mt-10">
-            <StatCard
-              label="Price"
-              icon={DollarSign}
-              name="price"
-              value={data.price}
-              color="text-green-500"
-              isEditing={isEditing}
-              onChange={handleChange}
-            />
-            <StatCard
-              label="Rating"
-              icon={Star}
-              name="rating"
-              value={data.rating}
-              color="text-yellow-400"
-              isEditing={isEditing}
-              onChange={handleChange}
-            />
-            <StatCard
-              label="Likes"
-              icon={Heart}
-              name="likes"
-              value={data.likes}
-              color="text-red-500"
-              isEditing={isEditing}
-              onChange={handleChange}
-            />
+          {/* META BADGES */}
+          <div className="flex gap-3 mt-6">
+            <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-sm">
+              {data.category}
+            </span>
+            <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
+              {data.city}
+            </span>
           </div>
 
-          {/* VIDEO URL FIELD */}
+          {/* LIKES CARD (your StatCard replacement) */}
+          <div className="mt-8 bg-white p-4 rounded-2xl border shadow-sm w-40 text-center">
+            <div className="p-3 rounded-full bg-red-50 mb-2 inline-block">
+              <Heart size={22} className="text-red-500" />
+            </div>
+            <p className="text-xs text-gray-500">Likes</p>
+
+            {isEditing ? (
+              <input
+                name="likes"
+                value={data.likes}
+                onChange={handleChange}
+                className="mt-2 w-full text-center border-b font-bold"
+              />
+            ) : (
+              <p className="text-xl font-bold mt-2">{data.likes}</p>
+            )}
+          </div>
+
+          {/* YOUTUBE LINK (EDIT MODE) */}
           {isEditing && (
             <div className="mt-8 bg-gray-50 p-4 rounded-xl">
               <label className="text-xs text-gray-500 font-bold">
-                Video URL
+                YouTube Video Link
               </label>
               <input
-                name="videoUrl"
-                value={data.videoUrl}
+                name="ytVideoLink"
+                value={data.ytVideoLink}
                 onChange={handleChange}
                 className="w-full mt-2 p-2 border rounded"
               />
@@ -169,49 +156,17 @@ const PlaceDetails = () => {
             )}
           </div>
 
-          {/* HOST */}
-          <div className="flex items-center bg-white border p-4 rounded-xl mt-10">
-            <img
-              src={data.hostImage}
-              className="w-12 h-12 rounded-full mr-4"
-            />
-            <div>
-              <p className="text-sm text-gray-500">Host</p>
-              {isEditing ? (
-                <input
-                  name="hostName"
-                  value={data.hostName}
-                  onChange={handleChange}
-                  className="border-b"
-                />
-              ) : (
-                <p className="font-bold">{data.hostName}</p>
-              )}
-            </div>
-
-            <button className="ml-auto px-4 py-2 bg-black text-white rounded-lg">
-              Contact Host
-            </button>
-          </div>
-
-          {/* AMENITIES */}
+          {/* PHOTO GALLERY (NEW – matches your API) */}
           <div className="mt-10">
-            <h3 className="text-xl font-bold mb-3">Amenities</h3>
-
-            <div className="grid grid-cols-2 gap-4">
-              {data.amenities?.map((a, i) => (
-                <div key={i} className="flex items-center p-3 bg-gray-50 rounded-lg">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-3" />
-                  {isEditing ? (
-                    <input
-                      value={a}
-                      onChange={(e) => handleAmenityChange(i, e.target.value)}
-                      className="border-b w-full"
-                    />
-                  ) : (
-                    <span>{a}</span>
-                  )}
-                </div>
+            <h3 className="text-xl font-bold mb-3">Photos</h3>
+            <div className="grid grid-cols-3 gap-4">
+              {data.photos.map((p, i) => (
+                <img
+                  key={p._id}
+                  src={p.url}
+                  alt={`photo-${i}`}
+                  className="w-full h-40 object-cover rounded-xl"
+                />
               ))}
             </div>
           </div>
@@ -223,45 +178,17 @@ const PlaceDetails = () => {
       <div className="w-[30%] bg-black">
         <VideoPlayer
           src={data.videos[0].url}
-          title={data.title}
-          location={data.location}
+          title={data.name}
+          location={data.location.address}
           likes={data.likes}
-          price={data.price}
         />
       </div>
-
     </div>
   );
 };
 
-
 // ------------------------------------------
-// STAT CARD COMPONENT
-// ------------------------------------------
-const StatCard = ({ icon: Icon, label, value, name, color, isEditing, onChange }) => (
-  <div className="bg-white p-4 rounded-2xl border shadow-sm text-center">
-    <div className={`p-3 rounded-full bg-gray-50 mb-2 ${color}`}>
-      <Icon size={22} />
-    </div>
-
-    <p className="text-xs text-gray-500">{label}</p>
-
-    {isEditing ? (
-      <input
-        name={name}
-        value={value}
-        onChange={onChange}
-        className="mt-2 w-full text-center border-b font-bold"
-      />
-    ) : (
-      <p className="text-xl font-bold mt-2">{value}</p>
-    )}
-  </div>
-);
-
-
-// ------------------------------------------
-// VIDEO PLAYER
+// VIDEO PLAYER (kept your design)
 // ------------------------------------------
 const VideoPlayer = ({ src, title, location, likes }) => {
   const videoRef = useRef(null);
@@ -285,7 +212,6 @@ const VideoPlayer = ({ src, title, location, likes }) => {
 
   return (
     <div className="relative w-full h-full" onClick={togglePlay}>
-      
       <video
         ref={videoRef}
         src={src}
@@ -314,7 +240,7 @@ const VideoPlayer = ({ src, title, location, likes }) => {
       {/* Overlay Info */}
       <div className="absolute bottom-0 p-6 text-white bg-gradient-to-t from-black/80 via-black/30 to-transparent">
         <h2 className="text-2xl font-bold">{title}</h2>
-        {/* <p className="text-sm text-gray-200">{location}</p> */}
+        <p className="text-sm text-gray-200">{location}</p>
 
         <div className="absolute right-6 bottom-20 flex flex-col items-center space-y-4">
           <div className="bg-black/40 p-3 rounded-full">
@@ -327,10 +253,8 @@ const VideoPlayer = ({ src, title, location, likes }) => {
           </div>
         </div>
       </div>
-
     </div>
   );
 };
-
 
 export default PlaceDetails;

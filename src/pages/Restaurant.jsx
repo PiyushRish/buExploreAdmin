@@ -1,21 +1,21 @@
 import React, { useState, useContext } from "react";
-import { Heart, MapPin, Share2 } from "lucide-react";
+import { Heart, MapPin, Share2, Star, Clock, Utensils, Wallet, Globe, Phone } from "lucide-react";
 import Navbar from "../components/Navbar.jsx";
 import { PlaceContext } from "../contextApi/places.jsx";
-import { usePlacesQuery } from "../queries/placeQueries.js";
+import { useRestaurantsQuery } from "../queries/restaurantQueries.js"; // <-- adjust if your hook name is different
 
 /* -------------------------------------------------- */
-/*              PLACE CARD COMPONENT                 */
+/*            RESTAURANT CARD COMPONENT              */
 /* -------------------------------------------------- */
 
-const PlaceCard = ({ place }) => {
+const RestaurantCard = ({ restaurant }) => {
   const [isLiked, setIsLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(place?.likes || 0);
+  const [likeCount, setLikeCount] = useState(0);
 
   const { setClickedPlaceHandler } = useContext(PlaceContext);
 
   const handleLike = (e) => {
-    e.stopPropagation(); // prevents card click
+    e.stopPropagation();
     setIsLiked((prev) => !prev);
     setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
   };
@@ -25,15 +25,13 @@ const PlaceCard = ({ place }) => {
       className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl 
       transition-all duration-300 transform hover:-translate-y-1 
       border border-gray-100 flex flex-col h-full cursor-pointer"
-      onClick={() => setClickedPlaceHandler(place)}
+      onClick={() => setClickedPlaceHandler(restaurant)}
     >
-      {/* IMAGE SECTION */}
-      <div className="relative h-56 overflow-hidden">
-        <img
-          src={place?.photos?.[0]?.url || "https://via.placeholder.com/400x300"}
-          alt={place?.name || "Place Image"}
-          className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-        />
+      {/* NO IMAGE → RESTAURANT PLACEHOLDER */}
+      <div className="relative h-56 bg-gradient-to-r from-red-600 to-orange-500 flex items-center justify-center">
+        <h2 className="text-4xl font-extrabold text-white tracking-wider">
+          RESTAURANT
+        </h2>
 
         <div className="absolute top-3 right-3">
           <button
@@ -43,36 +41,60 @@ const PlaceCard = ({ place }) => {
             <Share2 size={18} />
           </button>
         </div>
-
-        <div className="absolute bottom-3 left-3">
-          <span
-            className="bg-black/60 backdrop-blur-md text-white text-xs 
-            px-2 py-1 rounded-md"
-          >
-            Pilgrimage
-          </span>
-        </div>
       </div>
 
       {/* CONTENT SECTION */}
       <div className="p-5 flex flex-col flex-grow">
         <h3 className="font-bold text-xl text-gray-800 line-clamp-1">
-          {place?.name}
+          {restaurant?.title}
         </h3>
 
         <div className="flex items-center text-gray-500 text-sm mt-1">
           <MapPin size={14} className="mr-1" />
-          {place?.location?.address || "Address not available"}
+          {restaurant?.location || "Location not available"}
         </div>
 
         <p className="text-gray-600 text-sm mt-3 mb-4 line-clamp-2 flex-grow">
-          {place?.description || "No description available."}
+          {restaurant?.description || "No description available."}
         </p>
+
+        {/* Restaurant Info Row */}
+        <div className="flex justify-between items-center mb-3 text-sm">
+          <span className="flex items-center font-semibold text-gray-700">
+            <Star size={16} className="text-yellow-400 mr-1" />
+            {restaurant?.rating || "N/A"}
+          </span>
+
+          <span className="flex items-center font-semibold text-gray-700">
+            <Wallet size={16} className="mr-1" />
+            ₹{restaurant?.averageCost || "N/A"}
+          </span>
+        </div>
+
+        {/* Timings */}
+        <div className="flex items-center text-sm text-gray-700 mb-3">
+          <Clock size={14} className="mr-1" />
+          {restaurant?.timings || "Timings not available"}
+        </div>
+
+        {/* Cuisine Tags */}
+        {restaurant?.cuisine?.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {restaurant.cuisine.map((c, i) => (
+              <span
+                key={i}
+                className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* FOOTER */}
         <div className="pt-4 border-t border-gray-100 flex items-center justify-between mt-auto">
           <span className="font-semibold text-sm text-gray-500">
-            {place?.city || "Unknown City"}
+            {restaurant?.subCategory || "Restaurant"}
           </span>
 
           <button
@@ -98,17 +120,18 @@ const PlaceCard = ({ place }) => {
 };
 
 /* -------------------------------------------------- */
-/*                MAIN PLACES GRID                   */
+/*              MAIN RESTAURANTS GRID                */
 /* -------------------------------------------------- */
 
-const Places = () => {
-  const { data, isLoading, isError } = usePlacesQuery();
-  console.log(data,"place data is here ");
+const Restaurants = () => {
+  const { data, isLoading, isError } = useRestaurantsQuery();
+
+  console.log(data, "restaurant data");
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        Loading places...
+        Loading restaurants...
       </div>
     );
   }
@@ -116,12 +139,12 @@ const Places = () => {
   if (isError) {
     return (
       <div className="flex items-center justify-center min-h-screen text-red-500">
-        Failed to load places. Please try again later.
+        Failed to load restaurants. Please try again later.
       </div>
     );
   }
 
-  const places = data?.places || [];
+  const restaurants = data?.restaurants || [];
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -130,22 +153,21 @@ const Places = () => {
       <div className="max-w-7xl mx-auto">
         <div className="mb-10 text-center">
           <h1 className="text-4xl font-extrabold text-gray-900 mb-4">
-            Popular Destinations
+            Best Restaurants
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Explore our curated list of top-rated places around the world.
-            Find your next adventure or relaxing getaway.
+            Discover top-rated restaurants, cafes, and dining spots near you.
           </p>
         </div>
 
-        {places.length === 0 ? (
+        {restaurants.length === 0 ? (
           <div className="text-center text-gray-500">
-            No places found.
+            No restaurants found.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {places.map((place) => (
-              <PlaceCard key={place?.id || place?._id} place={place} />
+            {restaurants.map((restaurant) => (
+              <RestaurantCard key={restaurant?._id} restaurant={restaurant} />
             ))}
           </div>
         )}
@@ -155,5 +177,5 @@ const Places = () => {
 };
 
 export default function App() {
-  return <Places />;
+  return <Restaurants />;
 }

@@ -1,16 +1,17 @@
 import React, { useState, useContext } from "react";
-import { Heart, MapPin, Share2 } from "lucide-react";
+import { Heart, MapPin, Share2, Star } from "lucide-react";
 import Navbar from "../components/Navbar.jsx";
 import { PlaceContext } from "../contextApi/places.jsx";
-import { usePlacesQuery } from "../queries/placeQueries.js";
+import HotelDetails from "./HotelDetails.jsx";
+import { useHotelsQuery } from "../queries/hotelQueries.js"; // <-- your hotel API hook
 
 /* -------------------------------------------------- */
-/*              PLACE CARD COMPONENT                 */
+/*              HOTEL CARD COMPONENT                 */
 /* -------------------------------------------------- */
 
-const PlaceCard = ({ place }) => {
+const HotelCard = ({ hotel }) => {
   const [isLiked, setIsLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(place?.likes || 0);
+  const [likeCount, setLikeCount] = useState(0);
 
   const { setClickedPlaceHandler } = useContext(PlaceContext);
 
@@ -25,15 +26,13 @@ const PlaceCard = ({ place }) => {
       className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl 
       transition-all duration-300 transform hover:-translate-y-1 
       border border-gray-100 flex flex-col h-full cursor-pointer"
-      onClick={() => setClickedPlaceHandler(place)}
+      onClick={() => setClickedPlaceHandler(hotel)}
     >
-      {/* IMAGE SECTION */}
-      <div className="relative h-56 overflow-hidden">
-        <img
-          src={place?.photos?.[0]?.url || "https://via.placeholder.com/400x300"}
-          alt={place?.name || "Place Image"}
-          className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-        />
+      {/* IMAGE REPLACED WITH HOTEL TEXT */}
+      <div className="relative h-56 bg-gray-900 flex items-center justify-center">
+        <h2 className="text-4xl font-extrabold text-white tracking-wider">
+          HOTEL
+        </h2>
 
         <div className="absolute top-3 right-3">
           <button
@@ -43,36 +42,39 @@ const PlaceCard = ({ place }) => {
             <Share2 size={18} />
           </button>
         </div>
-
-        <div className="absolute bottom-3 left-3">
-          <span
-            className="bg-black/60 backdrop-blur-md text-white text-xs 
-            px-2 py-1 rounded-md"
-          >
-            Pilgrimage
-          </span>
-        </div>
       </div>
 
       {/* CONTENT SECTION */}
       <div className="p-5 flex flex-col flex-grow">
         <h3 className="font-bold text-xl text-gray-800 line-clamp-1">
-          {place?.name}
+          {hotel?.title}
         </h3>
 
         <div className="flex items-center text-gray-500 text-sm mt-1">
           <MapPin size={14} className="mr-1" />
-          {place?.location?.address || "Address not available"}
+          {hotel?.location || "Location not available"}
         </div>
 
         <p className="text-gray-600 text-sm mt-3 mb-4 line-clamp-2 flex-grow">
-          {place?.description || "No description available."}
+          {hotel?.description || "No description available."}
         </p>
+
+        {/* Hotel Info Row */}
+        <div className="flex justify-between items-center mb-3 text-sm">
+          <span className="flex items-center font-semibold text-gray-700">
+            <Star size={16} className="text-yellow-400 mr-1" />
+            {hotel?.rating}
+          </span>
+
+          <span className="font-semibold text-gray-700">
+            {hotel?.priceRange}
+          </span>
+        </div>
 
         {/* FOOTER */}
         <div className="pt-4 border-t border-gray-100 flex items-center justify-between mt-auto">
           <span className="font-semibold text-sm text-gray-500">
-            {place?.city || "Unknown City"}
+            {hotel?.subCategory || "Hotel"}
           </span>
 
           <button
@@ -98,17 +100,17 @@ const PlaceCard = ({ place }) => {
 };
 
 /* -------------------------------------------------- */
-/*                MAIN PLACES GRID                   */
+/*                MAIN HOTELS GRID                   */
 /* -------------------------------------------------- */
 
-const Places = () => {
-  const { data, isLoading, isError } = usePlacesQuery();
-  console.log(data,"place data is here ");
+const Hotels = () => {
+  const { data, isLoading, isError } = useHotelsQuery();
+  const { clickedPlace, setClickedPlaceHandler } = useContext(PlaceContext);
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        Loading places...
+        Loading hotels...
       </div>
     );
   }
@@ -116,13 +118,19 @@ const Places = () => {
   if (isError) {
     return (
       <div className="flex items-center justify-center min-h-screen text-red-500">
-        Failed to load places. Please try again later.
+        Failed to load hotels. Please try again later.
       </div>
     );
   }
 
-  const places = data?.places || [];
+  const hotels = data?.hotels || [];
 
+  // 🔥 KEY LOGIC: If a hotel is clicked → show HotelDetails
+  if (clickedPlace) {
+    return <HotelDetails />;
+  }
+
+  // Otherwise show grid
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <Navbar />
@@ -130,22 +138,21 @@ const Places = () => {
       <div className="max-w-7xl mx-auto">
         <div className="mb-10 text-center">
           <h1 className="text-4xl font-extrabold text-gray-900 mb-4">
-            Popular Destinations
+            Luxury Hotels
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Explore our curated list of top-rated places around the world.
-            Find your next adventure or relaxing getaway.
+            Discover top-rated hotels with world-class amenities.
           </p>
         </div>
 
-        {places.length === 0 ? (
+        {hotels.length === 0 ? (
           <div className="text-center text-gray-500">
-            No places found.
+            No hotels found.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {places.map((place) => (
-              <PlaceCard key={place?.id || place?._id} place={place} />
+            {hotels.map((hotel) => (
+              <HotelCard key={hotel?._id} hotel={hotel} />
             ))}
           </div>
         )}
@@ -154,6 +161,7 @@ const Places = () => {
   );
 };
 
+
 export default function App() {
-  return <Places />;
+  return <Hotels />;
 }
