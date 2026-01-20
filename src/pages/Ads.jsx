@@ -1,8 +1,18 @@
-import React, { useState, useContext } from "react";
-import { Heart, Share2, Megaphone, Calendar, Clock, Plus, X, UploadCloud } from "lucide-react";
-import { PlaceContext } from "../contextApi/places.jsx"; // Ensure this path is correct
-import { useAdsQuery } from "../queries/adsQueries.js";   // Ensure this path is correct
+import React, { useState, useContext, useEffect } from "react";
+import {
+  Heart,
+  Share2,
+  Megaphone,
+  Calendar,
+  Clock,
+  Plus,
+  X,
+  UploadCloud,
+} from "lucide-react";
+import { PlaceContext } from "../contextApi/places.jsx";
+import { useAdsQuery } from "../queries/adsQueries.js";
 import AdDetails from "./AdDetails.jsx";
+import { useCreateAdMutation } from "../mutations/adsMutation.js";
 
 /* -------------------------------------------------- */
 /* AD CARD COMPONENT                 */
@@ -24,7 +34,6 @@ const AdCard = ({ ad }) => {
     paused: "bg-yellow-100 text-yellow-700",
     draft: "bg-gray-100 text-gray-700",
     scheduled: "bg-blue-100 text-blue-700",
-    ended: "bg-red-100 text-red-700",
   };
 
   return (
@@ -78,7 +87,9 @@ const AdCard = ({ ad }) => {
 
         <div className="flex items-center text-xs font-medium text-purple-600 bg-purple-50 w-fit px-2 py-1 rounded mb-3">
           <Megaphone size={12} className="mr-1" />
-          {(ad.content?.type || "AD").toUpperCase()}
+          {(ad.content?.type || "ad")
+            .replace(/_/g, " ")
+            .toUpperCase()}
         </div>
 
         {ad.content?.headline && (
@@ -95,8 +106,11 @@ const AdCard = ({ ad }) => {
         <div className="flex justify-between items-center mb-4 text-xs text-gray-500 font-medium">
           <div className="flex items-center bg-gray-50 px-2 py-1 rounded border border-gray-100">
             <Calendar size={12} className="mr-1.5" />
-            {new Date(ad.startDate).toLocaleDateString()}
+            {ad.startDate
+              ? new Date(ad.startDate).toLocaleDateString()
+              : "No start date"}
           </div>
+
           {ad.endDate && (
             <div className="flex items-center bg-gray-50 px-2 py-1 rounded border border-gray-100">
               <Clock size={12} className="mr-1.5" />
@@ -111,12 +125,16 @@ const AdCard = ({ ad }) => {
             <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">
               {ad.content.ctaText}
             </span>
-          ) : <span></span>}
+          ) : (
+            <span></span>
+          )}
 
           <button
             onClick={handleLike}
             className={`flex items-center space-x-1 px-3 py-1.5 rounded-full transition-colors ${
-              isLiked ? "bg-red-50 text-red-500" : "bg-gray-50 text-gray-400 hover:bg-gray-100"
+              isLiked
+                ? "bg-red-50 text-red-500"
+                : "bg-gray-50 text-gray-400 hover:bg-gray-100"
             }`}
           >
             <Heart size={16} className={isLiked ? "fill-current" : ""} />
@@ -136,11 +154,20 @@ const Ads = () => {
   const { data, isLoading, isError } = useAdsQuery();
   const { clickedPlace } = useContext(PlaceContext);
   const [showModal, setShowModal] = useState(false);
+  const[showVideoUpload,setShowVideoUpload] = useState(false);
+  const { mutate: createAd, isPending} = useCreateAdMutation();
 
-  // 1. DEFINE STATE (Renamed from 'form' to 'adForm' to avoid conflicts)
+  // {if(adForm.type === "video_ad"){
+  //   ()=>{
+  //     setShow
+  //   };
+
+  // }}
+
   const [adForm, setAdForm] = useState({
     advertiserName: "",
     name: "",
+    notes: "",
     status: "draft",
     startDate: "",
     endDate: "",
@@ -148,12 +175,16 @@ const Ads = () => {
     headline: "",
     bodyText: "",
     linkUrl: "",
-    ctaText: "Learn More"
+    ctaText: "Learn More",
   });
 
   const [imageFile, setImageFile] = useState(null);
+  const [videoFile, setVideoFile] = useState(null);
 
-  // 2. HANDLE INPUT CHANGES
+  const handleVideoChange = (e) => {
+    setVideoFile(e.target.files[0]);
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setAdForm((prev) => ({ ...prev, [name]: value }));
@@ -165,19 +196,25 @@ const Ads = () => {
     }
   };
 
-  // 3. HANDLE SUBMIT
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     const formData = new FormData();
 
-    // Append Image
+    // 2. APPEND FILES
+    // Important: Backend expects "photos" and "videos" (plural), 
+    // even if you are sending just one file.
     if (imageFile) {
-      formData.append("image", imageFile);
+      formData.append("photos", imageFile); 
     }
 
-    // Prepare Payload
+    if (videoFile) {
+      formData.append("videos", videoFile);
+    }
+
+    // 3. APPEND DATA
     const payload = {
       advertiserName: adForm.advertiserName,
       name: adForm.name,
+      notes: adForm.notes,
       status: adForm.status,
       startDate: adForm.startDate,
       endDate: adForm.endDate,
@@ -190,43 +227,66 @@ const Ads = () => {
       },
     };
 
-    // Append JSON Data
     formData.append("data", JSON.stringify(payload));
 
-    try {
-      console.log("Submitting...", payload);
-      // Replace with your actual backend URL
-      const response = await fetch("http://localhost:5000/api/campaigns/create-or-update", {
-        method: "POST",
-        body: formData,
-      });
+    console.log("Submitting...", payload);
 
-      const result = await response.json();
-      console.log("Response:", result);
-
-      if (result.success) {
+    // 4. TRIGGER THE MUTATION
+    createAd(formData, {
+      onSuccess: (data) => {
+        console.log("Success:", data);
         setShowModal(false);
-        // Reset form if needed
+        
+        // Reset Form
         setAdForm({
-          advertiserName: "", name: "", status: "draft", startDate: "", endDate: "",
-          type: "banner", headline: "", bodyText: "", linkUrl: "", ctaText: "Learn More"
+          advertiserName: "",
+          name: "",
+          notes: "",
+          status: "draft",
+          startDate: "",
+          endDate: "",
+          type: "banner",
+          headline: "",
+          bodyText: "",
+          linkUrl: "",
+          ctaText: "Learn More",
         });
         setImageFile(null);
-      } else {
-        alert("Error: " + result.message);
+        setVideoFile(null);
+        
+        // Optional: Show alert
+        // alert("Campaign created successfully!");
+      },
+      onError: (error) => {
+        console.error("Submission failed:", error);
+        alert(error.response?.data?.message || "Failed to create campaign.");
       }
-    } catch (error) {
-      console.error("Submission failed:", error);
-      alert("Failed to create campaign. Check console.");
-    }
+    });
   };
+useEffect(() => {
+  if (adForm.type === "video_ad") {
+    setShowVideoUpload(true);
+  } else {
+    setShowVideoUpload(false);
+    setVideoFile(null); // clear video if user switches away
+  }
+}, [adForm.type]);
 
-  /* --- RENDER --- */
-  
-  if (isLoading) return <div className="flex justify-center items-center h-screen">Loading ads...</div>;
-  if (isError) return <div className="text-red-500 text-center mt-10">Error loading ads.</div>;
 
-  // Show Details if an ad is clicked
+  if (isLoading)
+    return (
+      <div className="flex justify-center items-center h-screen">
+        Loading ads...
+      </div>
+    );
+
+  if (isError)
+    return (
+      <div className="text-red-500 text-center mt-10">
+        Error loading ads.
+      </div>
+    );
+
   if (clickedPlace) {
     return <AdDetails />;
   }
@@ -235,14 +295,15 @@ const Ads = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative font-sans">
-      
-      {/* HEADER */}
       <div className="max-w-7xl mx-auto mb-10 text-center">
-        <h1 className="text-4xl font-extrabold text-gray-900 mb-2">Ad Campaigns</h1>
-        <p className="text-gray-500">Manage your digital presence across all platforms</p>
+        <h1 className="text-4xl font-extrabold text-gray-900 mb-2">
+          Ad Campaigns
+        </h1>
+        <p className="text-gray-500">
+          Manage your digital presence across all platforms
+        </p>
       </div>
 
-      {/* GRID */}
       <div className="max-w-7xl mx-auto">
         {ads.length === 0 ? (
           <div className="text-center text-gray-500 py-20 bg-white rounded-xl shadow-sm border border-dashed border-gray-300">
@@ -258,7 +319,6 @@ const Ads = () => {
         )}
       </div>
 
-      {/* FLOATING ADD BUTTON */}
       <button
         onClick={() => setShowModal(true)}
         className="fixed bottom-8 right-8 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all z-40"
@@ -266,69 +326,139 @@ const Ads = () => {
         <Plus size={28} />
       </button>
 
-      {/* CREATE AD MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            
-            {/* Modal Header */}
             <div className="flex justify-between items-center p-6 border-b sticky top-0 bg-white z-10">
-              <h2 className="text-2xl font-bold text-gray-800">New Campaign</h2>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
+              <h2 className="text-2xl font-bold text-gray-800">
+                New Campaign
+              </h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
                 <X size={24} />
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-6 space-y-4">
-              
-              {/* Row 1 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Campaign Name</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    Campaign Name
+                  </label>
                   <input
                     name="name"
                     value={adForm.name}
                     onChange={handleChange}
-                    className="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full border border-gray-300 p-2 rounded-lg"
                     placeholder="e.g. Summer Sale"
                   />
                 </div>
+
                 <div>
-                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Advertiser Name</label>
-                   <input
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    Advertiser Name
+                  </label>
+                  <input
                     name="advertiserName"
                     value={adForm.advertiserName}
                     onChange={handleChange}
-                    className="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full border border-gray-300 p-2 rounded-lg"
                     placeholder="e.g. Nike Inc."
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    Notes
+                  </label>
+                  <input
+                    name="notes"
+                    value={adForm.notes}
+                    onChange={handleChange}
+                    className="w-full border border-gray-300 p-2 rounded-lg"
+                    placeholder="Notes (Advertiser Information)."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    Ad Type
+                  </label>
+                  <select
+                    name="type"
+                    value={adForm.type}
+                    onChange={handleChange}
+                    className="w-full border p-2 rounded-lg capitalize"
+                  >
+                    {[
+                      "banner",
+                      "splash_screen",
+                      "text_ad",
+                      "image_card",
+                      "video_ad",
+                    ].map((type) => (
+                      <option key={type} value={type}>
+                        {type.replace(/_/g, " ")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              {/* Row 2: Dates & Status */}
               <div className="grid grid-cols-3 gap-4">
-                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Start Date</label>
-                    <input type="date" name="startDate" value={adForm.startDate} onChange={handleChange} className="w-full border p-2 rounded-lg" />
-                 </div>
-                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">End Date</label>
-                    <input type="date" name="endDate" value={adForm.endDate} onChange={handleChange} className="w-full border p-2 rounded-lg" />
-                 </div>
-                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label>
-                    <select name="status" value={adForm.status} onChange={handleChange} className="w-full border p-2 rounded-lg capitalize">
-                      {['draft', 'active', 'paused', 'scheduled'].map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    name="startDate"
+                    value={adForm.startDate}
+                    onChange={handleChange}
+                    className="w-full border p-2 rounded-lg"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    name="endDate"
+                    value={adForm.endDate}
+                    onChange={handleChange}
+                    className="w-full border p-2 rounded-lg"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    Status
+                  </label>
+                  <select
+                    name="status"
+                    value={adForm.status}
+                    onChange={handleChange}
+                    className="w-full border p-2 rounded-lg capitalize"
+                  >
+                    {["draft", "active", "paused", "scheduled"].map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <hr className="border-gray-100 my-2" />
 
-              {/* Row 3: Content */}
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Headline</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                  Headline
+                </label>
                 <input
                   name="headline"
                   value={adForm.headline}
@@ -339,7 +469,9 @@ const Ads = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Body Text</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                  Body Text
+                </label>
                 <textarea
                   name="bodyText"
                   rows={3}
@@ -352,26 +484,84 @@ const Ads = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">CTA Text</label>
-                  <input name="ctaText" value={adForm.ctaText} onChange={handleChange} className="w-full border p-2 rounded-lg" />
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    CTA Text
+                  </label>
+                  <input
+                    name="ctaText"
+                    value={adForm.ctaText}
+                    onChange={handleChange}
+                    className="w-full border p-2 rounded-lg"
+                  />
                 </div>
+
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Destination URL</label>
-                  <input name="linkUrl" value={adForm.linkUrl} onChange={handleChange} className="w-full border p-2 rounded-lg" placeholder="https://..." />
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    Destination URL
+                  </label>
+                  <input
+                    name="linkUrl"
+                    value={adForm.linkUrl}
+                    onChange={handleChange}
+                    className="w-full border p-2 rounded-lg"
+                    placeholder="https://..."
+                  />
                 </div>
               </div>
 
-              {/* Image Upload */}
               <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-6 text-center">
-                <input type="file" id="adImage" accept="image/*" onChange={handleFileChange} className="hidden" />
-                <label htmlFor="adImage" className="cursor-pointer flex flex-col items-center">
-                  <UploadCloud className="text-blue-500 mb-2" size={32} />
+                <input
+                  type="file"
+                  id="adImage"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="adImage"
+                  className="cursor-pointer flex flex-col items-center"
+                >
+                  <UploadCloud
+                    className="text-blue-500 mb-2"
+                    size={32}
+                  />
                   <span className="text-sm font-semibold text-gray-700">
-                    {imageFile ? imageFile.name : "Click to upload Banner Image"}
+                    {imageFile
+                      ? imageFile.name
+                      : "Click to upload Banner Image"}
                   </span>
-                  <span className="text-xs text-gray-400 mt-1">Supports JPG, PNG</span>
+                  <span className="text-xs text-gray-400 mt-1">
+                    Supports JPG, PNG
+                  </span>
                 </label>
               </div>
+
+              {showVideoUpload && <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-6 text-center mt-4">
+                <input
+                  type="file"
+                  id="adVideo"
+                  accept="video/*"
+                  onChange={handleVideoChange}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="adVideo"
+                  className="cursor-pointer flex flex-col items-center"
+                >
+                  <UploadCloud
+                    className="text-purple-500 mb-2"
+                    size={32}
+                  />
+                  <span className="text-sm font-semibold text-gray-700">
+                    {videoFile
+                      ? videoFile.name
+                      : "Click to upload Video Ad"}
+                  </span>
+                  <span className="text-xs text-gray-400 mt-1">
+                    Supports MP4, MOV
+                  </span>
+                </label>
+              </div>}
 
               <button
                 onClick={handleSubmit}
