@@ -1,13 +1,12 @@
 import React, { useState, useContext } from "react";
-import { Heart, Share2, Megaphone, Calendar, Clock } from "lucide-react";
-import Navbar from "../components/Navbar.jsx";
-import { PlaceContext } from "../contextApi/places.jsx";
-import { useAdsQuery } from "../queries/adsQueries.js"; // change if your hook name is different
+import { Heart, Share2, Megaphone, Calendar, Clock, Plus, X, UploadCloud } from "lucide-react";
+import { PlaceContext } from "../contextApi/places.jsx"; // Ensure this path is correct
+import { useAdsQuery } from "../queries/adsQueries.js";   // Ensure this path is correct
+import AdDetails from "./AdDetails.jsx";
 
 /* -------------------------------------------------- */
-/*                 AD CARD COMPONENT                 */
+/* AD CARD COMPONENT                 */
 /* -------------------------------------------------- */
-
 const AdCard = ({ ad }) => {
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
@@ -35,104 +34,93 @@ const AdCard = ({ ad }) => {
       border border-gray-100 flex flex-col h-full cursor-pointer"
       onClick={() => setClickedPlaceHandler(ad)}
     >
-      {/* IMAGE OR PLACEHOLDER */}
-      <div className="relative h-56 bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center">
+      {/* IMAGE SECTION */}
+      <div className="relative h-56 bg-gray-200 flex items-center justify-center overflow-hidden">
         {ad.content?.imageUrl ? (
           <img
             src={ad.content.imageUrl}
             alt={ad.name}
             className="w-full h-full object-cover"
+            loading="lazy"
+            onError={(e) => {
+              e.target.src = "https://picsum.photos/800/600";
+            }}
           />
         ) : (
-          <h2 className="text-4xl font-extrabold text-white tracking-wider">
-            AD
-          </h2>
+          <div className="text-center text-gray-400 px-4">
+            <Megaphone size={40} className="mx-auto mb-2 opacity-50" />
+            <span className="text-sm font-semibold">No Image</span>
+          </div>
         )}
 
         <div className="absolute top-3 right-3">
-          <button className="p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors text-gray-700">
+          <button className="p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors text-gray-700 shadow-sm">
             <Share2 size={18} />
           </button>
         </div>
 
-        {/* Status badge */}
         <div className="absolute bottom-3 left-3">
           <span
-            className={`px-3 py-1 rounded-full text-xs font-semibold ${
+            className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
               statusColor[ad.status] || "bg-gray-100 text-gray-700"
             }`}
           >
-            {ad.status.toUpperCase()}
+            {ad.status}
           </span>
         </div>
       </div>
 
       {/* CONTENT SECTION */}
       <div className="p-5 flex flex-col flex-grow">
-        <h3 className="font-bold text-xl text-gray-800 line-clamp-1">
+        <h3 className="font-bold text-xl text-gray-900 line-clamp-1 mb-1">
           {ad.name}
         </h3>
 
-        <div className="flex items-center text-sm text-gray-600 mt-1">
-          <Megaphone size={14} className="mr-1 text-purple-500" />
-          {ad.content?.type || "ad"}
+        <div className="flex items-center text-xs font-medium text-purple-600 bg-purple-50 w-fit px-2 py-1 rounded mb-3">
+          <Megaphone size={12} className="mr-1" />
+          {(ad.content?.type || "AD").toUpperCase()}
         </div>
 
         {ad.content?.headline && (
-          <p className="font-semibold text-gray-800 mt-2">
+          <p className="font-bold text-gray-800 text-sm mb-2 line-clamp-1">
             {ad.content.headline}
           </p>
         )}
 
-        <p className="text-gray-600 text-sm mt-2 mb-4 line-clamp-2 flex-grow">
-          {ad.content?.bodyText || "No description available."}
+        <p className="text-gray-600 text-sm mb-4 line-clamp-2 flex-grow leading-relaxed">
+          {ad.content?.bodyText || "No description provided."}
         </p>
 
-        {/* Dates Row */}
-        <div className="flex justify-between items-center mb-3 text-sm text-gray-700">
-          <span className="flex items-center">
-            <Calendar size={14} className="mr-1" />
+        {/* Dates */}
+        <div className="flex justify-between items-center mb-4 text-xs text-gray-500 font-medium">
+          <div className="flex items-center bg-gray-50 px-2 py-1 rounded border border-gray-100">
+            <Calendar size={12} className="mr-1.5" />
             {new Date(ad.startDate).toLocaleDateString()}
-          </span>
-
+          </div>
           {ad.endDate && (
-            <span className="flex items-center">
-              <Clock size={14} className="mr-1" />
+            <div className="flex items-center bg-gray-50 px-2 py-1 rounded border border-gray-100">
+              <Clock size={12} className="mr-1.5" />
               {new Date(ad.endDate).toLocaleDateString()}
-            </span>
+            </div>
           )}
         </div>
 
-        {/* CTA */}
-        {ad.content?.ctaText && (
-          <div className="mb-3">
-            <span className="px-3 py-1 bg-purple-50 text-purple-600 rounded-full text-xs">
-              {ad.content.ctaText}
-            </span>
-          </div>
-        )}
-
         {/* FOOTER */}
         <div className="pt-4 border-t border-gray-100 flex items-center justify-between mt-auto">
-          <span className="font-semibold text-sm text-gray-500">
-            {ad.content?.type || "Advertisement"}
-          </span>
+          {ad.content?.ctaText ? (
+            <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">
+              {ad.content.ctaText}
+            </span>
+          ) : <span></span>}
 
           <button
             onClick={handleLike}
             className={`flex items-center space-x-1 px-3 py-1.5 rounded-full transition-colors ${
-              isLiked
-                ? "bg-red-50 text-red-500"
-                : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+              isLiked ? "bg-red-50 text-red-500" : "bg-gray-50 text-gray-400 hover:bg-gray-100"
             }`}
           >
-            <Heart
-              size={18}
-              className={`transition-all duration-300 ${
-                isLiked ? "fill-red-500 scale-110" : ""
-              }`}
-            />
-            <span className="text-sm font-medium">{likeCount}</span>
+            <Heart size={16} className={isLiked ? "fill-current" : ""} />
+            <span className="text-xs font-bold">{likeCount}</span>
           </button>
         </div>
       </div>
@@ -141,47 +129,125 @@ const AdCard = ({ ad }) => {
 };
 
 /* -------------------------------------------------- */
-/*                 MAIN ADS GRID                     */
+/* MAIN ADS GRID                     */
 /* -------------------------------------------------- */
 
 const Ads = () => {
   const { data, isLoading, isError } = useAdsQuery();
+  const { clickedPlace } = useContext(PlaceContext);
+  const [showModal, setShowModal] = useState(false);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        Loading ads...
-      </div>
-    );
+  // 1. DEFINE STATE (Renamed from 'form' to 'adForm' to avoid conflicts)
+  const [adForm, setAdForm] = useState({
+    advertiserName: "",
+    name: "",
+    status: "draft",
+    startDate: "",
+    endDate: "",
+    type: "banner",
+    headline: "",
+    bodyText: "",
+    linkUrl: "",
+    ctaText: "Learn More"
+  });
+
+  const [imageFile, setImageFile] = useState(null);
+
+  // 2. HANDLE INPUT CHANGES
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setAdForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setImageFile(e.target.files[0]);
+    }
+  };
+
+  // 3. HANDLE SUBMIT
+  const handleSubmit = async () => {
+    const formData = new FormData();
+
+    // Append Image
+    if (imageFile) {
+      formData.append("image", imageFile);
+    }
+
+    // Prepare Payload
+    const payload = {
+      advertiserName: adForm.advertiserName,
+      name: adForm.name,
+      status: adForm.status,
+      startDate: adForm.startDate,
+      endDate: adForm.endDate,
+      content: {
+        type: adForm.type,
+        headline: adForm.headline,
+        bodyText: adForm.bodyText,
+        linkUrl: adForm.linkUrl,
+        ctaText: adForm.ctaText,
+      },
+    };
+
+    // Append JSON Data
+    formData.append("data", JSON.stringify(payload));
+
+    try {
+      console.log("Submitting...", payload);
+      // Replace with your actual backend URL
+      const response = await fetch("http://localhost:5000/api/campaigns/create-or-update", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+      console.log("Response:", result);
+
+      if (result.success) {
+        setShowModal(false);
+        // Reset form if needed
+        setAdForm({
+          advertiserName: "", name: "", status: "draft", startDate: "", endDate: "",
+          type: "banner", headline: "", bodyText: "", linkUrl: "", ctaText: "Learn More"
+        });
+        setImageFile(null);
+      } else {
+        alert("Error: " + result.message);
+      }
+    } catch (error) {
+      console.error("Submission failed:", error);
+      alert("Failed to create campaign. Check console.");
+    }
+  };
+
+  /* --- RENDER --- */
+  
+  if (isLoading) return <div className="flex justify-center items-center h-screen">Loading ads...</div>;
+  if (isError) return <div className="text-red-500 text-center mt-10">Error loading ads.</div>;
+
+  // Show Details if an ad is clicked
+  if (clickedPlace) {
+    return <AdDetails />;
   }
 
-  if (isError) {
-    return (
-      <div className="flex items-center justify-center min-h-screen text-red-500">
-        Failed to load ads. Please try again later.
-      </div>
-    );
-  }
-
-  const ads = data?.ads || [];
+  const ads = data?.ads ?? [];
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Navbar />
+    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative font-sans">
+      
+      {/* HEADER */}
+      <div className="max-w-7xl mx-auto mb-10 text-center">
+        <h1 className="text-4xl font-extrabold text-gray-900 mb-2">Ad Campaigns</h1>
+        <p className="text-gray-500">Manage your digital presence across all platforms</p>
+      </div>
 
+      {/* GRID */}
       <div className="max-w-7xl mx-auto">
-        <div className="mb-10 text-center">
-          <h1 className="text-4xl font-extrabold text-gray-900 mb-4">
-            Advertisements
-          </h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Manage active, scheduled, and draft ad campaigns.
-          </p>
-        </div>
-
         {ads.length === 0 ? (
-          <div className="text-center text-gray-500">
-            No ads found.
+          <div className="text-center text-gray-500 py-20 bg-white rounded-xl shadow-sm border border-dashed border-gray-300">
+            <Megaphone className="mx-auto text-gray-300 mb-4" size={48} />
+            <p>No campaigns found. Create your first one!</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -191,6 +257,132 @@ const Ads = () => {
           </div>
         )}
       </div>
+
+      {/* FLOATING ADD BUTTON */}
+      <button
+        onClick={() => setShowModal(true)}
+        className="fixed bottom-8 right-8 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all z-40"
+      >
+        <Plus size={28} />
+      </button>
+
+      {/* CREATE AD MODAL */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-6 border-b sticky top-0 bg-white z-10">
+              <h2 className="text-2xl font-bold text-gray-800">New Campaign</h2>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              
+              {/* Row 1 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Campaign Name</label>
+                  <input
+                    name="name"
+                    value={adForm.name}
+                    onChange={handleChange}
+                    className="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="e.g. Summer Sale"
+                  />
+                </div>
+                <div>
+                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Advertiser Name</label>
+                   <input
+                    name="advertiserName"
+                    value={adForm.advertiserName}
+                    onChange={handleChange}
+                    className="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="e.g. Nike Inc."
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Dates & Status */}
+              <div className="grid grid-cols-3 gap-4">
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Start Date</label>
+                    <input type="date" name="startDate" value={adForm.startDate} onChange={handleChange} className="w-full border p-2 rounded-lg" />
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">End Date</label>
+                    <input type="date" name="endDate" value={adForm.endDate} onChange={handleChange} className="w-full border p-2 rounded-lg" />
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label>
+                    <select name="status" value={adForm.status} onChange={handleChange} className="w-full border p-2 rounded-lg capitalize">
+                      {['draft', 'active', 'paused', 'scheduled'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                 </div>
+              </div>
+
+              <hr className="border-gray-100 my-2" />
+
+              {/* Row 3: Content */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Headline</label>
+                <input
+                  name="headline"
+                  value={adForm.headline}
+                  onChange={handleChange}
+                  className="w-full border p-2 rounded-lg font-bold"
+                  placeholder="Catchy Title"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Body Text</label>
+                <textarea
+                  name="bodyText"
+                  rows={3}
+                  value={adForm.bodyText}
+                  onChange={handleChange}
+                  className="w-full border p-2 rounded-lg resize-none"
+                  placeholder="Main ad copy..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">CTA Text</label>
+                  <input name="ctaText" value={adForm.ctaText} onChange={handleChange} className="w-full border p-2 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Destination URL</label>
+                  <input name="linkUrl" value={adForm.linkUrl} onChange={handleChange} className="w-full border p-2 rounded-lg" placeholder="https://..." />
+                </div>
+              </div>
+
+              {/* Image Upload */}
+              <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-6 text-center">
+                <input type="file" id="adImage" accept="image/*" onChange={handleFileChange} className="hidden" />
+                <label htmlFor="adImage" className="cursor-pointer flex flex-col items-center">
+                  <UploadCloud className="text-blue-500 mb-2" size={32} />
+                  <span className="text-sm font-semibold text-gray-700">
+                    {imageFile ? imageFile.name : "Click to upload Banner Image"}
+                  </span>
+                  <span className="text-xs text-gray-400 mt-1">Supports JPG, PNG</span>
+                </label>
+              </div>
+
+              <button
+                onClick={handleSubmit}
+                className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition-all transform active:scale-95"
+              >
+                Create Campaign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
