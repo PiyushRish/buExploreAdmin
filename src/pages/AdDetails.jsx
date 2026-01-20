@@ -1,7 +1,7 @@
 import React, { useState, useContext, useRef } from "react";
 import {
   Megaphone, Heart, Share2, Save, Edit2,
-  ArrowLeft, Calendar, ImageIcon, UploadCloud, X
+  ArrowLeft, Calendar, ImageIcon, UploadCloud, X,Trash2
 } from "lucide-react";
 
 import { PlaceContext } from "../contextApi/places.jsx";
@@ -119,6 +119,15 @@ const AdDetails = () => {
           >
             <ArrowLeft size={20} className="mr-2" /> Back to Dashboard
           </button>
+
+          <button
+              className="flex items-center px-4 py-2 rounded-lg bg-red-50 text-red-600 
+                         hover:bg-red-100 transition-colors border border-red-200"
+              onClick={() => setShowDeleteModal(true)}
+            >
+              <Trash2 size={16} className="mr-2" />
+              Delete
+            </button>
 
           <button
             onClick={isEditing ? handleSave : toggleEdit}

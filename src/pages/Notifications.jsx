@@ -1,8 +1,10 @@
 import React, { useState } from "react";
-import { Bell, Plus, X, Send, Image, Link, User } from "lucide-react";
-import Navbar from "../components/Navbar.jsx";
-import { useNotificationsQuery } from "../queries/notificationQueries.js"; 
-// adjust hook names to match your project
+import { 
+  Bell, Plus, X, Send, User, Trash2, 
+  Search, Filter, Calendar, ExternalLink, BellOff 
+} from "lucide-react";
+import { useNotificationsQuery } from "../queries/notificationQueries.js";
+import { useDeleteNotification, useSendNotification } from "../mutations/notificationMutation.js";
 
 const typeColors = {
   SYSTEM: "bg-blue-100 text-blue-700",
@@ -14,17 +16,22 @@ const typeColors = {
 };
 
 const Notifications = () => {
+  // 1. FIX: Hooks must be at the top level
   const { data, isLoading, isError } = useNotificationsQuery();
-  console.table(data,"notificaiton data")
-//   const createNotification = useCreateNotification();
+  const sendNotification = useSendNotification();
+  const deleteNotification = useDeleteNotification(); // Get the delete function here
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // 2. FIX: Add state to track which ID we are deleting
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteId, setDeleteId] = useState(null); 
+  
   const [form, setForm] = useState({
     title: "",
     message: "",
     type: "SYSTEM",
     image: "",
-    link: "",
     user: "", // empty = broadcast
   });
 
@@ -32,15 +39,39 @@ const Notifications = () => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  // 3. FIX: New function to handle the actual deletion confirmation
+  const confirmDelete = () => {
+    if (!deleteId) return;
+
+    deleteNotification.mutate(deleteId, {
+      onSuccess: () => {
+        setShowDeleteModal(false);
+        setDeleteId(null);
+      },
+      onError: (err) => {
+        console.error(err);
+        alert("Failed to delete");
+      }
+    });
+  };
+
+  // Helper to open the modal and save the ID
+  const openDeleteModal = (id) => {
+    setDeleteId(id);
+    setShowDeleteModal(true);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
     const payload = {
-      ...form,
-      user: form.user || null, // null = broadcast
+      title: form.title,
+      message: form.message,
+      type: form.type,
+      userIds: form.user ? [form.user.trim()] : [],
     };
 
-    createNotification.mutate(payload, {
+    sendNotification.mutate(payload, {
       onSuccess: () => {
         setIsModalOpen(false);
         setForm({
@@ -48,7 +79,6 @@ const Notifications = () => {
           message: "",
           type: "SYSTEM",
           image: "",
-          link: "",
           user: "",
         });
       },
@@ -71,12 +101,10 @@ const Notifications = () => {
     );
   }
 
-const notifications = data?.data || [];
+  const notifications = data?.data || [];
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative">
-      <Navbar />
-
       <div className="max-w-5xl mx-auto">
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-extrabold text-gray-900 mb-2">
@@ -99,7 +127,6 @@ const notifications = data?.data || [];
                 key={n._id}
                 className="bg-white rounded-xl shadow p-4 flex gap-4 items-start"
               >
-                {/* Optional Image */}
                 {n.image && (
                   <img
                     src={n.image}
@@ -112,13 +139,25 @@ const notifications = data?.data || [];
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-lg">{n.title}</h3>
 
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        typeColors[n.type] || typeColors.GENERAL
-                      }`}
-                    >
-                      {n.type}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <span
+                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            typeColors[n.type] || typeColors.GENERAL
+                        }`}
+                        >
+                        {n.type}
+                        </span>
+                        
+                        {/* 4. FIX: Use openDeleteModal instead of calling hook directly */}
+                        <button
+                        className="flex items-center px-4 py-2 rounded-lg bg-red-50 text-red-600 
+                                    hover:bg-red-100 transition-colors border border-red-200"
+                        onClick={() => openDeleteModal(n._id)}
+                        >
+                        <Trash2 size={16} className="mr-2" />
+                        Delete
+                        </button>
+                    </div>
                   </div>
 
                   <p className="text-gray-600 mt-1">{n.message}</p>
@@ -160,7 +199,7 @@ const notifications = data?.data || [];
         <Plus size={24} />
       </button>
 
-      {/* Add Notification Modal */}
+      {/* Add Notification Modal - YOUR ORIGINAL UI */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-xl">
@@ -212,28 +251,6 @@ const notifications = data?.data || [];
               </select>
 
               <div className="flex items-center gap-2">
-                <Image size={16} />
-                <input
-                  name="image"
-                  placeholder="Image URL (optional)"
-                  value={form.image}
-                  onChange={handleChange}
-                  className="w-full p-2 border rounded"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Link size={16} />
-                <input
-                  name="link"
-                  placeholder="Redirect Link (optional)"
-                  value={form.link}
-                  onChange={handleChange}
-                  className="w-full p-2 border rounded"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
                 <User size={16} />
                 <input
                   name="user"
@@ -246,13 +263,46 @@ const notifications = data?.data || [];
 
               <button
                 type="submit"
+                disabled={sendNotification.isPending}
                 className="w-full bg-blue-600 text-white py-2 rounded-lg flex items-center justify-center gap-2"
               >
                 <Send size={16} />
-                Send Notification
+                {sendNotification.isPending
+                  ? "Sending..."
+                  : "Send Notification"}
               </button>
+
+              {sendNotification.isError && (
+                <p className="text-red-500 text-sm text-center">
+                  Failed to send notification
+                </p>
+              )}
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal - ADDED TO HANDLE DELETE LOGIC */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-xl max-w-sm w-full shadow-2xl">
+                <h3 className="text-lg font-bold text-gray-900">Delete Notification?</h3>
+                <p className="text-gray-500 mt-2 text-sm">This action cannot be undone.</p>
+                <div className="flex gap-3 mt-6">
+                    <button 
+                        onClick={() => setShowDeleteModal(false)} 
+                        className="flex-1 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        onClick={confirmDelete} 
+                        className="flex-1 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 font-medium"
+                    >
+                        {deleteNotification.isPending ? "Deleting..." : "Delete"}
+                    </button>
+                </div>
+            </div>
         </div>
       )}
     </div>

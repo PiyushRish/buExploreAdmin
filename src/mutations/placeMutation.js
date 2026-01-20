@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { deletePlace } from "../api/places.api.js";
-import { addPlace } from "../api/places.api.js";
+import { deletePlace, addPlace,updatePlace } from "../api/places.api.js";
 export const useDeletePlaceMutation = () => {
   const queryClient = useQueryClient();
 
@@ -39,3 +38,26 @@ export const useAddPlaceMutation = () => {
     },
   });
 };
+
+
+
+
+export const useUpdatePlaceMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (formData) => updatePlace(formData),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["places"] });
+      queryClient.invalidateQueries({ queryKey: ["places", "category"] });
+      queryClient.invalidateQueries({ queryKey: ["places", "search"] });
+    },
+
+    onError: (error) => {
+      console.error("Add place failed:", error);
+    },
+  });
+};
+
+

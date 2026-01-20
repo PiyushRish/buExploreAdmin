@@ -33,3 +33,19 @@ export const addPlace = async (formData) => {
   );
   return res.data;
 };
+
+export const updatePlace = async ({ id, formData }) => {
+  const res = await axiosClient.patch(
+    `/places/${id}`,   // ✅ ID IN URL
+    formData,
+    { 
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      timeout: 60000 
+    }
+  );
+  return res.data;
+};
+
+

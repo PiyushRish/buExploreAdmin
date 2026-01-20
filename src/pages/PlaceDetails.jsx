@@ -5,20 +5,18 @@ import {
 } from "lucide-react";
 
 import { PlaceContext } from "../contextApi/places.jsx";
-// import { useDeletePlaceMutation } from "../queries/places.mutations.js"; // <-- IMPORTANT
-import { useDeletePlaceMutation } from "../mutations/placeMutation.js";
+import { useDeletePlaceMutation, useUpdatePlaceMutation } from "../mutations/placeMutation.js";
 
 const PlaceDetails = () => {
   const { clickedPlace, setClickedPlaceHandler } = useContext(PlaceContext);
-
   if (!clickedPlace) return null;
 
   const [data, setData] = useState(clickedPlace);
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // React Query delete mutation
   const deletePlaceMutation = useDeletePlaceMutation();
+  const updatePlaceMutation = useUpdatePlaceMutation();
 
   // -------- VIDEO STATES --------
   const [ytLink, setYtLink] = useState(clickedPlace.ytVideoLink || "");
@@ -27,7 +25,7 @@ const PlaceDetails = () => {
     clickedPlace.videos?.[0]?.url || null
   );
 
-  // -------- PHOTO UPLOAD STATES --------
+  // -------- PHOTO STATES --------
   const [photoFiles, setPhotoFiles] = useState([]);
 
   const handleChange = (e) => {
@@ -41,11 +39,10 @@ const PlaceDetails = () => {
     }));
   };
 
-  // -------- VIDEO DRAG & DROP (KEPT EXACTLY AS YOU HAD) --------
+  // -------- VIDEO HANDLERS --------
   const handleVideoDrop = (e) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-
     if (file && file.type.startsWith("video/")) {
       setVideoFile(file);
       setVideoPreview(URL.createObjectURL(file));
@@ -60,7 +57,7 @@ const PlaceDetails = () => {
     }
   };
 
-  // -------- PHOTO DRAG & DROP (UNCHANGED) --------
+  // -------- PHOTO HANDLERS --------
   const handlePhotoDrop = (e) => {
     e.preventDefault();
     const files = Array.from(e.dataTransfer.files).filter(file =>
@@ -119,13 +116,87 @@ const PlaceDetails = () => {
     setData(prev => ({ ...prev, photos: updated }));
   };
 
-  const toggleEdit = () => setIsEditing(p => !p);
+  // -------- PARTIAL DIFF LOGIC --------
+  const getChangedFields = () => {
+    const changes = {};
+
+    if (data.name !== clickedPlace.name) changes.name = data.name;
+    if (data.description !== clickedPlace.description)
+      changes.description = data.description;
+    if (data.category !== clickedPlace.category)
+      changes.category = data.category;
+    if (data.city !== clickedPlace.city)
+      changes.city = data.city;
+    if (Number(data.likes) !== Number(clickedPlace.likes))
+      changes.likes = Number(data.likes);
+
+    if (ytLink !== clickedPlace.ytVideoLink)
+      changes.ytVideoLink = ytLink;
+
+    if (data.location?.address !== clickedPlace.location?.address) {
+      changes.location = {
+        ...clickedPlace.location,
+        address: data.location.address,
+      };
+    }
+
+    const currentPhotoUrls = data.photos.map(p => p.url).sort();
+    const originalPhotoUrls = (clickedPlace.photos || [])
+      .map(p => p.url)
+      .sort();
+
+    if (JSON.stringify(currentPhotoUrls) !== JSON.stringify(originalPhotoUrls)) {
+      changes.photos = data.photos.map(p => ({ url: p.url }));
+    }
+
+    return changes;
+  };
+
+  // -------- SAVE (ONLY CHANGED FIELDS) --------
+  const handleSave = async () => {
+    try {
+      const changes = getChangedFields();
+
+      if (
+        Object.keys(changes).length === 0 &&
+        !videoFile &&
+        photoFiles.length === 0
+      ) {
+        setIsEditing(false);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("data", JSON.stringify(changes));
+
+      photoFiles.forEach(file => {
+        formData.append("placePhoto", file);
+      });
+
+      if (videoFile) {
+        formData.append("placeVideo", videoFile);
+      }
+
+      await updatePlaceMutation.mutateAsync({
+        id: data._id,
+        formData,
+      });
+
+      setIsEditing(false);
+      console.log("Updated only changed fields:", changes);
+    } catch (err) {
+      console.error("Update failed:", err);
+    }
+  };
+
+  const toggleEdit = () => {
+    if (isEditing) handleSave();
+    else setIsEditing(true);
+  };
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* LEFT SIDE */}
       <div className="w-[70%] h-full flex flex-col bg-white border-r">
-
         {/* HEADER */}
         <div className="h-16 border-b px-8 flex items-center justify-between">
           <button
@@ -135,11 +206,9 @@ const PlaceDetails = () => {
             <ArrowLeft size={20} className="mr-2" /> Back
           </button>
 
-          {/* EDIT + DELETE BUTTON GROUP */}
           <div className="flex items-center gap-3">
             <button
-              className="flex items-center px-4 py-2 rounded-lg bg-red-50 text-red-600 
-                         hover:bg-red-100 transition-colors border border-red-200"
+              className="flex items-center px-4 py-2 rounded-lg bg-red-50 text-red-600 border border-red-200"
               onClick={() => setShowDeleteModal(true)}
             >
               <Trash2 size={16} className="mr-2" />
@@ -148,15 +217,15 @@ const PlaceDetails = () => {
 
             <button
               onClick={toggleEdit}
+              disabled={updatePlaceMutation.isLoading}
               className={`flex items-center px-4 py-2 rounded-lg ${
-                isEditing
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700"
+                isEditing ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700"
               }`}
             >
               {isEditing ? (
                 <>
-                  <Save size={16} className="mr-2" /> Save
+                  <Save size={16} className="mr-2" />
+                  {updatePlaceMutation.isLoading ? "Saving..." : "Save"}
                 </>
               ) : (
                 <>
@@ -199,42 +268,8 @@ const PlaceDetails = () => {
             </div>
           )}
 
-          {/* META BADGES */}
-          <div className="flex gap-3 mt-6">
-            {isEditing ? (
-              <>
-                <input
-                  name="category"
-                  value={data.category}
-                  onChange={handleChange}
-                  className="px-3 py-1 border rounded-full text-sm"
-                />
-                <input
-                  name="city"
-                  value={data.city}
-                  onChange={handleChange}
-                  className="px-3 py-1 border rounded-full text-sm"
-                />
-              </>
-            ) : (
-              <>
-                <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-sm">
-                  {data.category}
-                </span>
-                <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
-                  {data.city}
-                </span>
-              </>
-            )}
-          </div>
-
           {/* LIKES */}
           <div className="mt-8 bg-white p-4 rounded-2xl border shadow-sm w-40 text-center">
-            <div className="p-3 rounded-full bg-red-50 mb-2 inline-block">
-              <Heart size={22} className="text-red-500" />
-            </div>
-            <p className="text-xs text-gray-500">Likes</p>
-
             {isEditing ? (
               <input
                 name="likes"
@@ -249,15 +284,10 @@ const PlaceDetails = () => {
 
           {/* YOUTUBE LINK */}
           <div className="mt-8 bg-gray-50 p-4 rounded-xl">
-            <label className="text-xs text-gray-500 font-bold">
-              YouTube Video Link
-            </label>
-
             {isEditing ? (
               <input
                 value={ytLink}
                 onChange={(e) => setYtLink(e.target.value)}
-                placeholder="https://youtube.com/..."
                 className="w-full mt-2 p-2 border rounded"
               />
             ) : (
@@ -267,7 +297,6 @@ const PlaceDetails = () => {
 
           {/* DESCRIPTION */}
           <div className="mt-10">
-            <h3 className="text-xl font-bold">About</h3>
             {isEditing ? (
               <textarea
                 name="description"
@@ -283,7 +312,7 @@ const PlaceDetails = () => {
             )}
           </div>
 
-          {/* PHOTO GALLERY (UNCHANGED) */}
+          {/* PHOTO UPLOADER */}
           <div className="mt-10">
             <h3 className="text-xl font-bold mb-3">Photos</h3>
 
@@ -320,12 +349,11 @@ const PlaceDetails = () => {
                       value={p.url}
                       onChange={(e) => updatePhoto(i, e.target.value)}
                       className="w-full border p-1 text-xs mb-1"
-                      placeholder="Paste image URL"
                     />
                   )}
 
                   <img
-                    src={p.url || "https://via.placeholder.com/400x300"}
+                    src={p.url}
                     alt={`photo-${i}`}
                     className="w-full h-40 object-cover rounded-xl"
                   />
@@ -343,7 +371,7 @@ const PlaceDetails = () => {
             </div>
           </div>
 
-          {/* CLOUDINARY VIDEO (YOUR ORIGINAL SECTION — KEPT) */}
+          {/* VIDEO UPLOADER */}
           <div className="mt-10 bg-gray-50 p-4 rounded-xl">
             <label className="text-xs text-gray-500 font-bold">
               Upload Video (Cloudinary)
@@ -383,34 +411,28 @@ const PlaceDetails = () => {
               </div>
             )}
           </div>
-
         </div>
       </div>
 
       {/* RIGHT VIDEO PREVIEW */}
       <div className="w-[30%] bg-black">
         <VideoPlayer
-          src={videoPreview || data.videos[0].url}
+          src={videoPreview || data.videos?.[0]?.url}
           title={data.name}
           location={data.location.address}
           likes={data.likes}
         />
       </div>
 
-      {/* DELETE MODAL (ADDED — DOES NOT REMOVE ANYTHING ELSE) */}
+      {/* DELETE MODAL */}
       {showDeleteModal && (
         <DeleteModal
           placeName={data.name}
           onClose={() => setShowDeleteModal(false)}
           onConfirm={async () => {
-            try {
-              console.log("data id for deletion",data._id)
-              await deletePlaceMutation.mutateAsync(data._id);
-              setShowDeleteModal(false);
-              setClickedPlaceHandler(null);
-            } catch (err) {
-              console.error("Delete failed:", err);
-            }
+            await deletePlaceMutation.mutateAsync(data._id);
+            setShowDeleteModal(false);
+            setClickedPlaceHandler(null);
           }}
         />
       )}
@@ -418,40 +440,27 @@ const PlaceDetails = () => {
   );
 };
 
-/* -------- DELETE MODAL (NEW) -------- */
-const DeleteModal = ({ onClose, onConfirm, placeName }) => {
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 w-[400px] shadow-xl">
-        <h2 className="text-xl font-bold text-gray-900">Confirm Delete</h2>
-
-        <p className="mt-3 text-gray-600">
-          Are you sure you want to delete{" "}
-          <span className="font-semibold text-black">{placeName}</span>?  
-          This action cannot be undone.
-        </p>
-
-        <div className="flex justify-end gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg border text-gray-700 hover:bg-gray-100"
-          >
-            Cancel
-          </button>
-
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
-          >
-            Delete
-          </button>
-        </div>
+/* -------- DELETE MODAL -------- */
+const DeleteModal = ({ onClose, onConfirm, placeName }) => (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-xl p-6 w-[400px] shadow-xl">
+      <h2 className="text-xl font-bold">Confirm Delete</h2>
+      <p className="mt-3">
+        Are you sure you want to delete <b>{placeName}</b>?
+      </p>
+      <div className="flex justify-end gap-3 mt-6">
+        <button onClick={onClose} className="px-4 py-2 border rounded">
+          Cancel
+        </button>
+        <button onClick={onConfirm} className="px-4 py-2 bg-red-600 text-white rounded">
+          Delete
+        </button>
       </div>
     </div>
-  );
-};
+  </div>
+);
 
-/* -------- VIDEO PLAYER (UNCHANGED) -------- */
+/* -------- VIDEO PLAYER -------- */
 const VideoPlayer = ({ src, title, location, likes }) => {
   const videoRef = useRef(null);
   const [play, setPlay] = useState(true);
@@ -461,59 +470,15 @@ const VideoPlayer = ({ src, title, location, likes }) => {
     videoRef.current?.play().catch(() => {});
   }, [src]);
 
-  const togglePlay = () => {
-    if (!videoRef.current) return;
-    if (videoRef.current.paused) {
-      videoRef.current.play();
-      setPlay(true);
-    } else {
-      videoRef.current.pause();
-      setPlay(false);
-    }
-  };
-
   return (
-    <div className="relative w-full h-full" onClick={togglePlay}>
-      <video
-        ref={videoRef}
-        src={src}
-        muted={muted}
-        loop
-        playsInline
-        className="w-full h-full object-cover"
-      />
-
-      {!play && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-          <Play size={40} className="text-white" />
-        </div>
-      )}
-
+    <div className="relative w-full h-full">
+      <video ref={videoRef} src={src} muted={muted} loop className="w-full h-full" />
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setMuted((m) => !m);
-        }}
-        className="absolute top-4 right-4 p-2 bg-black/40 rounded-full text-white"
+        onClick={() => setMuted(m => !m)}
+        className="absolute top-4 right-4 p-2 bg-black/40 text-white rounded-full"
       >
-        {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+        {muted ? <VolumeX /> : <Volume2 />}
       </button>
-
-      <div className="absolute bottom-0 p-6 text-white bg-gradient-to-t from-black/80 via-black/30 to-transparent">
-        <h2 className="text-2xl font-bold">{title}</h2>
-        <p className="text-sm text-gray-200">{location}</p>
-
-        <div className="absolute right-6 bottom-20 flex flex-col items-center space-y-4">
-          <div className="bg-black/40 p-3 rounded-full">
-            <Heart size={26} className="text-red-500" />
-          </div>
-          <span className="text-sm">{likes}</span>
-
-          <div className="bg-black/40 p-3 rounded-full">
-            <Share2 size={22} />
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

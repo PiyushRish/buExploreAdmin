@@ -18,3 +18,11 @@ export const useCreateAdMutation = () => {
     },
   });
 };
+
+
+export const useUpdateAdMutation = () =>{
+
+}
+export const useDeleteAdMutation = () =>{
+  
+}
