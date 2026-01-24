@@ -9,6 +9,9 @@ import { PlaceContext } from "../contextApi/places.jsx";
 const AdDetails = () => {
   const { clickedPlace: clickedAd, setClickedPlaceHandler } = useContext(PlaceContext);
 
+
+  console.log("Clicked Ad:", clickedAd);
+
   if (!clickedAd) return null;
 
   const [data, setData] = useState(clickedAd);

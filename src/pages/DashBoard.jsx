@@ -14,6 +14,9 @@ import Ads from "./Ads.jsx";                    // NEW
 import Notifications from "./Notifications.jsx"; // NEW
 import PlaceDetails from "./PlaceDetails.jsx";
 import { PlaceContext } from "../contextApi/places.jsx";
+// import TestimonialsAdmin from "./TestimonialAdmin.jsx";
+// import ExperiencesFeed from "./TestimonialAdmin.jsx";
+import TestimonialsPage from "./TestimonialAdmin.jsx";
 
 const DashBoard = () => {
   const [activeTab, setActiveTab] = useState("Places");
@@ -201,7 +204,7 @@ const DashBoard = () => {
 
         {activeTab === "Testimonials" && (
           <div className="bg-white rounded-2xl shadow p-4 h-full">
-            <Testimonials />
+            <TestimonialsPage />
           </div>
         )}
 
