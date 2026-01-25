@@ -7,13 +7,12 @@ import {
   Plus, 
   X, 
   Upload, 
-  Trash2, 
   Globe, 
   Phone, 
   Mail, 
   ChevronDown 
 } from "lucide-react";
-import Navbar from "../components/Navbar.jsx";
+import Navbar from "../components/Navbar.jsx"; // Assuming Navbar is here
 import { PlaceContext } from "../contextApi/places.jsx";
 import HotelDetails from "./HotelDetails.jsx";
 import { useHotelsQuery } from "../queries/hotelQueries.js";
@@ -34,6 +33,11 @@ const HotelCard = ({ hotel }) => {
     setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
   };
 
+  // Helper to safely get the first image URL
+  // Checks if photos exists, then checks if it's an object with .url or just a string
+  const imageUrl = hotel?.photos?.[0]?.url || hotel?.photos?.[0];
+  const displayImage = imageUrl || "https://via.placeholder.com/400x300?text=No+Image";
+
   return (
     <div
       className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl 
@@ -42,13 +46,19 @@ const HotelCard = ({ hotel }) => {
       onClick={() => setClickedPlaceHandler(hotel)}
     >
       <div className="relative h-56 bg-gray-900 flex items-center justify-center overflow-hidden">
-        {/* Placeholder gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10" />
-        <h2 className="text-4xl font-extrabold text-white tracking-wider z-20 relative">
-          HOTEL
-        </h2>
         
-        <div className="absolute top-3 right-3 z-30">
+        {/* --- REAL PHOTO LOGIC --- */}
+        <img
+          src={displayImage}
+          alt={hotel?.title || "Hotel Image"}
+          className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+        />
+        
+        {/* Gradient Overlay (Makes text/icons readable) */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent z-10" />
+
+        {/* Share Button (Above image and gradient) */}
+        <div className="absolute top-3 right-3 z-20">
           <button className="p-2 bg-white/20 backdrop-blur-md text-white rounded-full hover:bg-white hover:text-gray-900 transition-colors">
             <Share2 size={18} />
           </button>
@@ -116,17 +126,17 @@ const Hotels = () => {
   const [showModal, setShowModal] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Expanded Form State matching the JSON structure
+  // Form State
   const [form, setForm] = useState({
     title: "",
-    subCategory: "Hotels", // Default value for dropdown
+    subCategory: "Hotels",
     priceRange: "",
     rating: "",
     description: "",
     location: "",
     distanceFromCenter: "",
-    amenities: "", // Will parse string to array on submit
-    roomTypes: "", // Will parse string to array on submit
+    amenities: "", 
+    roomTypes: "", 
     contact: {
       phone: "",
       email: "",
@@ -136,12 +146,10 @@ const Hotels = () => {
 
   const [photoFiles, setPhotoFiles] = useState([]);
 
-  // Handle regular inputs
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // Handle nested contact inputs
   const handleContactChange = (e) => {
     setForm({
         ...form,
@@ -152,16 +160,12 @@ const Hotels = () => {
     });
   };
 
-  // Handle Image Selection with Limit
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
-    
-    // Check limit
     if (photoFiles.length + files.length > 4) {
         alert("You can only upload a maximum of 4 images.");
         return;
     }
-
     setPhotoFiles((prev) => [...prev, ...files]);
   };
 
@@ -172,7 +176,7 @@ const Hotels = () => {
   const handleSubmit = async () => {
     const formData = new FormData();
 
-    // Append regular fields
+    // 1. Append regular fields
     formData.append("title", form.title);
     formData.append("subCategory", form.subCategory);
     formData.append("priceRange", form.priceRange);
@@ -181,27 +185,31 @@ const Hotels = () => {
     formData.append("location", form.location);
     formData.append("distanceFromCenter", form.distanceFromCenter);
     
-    // Convert comma-separated strings to arrays
-    const amenitiesArray = form.amenities.split(',').map(item => item.trim());
-    const roomTypesArray = form.roomTypes.split(',').map(item => item.trim());
+    // 2. Convert comma-separated strings to arrays
+    const amenitiesArray = form.amenities ? form.amenities.split(',').map(item => item.trim()) : [];
+    const roomTypesArray = form.roomTypes ? form.roomTypes.split(',').map(item => item.trim()) : [];
 
-    // Serialize complex data
+    // 3. Serialize complex data
     formData.append("amenities", JSON.stringify(amenitiesArray));
     formData.append("roomTypes", JSON.stringify(roomTypesArray));
     formData.append("contact", JSON.stringify(form.contact));
 
-    // Append Images
-    photoFiles.forEach((file) => formData.append("hotelPhoto", file));
+    // 4. Append Images
+    photoFiles.forEach((file) => formData.append("HotelPhotos", file)); 
 
-    await addHotelMutation.mutateAsync(formData);
-    
-    // Reset and Close
-    setForm({
-        title: "", subCategory: "Hotels", priceRange: "", rating: "", description: "", location: "", distanceFromCenter: "",
-        amenities: "", roomTypes: "", contact: { phone: "", email: "", website: "" }
-    });
-    setPhotoFiles([]);
-    setShowModal(false);
+    try {
+        await addHotelMutation.mutateAsync(formData);
+        
+        // Reset and Close
+        setForm({
+            title: "", subCategory: "Hotels", priceRange: "", rating: "", description: "", location: "", distanceFromCenter: "",
+            amenities: "", roomTypes: "", contact: { phone: "", email: "", website: "" }
+        });
+        setPhotoFiles([]);
+        setShowModal(false);
+    } catch (error) {
+        console.error("Submission failed:", error);
+    }
   };
 
   if (isLoading) return <div className="flex items-center justify-center min-h-screen">Loading hotels...</div>;
@@ -212,7 +220,6 @@ const Hotels = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Navbar />
 
       <div className="max-w-7xl mx-auto">
         <div className="mb-10 text-center">
@@ -241,14 +248,11 @@ const Hotels = () => {
         <Plus size={28} />
       </button>
 
-      {/* -------------------------------------------------- */}
-      {/* CREATE HOTEL MODAL                    */}
-      {/* -------------------------------------------------- */}
+      {/* CREATE HOTEL MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
             
-            {/* Header */}
             <div className="flex justify-between items-center p-6 border-b border-gray-100">
               <h2 className="text-2xl font-bold text-gray-800">Add New Property</h2>
               <button 
@@ -259,10 +263,8 @@ const Hotels = () => {
               </button>
             </div>
 
-            {/* Scrollable Body */}
             <div className="p-6 overflow-y-auto custom-scrollbar space-y-5">
               
-              {/* Basic Info Section */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Basic Details</h3>
                 
@@ -283,7 +285,6 @@ const Hotels = () => {
                         className="w-full border border-gray-300 p-3 rounded-lg outline-none focus:border-blue-500"
                     />
                     
-                    {/* DROPDOWN FOR SUB-CATEGORY */}
                     <div className="relative">
                         <select
                             name="subCategory"
@@ -301,7 +302,6 @@ const Hotels = () => {
                             <ChevronDown size={16} />
                         </div>
                     </div>
-
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
@@ -333,7 +333,6 @@ const Hotels = () => {
                 </div>
               </div>
 
-              {/* Description */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Overview</h3>
                 <textarea
@@ -346,7 +345,6 @@ const Hotels = () => {
                 />
               </div>
 
-              {/* Lists Section */}
               <div className="space-y-4">
                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Features</h3>
                  <input
@@ -365,7 +363,6 @@ const Hotels = () => {
                 />
               </div>
 
-              {/* Contact Info Section */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Contact Information</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -402,7 +399,6 @@ const Hotels = () => {
                 </div>
               </div>
 
-              {/* Image Upload Section */}
               <div>
                 <div className="flex justify-between items-center mb-2">
                     <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Gallery</h3>
@@ -430,7 +426,6 @@ const Hotels = () => {
                         </button>
                     )}
 
-                    {/* Image Preview Grid */}
                     {photoFiles.length > 0 && (
                         <div className="grid grid-cols-4 gap-4 mt-6 w-full">
                             {photoFiles.map((file, index) => (
@@ -455,7 +450,6 @@ const Hotels = () => {
 
             </div>
 
-            {/* Footer */}
             <div className="p-6 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
               <button
                 onClick={handleSubmit}

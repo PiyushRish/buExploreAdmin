@@ -4,7 +4,7 @@ import { getRestaurants } from "../api/restaurant.api.js";
 
 export const useRestaurantsQuery = () => {
   return useQuery({
-    queryKey: ["restaurant"],
+    queryKey: ["restaurants"],
     queryFn: getRestaurants,
     staleTime: 1000 * 60, // optional
   });
