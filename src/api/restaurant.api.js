@@ -14,3 +14,4 @@ export const addRestaurant = async (restaurantData) => {
   });
   return res.data;
 }
+

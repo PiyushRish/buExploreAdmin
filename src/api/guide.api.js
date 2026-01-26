@@ -14,3 +14,18 @@ export const addGuide = async (guideData) => {
   });
   return res.data;
 }
+
+
+export const updateGuide = async (guideId, guideData) => {
+  const res = await axiosClient.patch(`/services/updateGuide/${guideId}`, guideData, {
+    headers: {  
+      "Content-Type": "multipart/form-data",  
+    },
+  });
+  return res.data;
+}
+
+export const deleteGuide = async (guideId) => {
+  const res = await axiosClient.delete(`/services/deleteGuide/${guideId}`);
+  return res.data;
+} 

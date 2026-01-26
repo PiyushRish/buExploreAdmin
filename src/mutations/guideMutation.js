@@ -1,6 +1,7 @@
 // import { use } from "react"
+
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { addGuide } from "../api/guide.api";
+import { addGuide,updateGuide,deleteGuide } from "../api/guide.api";
 
 
 export const useAddGuideMutation = () => {
@@ -20,10 +21,32 @@ export const useAddGuideMutation = () => {
 
 }
 export const useUpdateGuideMutation = () =>{
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({guideId, formData}) => updateGuide(guideId, formData),    
+        onSuccess: () => {
+          // Refresh all relevant place queries
+          queryClient.invalidateQueries({ queryKey: ["guides"] });  
+        },
+        onError: (error) => {
+            console.error("Guide update failed:", error);
+        },
+    });
 
 }
 
 export const useDeleteGuideMutation = () =>{
+    const queryClient = useQueryClient();   
+    return useMutation({
+        mutationFn: (guideId) => deleteGuide(guideId),  
+        onSuccess: () => {
+          // Refresh all relevant place queries
+          queryClient.invalidateQueries({ queryKey: ["guides"] });  
+        },
+        onError: (error) => {
+            console.error("Guide deletion failed:", error);
+        },
+    });
 
 }
     
