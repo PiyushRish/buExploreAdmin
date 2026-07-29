@@ -1,28 +1,62 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createAds } from "../api/ads.api";
+import {
+  createAds,
+  updateAdStatus,
+  deleteAd,
+  trackImpression,
+  trackClick,
+} from "../api/ads.api";
 
 export const useCreateAdMutation = () => {
-  // CORRECT: Use useQueryClient to get the client instance
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (formData) => createAds(formData),
-
     onSuccess: () => {
-      // Invalidate the "ads" query so the list refreshes automatically
       queryClient.invalidateQueries({ queryKey: ["ads"] });
     },
-
     onError: (error) => {
-      console.error("Create ad failed:", error);
+      console.error("[ADS] Create ad mutation failed:", error);
     },
   });
 };
 
+export const useUpdateAdStatusMutation = () => {
+  const queryClient = useQueryClient();
 
-export const useUpdateAdMutation = () =>{
+  return useMutation({
+    mutationFn: ({ adId, status }) => updateAdStatus(adId, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ads"] });
+    },
+    onError: (error) => {
+      console.error("[ADS] Update ad status mutation failed:", error);
+    },
+  });
+};
 
-}
-export const useDeleteAdMutation = () =>{
-  
-}
+export const useDeleteAdMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (adId) => deleteAd(adId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ads"] });
+    },
+    onError: (error) => {
+      console.error("[ADS] Delete ad mutation failed:", error);
+    },
+  });
+};
+
+export const useTrackImpressionMutation = () => {
+  return useMutation({
+    mutationFn: (adId) => trackImpression(adId),
+  });
+};
+
+export const useTrackClickMutation = () => {
+  return useMutation({
+    mutationFn: (adId) => trackClick(adId),
+  });
+};

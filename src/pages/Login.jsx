@@ -1,172 +1,74 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-
-const multipleOrganisation = [
-  "Central Level (MoSJE)",
-  "State Level (State/UT Dept)",
-  "District Level (Collector’s Office)",
-  "Executing Agency",
-  "Field / Beneficiary Level"
-];
-const components = [
-  "Adarsh Gram",
-  "GIA (Grant-in-Aid)",
-  "Hostel"
-];
-
-
-const jobLevelsMap = {
-  "Central Level (MoSJE)": [
-    "Central Admin (PM-AJAY Cell)",
-    "Central Auditor / Monitoring Agency"
-  ],
-  "State Level (State/UT Dept)": [
-    "State Admin / Nodal Officer",
-    "State Auditor"
-  ],
-  "District Level (Collector’s Office)": [
-    "District Officer"
-  ],
-  "Executing Agency": [
-    "Agency Admin (Head of Agency)",
-    "Agency Staff (Operators)"
-  ],
-  "Field / Beneficiary Level": [
-    "Enumerator (Field Worker)",
-    "Beneficiary (SC Community Member)"
-  ]
-};
+import { useLoginMutation } from "../mutations/loginMutation";
 
 const Login = () => {
   const navigate = useNavigate();
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
 
-  const [isOrgOpen, setIsOrgOpen] = useState(false);
-  const [organisation, setOrganisation] = useState("");
+  const { mutateAsync: login, isPending } = useLoginMutation();
 
-  const [isJobOpen, setIsJobOpen] = useState(false);
-  const [jobLevel, setJobLevel] = useState("");
-  const [jobOptions, setJobOptions] = useState([]);
+  const handleLogin = async (e) => {
+    e.preventDefault();
 
-  const orgRef = useRef(null);
-  const jobRef = useRef(null);
+    try {
+      // Sends identifier (email or phone) + password to POST /api/auth/login
+      const data = await login({ identifier, password });
 
-  const handleSelectOrganisation = (value) => {
-    setOrganisation(value);
-    setIsOrgOpen(false);
-    setJobOptions(jobLevelsMap[value] || []);
-    setJobLevel("");
-  };
-
-  const handleSelectJob = (value) => {
-    setJobLevel(value);
-    setIsJobOpen(false);
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (orgRef.current && !orgRef.current.contains(event.target)) {
-        setIsOrgOpen(false);
+      if (data?.token) {
+        localStorage.setItem("token", data.token);
+        sessionStorage.setItem("admin_auth_token", data.token);
+        navigate("/dashboard");
       }
-      if (jobRef.current && !jobRef.current.contains(event.target)) {
-        setIsJobOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    } catch (error) {
+      console.error("Login Error:", error);
+      alert(error?.response?.data?.message || "Invalid Email/Phone or Password");
+    }
+  };
 
   return (
-    <div className="h-screen w-screen bg-amber-200 flex justify-center items-center">
-      <div className="h-[80%] w-[40%] bg-white p-8 rounded shadow flex flex-col">
-        <h1 className="text-2xl font-bold mb-8 self-center">Login Page</h1>
-        <div className="flex flex-col gap-6 items-center">
+    <div className="h-screen w-screen bg-slate-900 flex justify-center items-center font-sans">
+      <div className="w-[90%] max-w-[420px] bg-white p-8 rounded-2xl shadow-2xl flex flex-col">
+        <h1 className="text-3xl font-black text-gray-900 mb-2 text-center">Admin Portal</h1>
+        <p className="text-xs text-gray-500 text-center mb-8">BUExplore Control Dashboard</p>
 
-          {/* Username */}
-          <div className="grid w-[90%] items-center gap-2">
-            <Label htmlFor="userName">User Name</Label>
-            <Input id="userName" placeholder="Enter your username" />
+        <form onSubmit={handleLogin} className="flex flex-col gap-5 w-full">
+          <div className="space-y-1">
+            <Label htmlFor="identifier">Email or Phone Number</Label>
+            <Input
+              id="identifier"
+              type="text"
+              placeholder="admin@buexplore.com"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              required
+            />
           </div>
 
-          {/* Password */}
-          <div className="grid w-[90%] items-center gap-2">
+          <div className="space-y-1">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" placeholder="••••••••" />
+            <Input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
           </div>
 
-          {/* Organisation Dropdown */}
-          <div ref={orgRef} className="relative w-[90%]">
-            <Label>Organisation Level</Label>
-            <button
-              onClick={() => setIsOrgOpen(!isOrgOpen)}
-              className="mt-2 w-full p-2 bg-white border rounded-md text-left"
-            >
-              {organisation || "Select an Organisation"}
-            </button>
-
-            {isOrgOpen && (
-              <div className="absolute z-10 mt-2 w-full rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5">
-                <div className="py-1">
-                  {multipleOrganisation.map((org) => (
-                    <a
-                      key={org}
-                      href="#"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleSelectOrganisation(org);
-                      }}
-                    >
-                      {org}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Job Level Dropdown */}
-          <div ref={jobRef} className="relative w-[90%]">
-            <Label>Role / Job Level</Label>
-            <button
-              onClick={() => setIsJobOpen(!isJobOpen)}
-              className="mt-2 w-full p-2 bg-white border rounded-md text-left"
-              disabled={!organisation}
-            >
-              {jobLevel || "Select a Job Level"}
-            </button>
-
-            {isJobOpen && (
-              <div className="absolute z-10 mt-2 w-full rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5">
-                <div className="py-1">
-                  {jobOptions.map((job) => (
-                    <a
-                      key={job}
-                      href="#"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleSelectJob(job);
-                      }}
-                    >
-                      {job}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Login Button */}
           <Button
-            onClick={() => navigate("/dashboard")}
-            className="mt-6 w-[90%]"
+            type="submit"
+            disabled={isPending}
+            className="mt-4 w-full bg-blue-600 hover:bg-blue-700 font-bold py-3 text-white"
           >
-            Log In
+            {isPending ? "Authenticating..." : "Log In"}
           </Button>
-        </div>
+        </form>
       </div>
     </div>
   );

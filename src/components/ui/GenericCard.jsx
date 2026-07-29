@@ -1,3 +1,5 @@
+import React, { useState } from "react";
+
 const GenericCard = ({
   title,
   location,
@@ -8,7 +10,6 @@ const GenericCard = ({
   onClick
 }) => {
   const [isLiked, setIsLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
 
   return (
     <div

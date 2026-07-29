@@ -1,11 +1,25 @@
 import { useQuery } from "@tanstack/react-query";
-
-import { getAds } from "../api/ads.api";
+import { getAds, getAdsByPlacement, getAdStats } from "../api/ads.api";
 
 export const useAdsQuery = () => {
   return useQuery({
     queryKey: ["ads"],
     queryFn: getAds,
-    staleTime: 1000 * 60, // optional
+  });
+};
+
+export const useAdsByPlacementQuery = (placement, limit = 1) => {
+  return useQuery({
+    queryKey: ["ads", placement, limit],
+    queryFn: () => getAdsByPlacement(placement, limit),
+    enabled: !!placement,
+  });
+};
+
+export const useAdStatsQuery = (adId) => {
+  return useQuery({
+    queryKey: ["adStats", adId],
+    queryFn: () => getAdStats(adId),
+    enabled: !!adId,
   });
 };

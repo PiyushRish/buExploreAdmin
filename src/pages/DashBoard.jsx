@@ -1,167 +1,67 @@
 import React, { useState, useContext } from "react";
-import { 
-  MapPin, Bell, User, Car, Megaphone, MessageSquare, AlertCircle 
+import {
+  MapPin, Bell, User, Car, Megaphone, MessageSquare, AlertCircle,
 } from "lucide-react";
 
 import Places from "./Places.jsx";
 import Hotels from "./Hotels.jsx";
 import Restaurants from "./Restaurant.jsx";
-// import Guides from "./Guides.jsx";      
-import Guides from "./Guide.jsx"
-import Vehicle from "./Vehicle.jsx";  
-import Ads from "./Ads.jsx";                    // NEW
-// import Testimonials from "./Testimonials.jsx"; // NEW
-import Notifications from "./Notifications.jsx"; // NEW
+import Guides from "./Guide.jsx";
+import Vehicle from "./Vehicle.jsx";
+import Ads from "./Ads.jsx";
+import Notifications from "./Notifications.jsx";
 import PlaceDetails from "./PlaceDetails.jsx";
-import { PlaceContext } from "../contextApi/places.jsx";
-// import TestimonialsAdmin from "./TestimonialAdmin.jsx";
-// import ExperiencesFeed from "./TestimonialAdmin.jsx";
 import TestimonialsPage from "./TestimonialAdmin.jsx";
+import { PlaceContext } from "../contextApi/places.jsx";
 
 const DashBoard = () => {
   const [activeTab, setActiveTab] = useState("Places");
   const { clickedPlace, setClickedPlaceHandler } = useContext(PlaceContext);
 
+  const navItems = [
+    { name: "Places", icon: Bell },
+    { name: "Hotels", icon: MapPin },
+    { name: "Restaurants", icon: MapPin },
+    { name: "Guides", icon: User },
+    { name: "Vehicles", icon: Car },
+    { name: "Ads", icon: Megaphone },
+    { name: "Testimonials", icon: MessageSquare },
+    { name: "Notifications", icon: AlertCircle },
+  ];
+
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
+    <div className="flex h-screen bg-gray-100 font-sans">
+      {/* SIDEBAR */}
       <div className="w-64 bg-white shadow-lg flex flex-col">
         <div className="flex items-center justify-center h-16 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-blue-600">Admin Panel</h1>
+          <h1 className="text-xl font-bold text-blue-600">Admin Dashboard</h1>
         </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-3">
-
-          <button
-            onClick={() => {
-              setActiveTab("Places");
-              setClickedPlaceHandler(null);
-            }}
-            className={`flex items-center w-full p-2 rounded-lg text-left ${
-              activeTab === "Places"
-                ? "bg-blue-100 text-blue-600"
-                : "hover:bg-gray-100"
-            }`}
-          >
-            <Bell className="w-5 h-5 mr-3" />
-            Places
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveTab("Hotels");
-              setClickedPlaceHandler(null);
-            }}
-            className={`flex items-center w-full p-2 rounded-lg text-left ${
-              activeTab === "Hotels"
-                ? "bg-blue-100 text-blue-600"
-                : "hover:bg-gray-100"
-            }`}
-          >
-            <MapPin className="w-5 h-5 mr-3" />
-            Hotels
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveTab("Restaurants");
-              setClickedPlaceHandler(null);
-            }}
-            className={`flex items-center w-full p-2 rounded-lg text-left ${
-              activeTab === "Restaurants"
-                ? "bg-blue-100 text-blue-600"
-                : "hover:bg-gray-100"
-            }`}
-          >
-            <MapPin className="w-5 h-5 mr-3" />
-            Restaurants
-          </button>
-
-          {/* GUIDE */}
-          <button
-            onClick={() => {
-              setActiveTab("Guides");
-              setClickedPlaceHandler(null);
-            }}
-            className={`flex items-center w-full p-2 rounded-lg text-left ${
-              activeTab === "Guides"
-                ? "bg-blue-100 text-blue-600"
-                : "hover:bg-gray-100"
-            }`}
-          >
-            <User className="w-5 h-5 mr-3" />
-            Guide
-          </button>
-
-          {/* VEHICLE */}
-          <button
-            onClick={() => {
-              setActiveTab("Vehicles");
-              setClickedPlaceHandler(null);
-            }}
-            className={`flex items-center w-full p-2 rounded-lg text-left ${
-              activeTab === "Vehicles"
-                ? "bg-blue-100 text-blue-600"
-                : "hover:bg-gray-100"
-            }`}
-          >
-            <Car className="w-5 h-5 mr-3" />
-            Vehicle
-          </button>
-
-          {/* ADS */}
-          <button
-            onClick={() => {
-              setActiveTab("Ads");
-              setClickedPlaceHandler(null);
-            }}
-            className={`flex items-center w-full p-2 rounded-lg text-left ${
-              activeTab === "Ads"
-                ? "bg-blue-100 text-blue-600"
-                : "hover:bg-gray-100"
-            }`}
-          >
-            <Megaphone className="w-5 h-5 mr-3" />
-            Ads
-          </button>
-
-          {/* TESTIMONIALS */}
-          <button
-            onClick={() => {
-              setActiveTab("Testimonials");
-              setClickedPlaceHandler(null);
-            }}
-            className={`flex items-center w-full p-2 rounded-lg text-left ${
-              activeTab === "Testimonials"
-                ? "bg-blue-100 text-blue-600"
-                : "hover:bg-gray-100"
-            }`}
-          >
-            <MessageSquare className="w-5 h-5 mr-3" />
-            Testimonials
-          </button>
-
-          {/* NOTIFICATIONS */}
-          <button
-            onClick={() => {
-              setActiveTab("Notifications");
-              setClickedPlaceHandler(null);
-            }}
-            className={`flex items-center w-full p-2 rounded-lg text-left ${
-              activeTab === "Notifications"
-                ? "bg-blue-100 text-blue-600"
-                : "hover:bg-gray-100"
-            }`}
-          >
-            <AlertCircle className="w-5 h-5 mr-3" />
-            Notifications
-          </button>
+        <nav className="flex-1 px-4 py-6 space-y-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.name;
+            return (
+              <button
+                key={item.name}
+                onClick={() => {
+                  setActiveTab(item.name);
+                  setClickedPlaceHandler(null);
+                }}
+                className={`flex items-center w-full p-3 rounded-lg text-left font-medium transition-all ${
+                  isActive ? "bg-blue-100 text-blue-600 font-bold" : "text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                <Icon className="w-5 h-5 mr-3" />
+                {item.name}
+              </button>
+            );
+          })}
         </nav>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 p-5 overflow-auto">
-
+      {/* MAIN CONTENT AREA */}
+      <div className="flex-1 p-6 overflow-auto">
         {activeTab === "Places" && (
           <div className="bg-white rounded-2xl shadow p-4 h-full">
             {clickedPlace ? (

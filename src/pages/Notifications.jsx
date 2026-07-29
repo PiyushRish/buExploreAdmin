@@ -1,312 +1,159 @@
 import React, { useState } from "react";
-import { 
-  Bell, Plus, X, Send, User, Trash2, 
-  Search, Filter, Calendar, ExternalLink, BellOff 
-} from "lucide-react";
-import { useNotificationsQuery } from "../queries/notificationQueries.js";
-import { useDeleteNotification, useSendNotification } from "../mutations/notificationMutation.js";
+import { Bell, Send, Trash2, CheckCircle2, User, Globe } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import axiosClient from "../api/axiosClient";
+import toast from "react-hot-toast";
 
-const typeColors = {
-  SYSTEM: "bg-blue-100 text-blue-700",
-  ORDER: "bg-purple-100 text-purple-700",
-  ADVERTISEMENT: "bg-pink-100 text-pink-700",
-  EVENT: "bg-green-100 text-green-700",
-  OFFER: "bg-yellow-100 text-yellow-700",
-  GENERAL: "bg-gray-100 text-gray-700",
-};
+const Notification = () => {
+  const queryClient = useQueryClient();
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  const [targetRole, setTargetRole] = useState("all");
 
-const Notifications = () => {
-  // 1. FIX: Hooks must be at the top level
-  const { data, isLoading, isError } = useNotificationsQuery();
-  const sendNotification = useSendNotification();
-  const deleteNotification = useDeleteNotification(); // Get the delete function here
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  // 2. FIX: Add state to track which ID we are deleting
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteId, setDeleteId] = useState(null); 
-  
-  const [form, setForm] = useState({
-    title: "",
-    message: "",
-    type: "SYSTEM",
-    image: "",
-    user: "", // empty = broadcast
+  const { data, isLoading } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: async () => {
+      const res = await axiosClient.get("/notification");
+      return res.data;
+    },
   });
 
-  const handleChange = (e) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  };
+  const sendMutation = useMutation({
+    mutationFn: async (payload) => {
+      const res = await axiosClient.post("/notification", payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      toast.success("Broadcast notification sent!");
+      setTitle("");
+      setMessage("");
+    },
+    onError: () => toast.error("Failed to send notification"),
+  });
 
-  // 3. FIX: New function to handle the actual deletion confirmation
-  const confirmDelete = () => {
-    if (!deleteId) return;
+  const deleteMutation = useMutation({
+    mutationFn: async (id) => {
+      await axiosClient.delete(`/notification/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      toast.error("Notification removed");
+    },
+  });
 
-    deleteNotification.mutate(deleteId, {
-      onSuccess: () => {
-        setShowDeleteModal(false);
-        setDeleteId(null);
-      },
-      onError: (err) => {
-        console.error(err);
-        alert("Failed to delete");
-      }
-    });
-  };
-
-  // Helper to open the modal and save the ID
-  const openDeleteModal = (id) => {
-    setDeleteId(id);
-    setShowDeleteModal(true);
-  };
-
-  const handleSubmit = (e) => {
+  const handleSend = (e) => {
     e.preventDefault();
-
-    const payload = {
-      title: form.title,
-      message: form.message,
-      type: form.type,
-      userIds: form.user ? [form.user.trim()] : [],
-    };
-
-    sendNotification.mutate(payload, {
-      onSuccess: () => {
-        setIsModalOpen(false);
-        setForm({
-          title: "",
-          message: "",
-          type: "SYSTEM",
-          image: "",
-          user: "",
-        });
-      },
-    });
+    if (!title || !message) {
+      toast.error("Title and message body are required");
+      return;
+    }
+    sendMutation.mutate({ title, message, targetRole });
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        Loading notifications...
-      </div>
-    );
-  }
+  const notifications = data?.notifications || data?.data || [];
 
-  if (isError) {
-    return (
-      <div className="flex items-center justify-center min-h-screen text-red-500">
-        Failed to load notifications.
-      </div>
-    );
-  }
-
-  const notifications = data?.data || [];
+  if (isLoading) return <div className="p-8 font-bold text-center text-gray-500">Loading Notifications...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative">
-      <div className="max-w-5xl mx-auto">
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-extrabold text-gray-900 mb-2">
-            Notifications
-          </h1>
-          <p className="text-lg text-gray-600">
-            View and manage system notifications
-          </p>
-        </div>
+    <div className="min-h-screen bg-gray-50 py-10 px-6 font-sans">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* LEFT FORM - SEND BROADCAST NOTIFICATION */}
+        <div className="bg-white p-6 rounded-2xl border shadow-sm space-y-4 h-fit">
+          <div className="flex items-center gap-2 text-blue-600 border-b pb-3">
+            <Bell size={20} />
+            <h2 className="text-xl font-bold text-gray-900">Broadcast Push Alert</h2>
+          </div>
 
-        {/* Notification List */}
-        <div className="space-y-4">
-          {notifications.length === 0 ? (
-            <div className="text-center text-gray-500">
-              No notifications found.
-            </div>
-          ) : (
-            notifications.map((n) => (
-              <div
-                key={n._id}
-                className="bg-white rounded-xl shadow p-4 flex gap-4 items-start"
-              >
-                {n.image && (
-                  <img
-                    src={n.image}
-                    alt="notification"
-                    className="w-16 h-16 object-cover rounded-lg"
-                  />
-                )}
-
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-lg">{n.title}</h3>
-
-                    <div className="flex items-center gap-2">
-                        <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            typeColors[n.type] || typeColors.GENERAL
-                        }`}
-                        >
-                        {n.type}
-                        </span>
-                        
-                        {/* 4. FIX: Use openDeleteModal instead of calling hook directly */}
-                        <button
-                        className="flex items-center px-4 py-2 rounded-lg bg-red-50 text-red-600 
-                                    hover:bg-red-100 transition-colors border border-red-200"
-                        onClick={() => openDeleteModal(n._id)}
-                        >
-                        <Trash2 size={16} className="mr-2" />
-                        Delete
-                        </button>
-                    </div>
-                  </div>
-
-                  <p className="text-gray-600 mt-1">{n.message}</p>
-
-                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                    <span>
-                      {new Date(n.createdAt).toLocaleString()}
-                    </span>
-
-                    {n.user && (
-                      <span className="flex items-center gap-1">
-                        <User size={14} /> Targeted
-                      </span>
-                    )}
-
-                    {n.link && (
-                      <a
-                        href={n.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 underline"
-                      >
-                        Open Link
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Floating Add Button */}
-      <button
-        onClick={() => setIsModalOpen(true)}
-        className="fixed bottom-8 right-8 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition"
-      >
-        <Plus size={24} />
-      </button>
-
-      {/* Add Notification Modal - YOUR ORIGINAL UI */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">Create Notification</h2>
-              <button onClick={() => setIsModalOpen(false)}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSend} className="space-y-4">
+            <div>
+              <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Alert Title *</label>
               <input
-                name="title"
-                placeholder="Title"
-                value={form.title}
-                onChange={handleChange}
-                className="w-full p-2 border rounded"
-                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. New Destination Unlocked!"
+                className="w-full border p-2.5 rounded-xl text-sm outline-none focus:border-blue-500"
               />
+            </div>
 
-              <textarea
-                name="message"
-                placeholder="Message"
-                value={form.message}
-                onChange={handleChange}
-                className="w-full p-2 border rounded"
-                rows={4}
-                required
-              />
-
+            <div>
+              <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Target Audience</label>
               <select
-                name="type"
-                value={form.type}
-                onChange={handleChange}
-                className="w-full p-2 border rounded"
+                value={targetRole}
+                onChange={(e) => setTargetRole(e.target.value)}
+                className="w-full border p-2.5 rounded-xl text-sm bg-white font-semibold outline-none focus:border-blue-500"
               >
-                {[
-                  "SYSTEM",
-                  "ORDER",
-                  "ADVERTISEMENT",
-                  "EVENT",
-                  "OFFER",
-                  "GENERAL",
-                ].map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
+                <option value="all">All Users & Visitors</option>
+                <option value="user">Tourists Only</option>
+                <option value="shopOwner">Shop Owners Only</option>
+                <option value="admin">Admins Only</option>
               </select>
+            </div>
 
-              <div className="flex items-center gap-2">
-                <User size={16} />
-                <input
-                  name="user"
-                  placeholder="User ID (leave empty for broadcast)"
-                  value={form.user}
-                  onChange={handleChange}
-                  className="w-full p-2 border rounded"
-                />
+            <div>
+              <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Message Body *</label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Write message details..."
+                rows={4}
+                className="w-full border p-2.5 rounded-xl text-sm resize-none outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={sendMutation.isPending}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-md text-sm flex items-center justify-center gap-2 transition-all disabled:bg-blue-300"
+            >
+              <Send size={16} />
+              {sendMutation.isPending ? "Sending Broadcast..." : "Dispatch Notification"}
+            </button>
+          </form>
+        </div>
+
+        {/* RIGHT LIST - SENT NOTIFICATIONS HISTORY */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="bg-white p-5 rounded-2xl border shadow-sm flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900">Sent Notification Logs ({notifications.length})</h2>
+            <span className="text-xs text-gray-400 font-bold">History Log</span>
+          </div>
+
+          <div className="space-y-4">
+            {notifications.length === 0 ? (
+              <div className="bg-white p-8 rounded-2xl border text-center text-gray-400 font-semibold">
+                No notifications dispatched yet.
               </div>
+            ) : (
+              notifications.map((n) => (
+                <div key={n._id} className="bg-white p-5 rounded-2xl border shadow-sm space-y-2 flex justify-between items-start gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-base text-gray-900">{n.title}</span>
+                      <span className="bg-blue-50 text-blue-600 text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase">
+                        Target: {n.targetRole || "All"}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 leading-relaxed">{n.message}</p>
+                    <span className="text-[10px] text-gray-400 font-mono block pt-1">
+                      Sent: {new Date(n.createdAt || Date.now()).toLocaleString()}
+                    </span>
+                  </div>
 
-              <button
-                type="submit"
-                disabled={sendNotification.isPending}
-                className="w-full bg-blue-600 text-white py-2 rounded-lg flex items-center justify-center gap-2"
-              >
-                <Send size={16} />
-                {sendNotification.isPending
-                  ? "Sending..."
-                  : "Send Notification"}
-              </button>
-
-              {sendNotification.isError && (
-                <p className="text-red-500 text-sm text-center">
-                  Failed to send notification
-                </p>
-              )}
-            </form>
+                  <button
+                    onClick={() => deleteMutation.mutate(n._id)}
+                    className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors flex-shrink-0"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
-      )}
-
-      {/* Delete Confirmation Modal - ADDED TO HANDLE DELETE LOGIC */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-xl max-w-sm w-full shadow-2xl">
-                <h3 className="text-lg font-bold text-gray-900">Delete Notification?</h3>
-                <p className="text-gray-500 mt-2 text-sm">This action cannot be undone.</p>
-                <div className="flex gap-3 mt-6">
-                    <button 
-                        onClick={() => setShowDeleteModal(false)} 
-                        className="flex-1 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium"
-                    >
-                        Cancel
-                    </button>
-                    <button 
-                        onClick={confirmDelete} 
-                        className="flex-1 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 font-medium"
-                    >
-                        {deleteNotification.isPending ? "Deleting..." : "Delete"}
-                    </button>
-                </div>
-            </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 };
 
-export default Notifications;
+export default Notification;

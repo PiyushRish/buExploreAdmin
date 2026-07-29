@@ -1,26 +1,30 @@
-import { useMutation ,useQueryClient} from "@tanstack/react-query";
-// import { sendNotification } from "../api/notificationApi";
-import { deleteNotification, sendNotification } from "../api/notification.api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { sendNotification, deleteNotification } from "../api/notification.api";
 
 export const useSendNotification = () => {
-        const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (payload) => sendNotification(payload),
     onSuccess: () => {
-      // Invalidate the "ads" query so the list refreshes automatically
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+    onError: (error) => {
+      console.error("Send notification failed:", error);
     },
   });
 };
 
 export const useDeleteNotification = () => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn:(id) => deleteNotification(id),
-         onSuccess: () => {
-      // Invalidate the "ads" query so the list refreshes automatically
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id) => deleteNotification(id),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
-    })
+    onError: (error) => {
+      console.error("Delete notification failed:", error);
+    },
+  });
 };

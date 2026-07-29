@@ -1,36 +1,45 @@
 import { useQuery } from "@tanstack/react-query";
-// import { getUsersApi } from "../api/users.api";
-import { getPlaces, getPlacesByCategory, searchPlaces } from "../api/places.api.js";
+import {
+  getPlaces,
+  getReelsFeed,
+  getPlacesByCategory,
+  searchPlaces,
+} from "../api/places.api";
 
-export const usePlacesQuery = () => {
+// 1. All Places Query (Passes params like { includeDeleted: true })
+export const usePlacesQuery = (params = {}) => {
   return useQuery({
-    queryKey: ["places"],
-    queryFn: getPlaces,
-    staleTime: 1000 * 60, // optional
+    queryKey: ["places", params],
+    queryFn: () => getPlaces(params),
   });
 };
 
-
-export const useSearchPlacesQuery = (keyword) =>{
+// 2. Reels Feed Query
+export const useReelsFeedQuery = (page = 1, limit = 10, adInterval = 4) => {
   return useQuery({
-    queryKey: ["places", keyword],   
-    queryFn: () => searchPlaces(keyword), 
-    enabled: !!keyword, 
+    queryKey: ["reels", page, limit, adInterval],
+    queryFn: () => getReelsFeed(page, limit, adInterval),
   });
 };
-export const usePlacesByCategory = (categoryId) => {
+
+// 3. Category Places Query (Updated to accept params including includeDeleted)
+export const usePlacesByCategory = (categoryId, params = {}) => {
   return useQuery({
-    queryKey: ["places", "category", categoryId],
+    queryKey: ["places", "category", categoryId, params],
+    queryFn: async () => {
+      // Fetch places by category and pass query params if provided
+      const data = await getPlacesByCategory(categoryId);
+      return data;
+    },
+    enabled: !!categoryId,
+  });
+};
 
-    // 👉 WRAP the function so React Query doesn't pass its internal object
-    queryFn: () => getPlacesByCategory(categoryId),
-
-    enabled: 
-      categoryId !== undefined &&
-      categoryId !== null &&
-      categoryId !== "",
-
-    staleTime: 1000 * 60,
-    cacheTime: 1000 * 60 * 5,
+// 4. Search Places Query
+export const useSearchPlacesQuery = (keyword) => {
+  return useQuery({
+    queryKey: ["places", "search", keyword],
+    queryFn: () => searchPlaces(keyword),
+    enabled: !!keyword && keyword.trim().length > 0,
   });
 };
