@@ -58,7 +58,7 @@ const data = [
 ];
 
 const renderCustomizedLabel = (props) => {
-  const { x, y, width, height, value } = props;
+  const { x, y, width, value } = props;
   const radius = 10;
 
   return (

@@ -23,7 +23,7 @@ const PLACEMENTS = [
   "profile_spotlight",
 ];
 
-const Ads = ({ setSelectedAd }) => {
+const Ads = ({ setSelectedAd = () => {} }) => {
   const { data, isLoading } = useAdsQuery();
   const createAdMutation = useCreateAdMutation();
 

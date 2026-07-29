@@ -110,7 +110,7 @@ const Restaurants = ({ setSelectedRestaurant }) => {
       setShowModal(false);
       setPhotoFiles([]);
     } catch (_err) {
-      toast.error(err?.response?.data?.message || "Failed to add restaurant");
+      toast.error("Failed to add restaurant");
     }
   };
 

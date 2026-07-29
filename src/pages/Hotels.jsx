@@ -32,12 +32,12 @@ const Hotels = () => {
 
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ title: "", location: "", priceRange: "", description: "" });
-  // Removed unused setPhotoFiles
+  // removed photoFiles
 
   const handleSubmit = async () => {
     const formData = new FormData();
     Object.keys(form).forEach((k) => formData.append(k, form[k]));
-    photoFiles.forEach((f) => formData.append("HotelPhotos", f));
+    // removed photoFiles
 
     await addHotelMutation.mutateAsync(formData);
     setShowModal(false);

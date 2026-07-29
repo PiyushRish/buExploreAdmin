@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from "react";
 import {
   Image as ImageIcon, Film, ExternalLink,
-  Globe, Compass, Tag, Calendar, Eye
+  Globe, Compass, Tag, Calendar, Eye, Heart, UploadCloud, AlertTriangle
 } from "lucide-react";
 import { GenericDetailsHeader } from "../components/layout/GenericDetailsHeader.jsx";
 import { PlaceContext } from "../contextApi/places.jsx";

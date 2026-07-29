@@ -1,35 +1,5 @@
-G:\BUXplore\buExploreAdmin\src\components\GlobalErrorBoundary.jsx
-Line 10: 'error' is defined but never used. Allowed unused args must match /^_/u.
-
-G:\BUXplore\buExploreAdmin\src\components\ui\admin\BarChart.jsx
-Line 61: 'height' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
-
-G:\BUXplore\buExploreAdmin\src\mutations\hotelMutation.js
-Line 17: 'id' is defined but never used. Allowed unused args must match /^_/u.
-
-G:\BUXplore\buExploreAdmin\src\mutations\restaurantMutation.js
-Line 17: 'id' is defined but never used. Allowed unused args must match /^_/u.
-
-G:\BUXplore\buExploreAdmin\src\mutations\vehicleMutation.js
-Line 16: 'id' is defined but never used. Allowed unused args must match /^_/u.
-
-G:\BUXplore\buExploreAdmin\src\pages\HotelDetails.jsx
-Line 11: 'setPhotoFiles' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
-
 G:\BUXplore\buExploreAdmin\src\pages\Hotels.jsx
-Line 1: 'useRef' is defined but never used. Allowed unused vars must match /^[A-Z_]/u.
 Line 35: 'setPhotoFiles' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
 
-G:\BUXplore\buExploreAdmin\src\pages\PlaceDetails.jsx
-Line 1: 'useRef' is defined but never used. Allowed unused vars must match /^[A-Z_]/u.
-Line 86: 'err' is not defined.
-
-G:\BUXplore\buExploreAdmin\src\pages\Places.jsx
-Line 104: 'refetch' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.
-Line 171: 'err' is not defined.
-
-G:\BUXplore\buExploreAdmin\src\pages\Restaurant.jsx
-Line 113: 'err' is not defined.
-
 G:\BUXplore\buExploreAdmin\vite.config.js
-Line 11: '__dirname' is not defined.
+Line 12: '__dirname' is not defined.

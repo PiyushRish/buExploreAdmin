@@ -8,7 +8,7 @@ const HotelDetails = () => {
   
   const [data, setData] = useState(hotel || {});
   const [isEditing, setIsEditing] = useState(false);
-  const [photoFiles, setPhotoFiles] = useState([]);
+  // removed photoFiles
 
   const updateMutation = useUpdateHotelMutation();
   const deleteMutation = useDeleteHotelMutation();
@@ -22,9 +22,7 @@ const HotelDetails = () => {
   const handleSave = async () => {
     const formData = new FormData();
     formData.append("data", JSON.stringify(data));
-    photoFiles.forEach((f) => formData.append("hotelPhoto", f));
-
-    await updateMutation.mutateAsync({ id: hotel._id, formData });
+    await updateMutation.mutateAsync({ formData });
     setIsEditing(false);
   };
 
