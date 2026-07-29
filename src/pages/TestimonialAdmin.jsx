@@ -1,48 +1,46 @@
 import React, { useState } from "react";
-import { MessageSquare, Plus, X, Trash2, Star, User } from "lucide-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import axiosClient from "../api/axiosClient";
+import { MessageSquare, Plus, X, Trash2, Star, User, UploadCloud } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useCreateTestimonialMutation, useDeleteTestimonialMutation } from "../mutations/testimonialMutation.js";
+import axiosClient from "../api/axiosClient.js";
 import toast from "react-hot-toast";
+import { validateMediaType } from "../utils/validators.js";
 
 const Testimonials = () => {
-  const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["testimonials"],
     queryFn: async () => {
-      const res = await axiosClient.get("/testimonials");
+      const res = await axiosClient.get("/testimonials/getTestimonials");
       return res.data;
     },
   });
 
-  const [userName, setUserName] = useState("");
   const [content, setContent] = useState("");
-  const [rating, setRating] = useState(5);
+  const [photos, setPhotos] = useState([]);
 
-  const addMutation = useMutation({
-    mutationFn: async (payload) => {
-      const res = await axiosClient.post("/testimonials", payload);
-      return res.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["testimonials"] });
-      toast.success("Testimonial created!");
-      setShowModal(false);
-      setUserName("");
-      setContent("");
-    },
-  });
+  const addMutation = useCreateTestimonialMutation();
+  const deleteMutation = useDeleteTestimonialMutation();
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id) => {
-      await axiosClient.delete(`/testimonials/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["testimonials"] });
-      toast.error("Testimonial deleted");
-    },
-  });
+  const handleCreate = () => {
+    if (!content) return toast.error("Content is required");
+    const formData = new FormData();
+    formData.append("content", content);
+    photos.forEach(f => formData.append("photos", f));
+
+    addMutation.mutate(formData, {
+      onSuccess: () => {
+        toast.success("Testimonial saved!");
+        setShowModal(false);
+        setContent("");
+        setPhotos([]);
+      },
+      onError: (err) => {
+        toast.error(err?.response?.data?.message || "Failed to create");
+      }
+    });
+  };
 
   const testimonials = data?.testimonials || data?.data || [];
 
@@ -76,10 +74,17 @@ const Testimonials = () => {
                   </div>
                 </div>
                 <p className="text-gray-600 text-sm italic leading-relaxed">"{t.content || t.comment}"</p>
+                {t.photos && t.photos.length > 0 && (
+                   <div className="flex gap-2 overflow-x-auto mt-2">
+                     {t.photos.map((p, i) => (
+                       <img key={i} src={p.url || p} alt="T" className="w-12 h-12 rounded object-cover border" />
+                     ))}
+                   </div>
+                )}
               </div>
 
               <div className="pt-4 mt-4 border-t flex justify-between items-center text-[10px] text-gray-400 font-mono">
-                <span>{new Date(t.createdAt || Date.now()).toLocaleDateString()}</span>
+                <span>{new Date(t.date || t.createdAt || Date.now()).toLocaleString()}</span>
                 <button onClick={() => deleteMutation.mutate(t._id)} className="text-xs font-bold text-red-600 flex items-center gap-1 hover:underline">
                   <Trash2 size={14} /> Remove Review
                 </button>
@@ -97,15 +102,23 @@ const Testimonials = () => {
               <button onClick={() => setShowModal(false)}><X size={20} /></button>
             </div>
 
-            <input placeholder="Tourist Name" value={userName} onChange={(e) => setUserName(e.target.value)} className="w-full border p-2.5 rounded-xl text-sm" />
             <textarea placeholder="Feedback Content *" value={content} onChange={(e) => setContent(e.target.value)} rows={4} className="w-full border p-2.5 rounded-xl text-sm resize-none" />
 
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-500">Rating (1 to 5):</span>
-              <input type="number" min="1" max="5" value={rating} onChange={(e) => setRating(Number(e.target.value))} className="w-20 border p-2 rounded-xl text-center font-bold" />
+            <div className="border border-dashed p-4 rounded-xl text-center bg-gray-50 mt-3">
+              <input type="file" multiple accept="image/*" id="tPhotos" onChange={(e) => {
+                const files = Array.from(e.target.files).slice(0, 4);
+                for (let f of files) {
+                  const v = validateMediaType(f, 'image');
+                  if (v !== true) return toast.error(v);
+                }
+                setPhotos(files);
+              }} className="hidden" />
+              <label htmlFor="tPhotos" className="cursor-pointer text-xs font-bold text-blue-600 flex flex-col items-center justify-center gap-2">
+                <UploadCloud size={20} /> {photos.length > 0 ? `${photos.length} Photos Selected (Max 4)` : "Attach Optional Photos"}
+              </label>
             </div>
 
-            <button onClick={() => addMutation.mutate({ userName, content, rating })} disabled={addMutation.isPending} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-md">
+            <button onClick={handleCreate} disabled={addMutation.isPending} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-md mt-4">
               Publish Testimonial
             </button>
           </div>

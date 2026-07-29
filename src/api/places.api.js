@@ -7,9 +7,10 @@ export const getPlaces = async (params = {}) => {
 };
 
 // 2. Get Reels Video Feed with server-side interleaved ads
-export const getReelsFeed = async (page = 1, limit = 10, adInterval = 4) => {
-  const res = await axiosClient.get("/places/reels", {
-    params: { page, limit, adInterval },
+export const getReelsFeed = async (categoryId = "", page = 1, limit = 10, adInterval = 4) => {
+  const finalCategoryId = categoryId === "" ? "ALL" : categoryId;
+  const res = await axiosClient.post("/places/reels", {
+    categoryId: finalCategoryId, page, limit, adInterval
   });
   return res.data;
 };

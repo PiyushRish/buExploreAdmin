@@ -15,10 +15,10 @@ export const usePlacesQuery = (params = {}) => {
 };
 
 // 2. Reels Feed Query
-export const useReelsFeedQuery = (page = 1, limit = 10, adInterval = 4) => {
+export const useReelsFeedQuery = (categoryId = "", page = 1, limit = 10, adInterval = 4) => {
   return useQuery({
-    queryKey: ["reels", page, limit, adInterval],
-    queryFn: () => getReelsFeed(page, limit, adInterval),
+    queryKey: ["reels", categoryId, page, limit, adInterval],
+    queryFn: () => getReelsFeed(categoryId, page, limit, adInterval),
   });
 };
 

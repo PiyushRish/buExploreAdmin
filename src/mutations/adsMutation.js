@@ -1,11 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   createAds,
+  createCampaign,
   updateAdStatus,
   deleteAd,
   trackImpression,
   trackClick,
-} from "../api/ads.api";
+  updateAd,
+} from "../api/ads.api.js";
 
 export const useCreateAdMutation = () => {
   const queryClient = useQueryClient();
@@ -21,6 +23,20 @@ export const useCreateAdMutation = () => {
   });
 };
 
+export const useCreateCampaignMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (campaignData) => createCampaign(campaignData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+    },
+    onError: (error) => {
+      console.error("[ADS] Create campaign mutation failed:", error);
+    },
+  });
+};
+
 export const useUpdateAdStatusMutation = () => {
   const queryClient = useQueryClient();
 
@@ -31,6 +47,20 @@ export const useUpdateAdStatusMutation = () => {
     },
     onError: (error) => {
       console.error("[ADS] Update ad status mutation failed:", error);
+    },
+  });
+};
+
+export const useUpdateAdMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ adId, formData }) => updateAd({ adId, formData }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ads"] });
+    },
+    onError: (error) => {
+      console.error("[ADS] Update ad mutation failed:", error);
     },
   });
 };

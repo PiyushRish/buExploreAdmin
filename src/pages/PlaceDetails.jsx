@@ -11,6 +11,7 @@ import {
   useRestorePlaceMutation,
 } from "../mutations/placeMutation.js";
 import toast from "react-hot-toast";
+import { validateMediaType } from "../utils/validators.js";
 
 const getImageUrl = (photo) => {
   if (!photo) return "https://picsum.photos/600/400";
@@ -29,7 +30,7 @@ const PlaceDetails = () => {
   const deletePlaceMutation = useDeletePlaceMutation();
   const restorePlaceMutation = useRestorePlaceMutation();
 
-  const [newPhotoFiles, setNewPhotoFiles] = useState([]);
+  const [newPhotoFile, setNewPhotoFile] = useState(null);
   const [newVideoFile, setNewVideoFile] = useState(null);
 
   useEffect(() => {
@@ -74,12 +75,12 @@ const PlaceDetails = () => {
       };
 
       formData.append("data", JSON.stringify(payload));
-      newPhotoFiles.forEach((file) => formData.append("placePhoto", file));
+      if (newPhotoFile) formData.append("placePhoto", newPhotoFile);
       if (newVideoFile) formData.append("placeVideo", newVideoFile);
 
       await updatePlaceMutation.mutateAsync({ id: data._id, formData });
       setIsEditing(false);
-      setNewPhotoFiles([]);
+      setNewPhotoFile(null);
       setNewVideoFile(null);
       toast.success("Destination details saved successfully!");
     } catch (_err) {
@@ -344,11 +345,15 @@ const PlaceDetails = () => {
                   + Upload Additional Photos
                   <input
                     type="file"
-                    multiple
                     accept="image/*"
-                    onChange={(e) =>
-                      setNewPhotoFiles((prev) => [...prev, ...Array.from(e.target.files)])
-                    }
+                    onChange={(e) => {
+                const f = e.target.files[0];
+                if (f) {
+                  const v = validateMediaType(f, "image");
+                  if (v !== true) return toast.error(v);
+                  setNewPhotoFile(f);
+                }
+              }}
                     className="hidden"
                   />
                 </label>
@@ -366,17 +371,15 @@ const PlaceDetails = () => {
               ))}
             </div>
 
-            {newPhotoFiles.length > 0 && (
+            {newPhotoFile && (
               <div className="pt-4 border-t">
                 <span className="text-xs font-bold text-gray-500 mb-2 block">
-                  Pending File Uploads ({newPhotoFiles.length}):
+                  Pending File Upload:
                 </span>
                 <div className="grid grid-cols-6 gap-3">
-                  {newPhotoFiles.map((file, i) => (
-                    <div key={i} className="aspect-square rounded-lg overflow-hidden border">
-                      <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="" />
-                    </div>
-                  ))}
+                  <div className="aspect-square rounded-lg overflow-hidden border">
+                    <img src={URL.createObjectURL(newPhotoFile)} className="w-full h-full object-cover" alt="" />
+                  </div>
                 </div>
               </div>
             )}
@@ -416,7 +419,14 @@ const PlaceDetails = () => {
               type="file"
               id="reelVideoInput"
               accept="video/*"
-              onChange={(e) => setNewVideoFile(e.target.files[0])}
+              onChange={(e) => {
+                const f = e.target.files[0];
+                if (f) {
+                  const v = validateMediaType(f, "video");
+                  if (v !== true) return toast.error(v);
+                  setNewVideoFile(f);
+                }
+              }}
               className="hidden"
             />
             <label htmlFor="reelVideoInput" className="cursor-pointer text-xs font-bold text-purple-300 flex items-center justify-center gap-2">

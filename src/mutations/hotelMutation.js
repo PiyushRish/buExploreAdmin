@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { addHotel } from "../api/hotel.api";
+import { addHotel, updateHotel, deleteHotel } from "../api/hotel.api";
 
 export const useAddHotelMutation = () => {
   const queryClient = useQueryClient();
@@ -14,7 +14,7 @@ export const useAddHotelMutation = () => {
 export const useUpdateHotelMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ formData }) => formData,
+    mutationFn: ({ id, formData }) => updateHotel(id, formData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hotels"] });
     },
@@ -24,7 +24,7 @@ export const useUpdateHotelMutation = () => {
 export const useDeleteHotelMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id) => id,
+    mutationFn: (id) => deleteHotel(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hotels"] });
     },

@@ -1,183 +1,236 @@
-import React, { useState } from "react";
-import { ArrowLeft, Save, Edit2, Trash2, AlertTriangle, RotateCcw, Image as ImageIcon, Star, Phone, Languages } from "lucide-react";
-import axiosClient from "../api/axiosClient";
-import { useQueryClient } from "@tanstack/react-query";
+import React, { useState, useEffect } from "react";
+import { User, MapPin, Star, UploadCloud, Save, X, Edit2, ShieldAlert, ArrowLeft, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
+import { validateMediaType } from "../utils/validators.js";
+import { useUpdateGuideMutation, useDeleteGuideMutation } from "../mutations/guideMutation";
 
 const getImageUrl = (photo) => {
-  if (!photo) return "https://picsum.photos/400/400";
+  if (!photo) return "";
   if (typeof photo === "string") return photo;
-  return photo.url || photo.secure_url || "https://picsum.photos/400/400";
+  return photo.url || photo.secure_url || "";
 };
 
-const GuideDetails = ({ guide, onBack }) => {
-  const queryClient = useQueryClient();
-  const [data, setData] = useState(guide);
+const GuideDetails = ({ guide, setSelectedGuide }) => {
+  const [data, setData] = useState({});
   const [isEditing, setIsEditing] = useState(false);
-  const [deleteMode, setDeleteMode] = useState(null);
-  const [isPending, setIsPending] = useState(false);
+  const [newPhotoFiles, setNewPhotoFiles] = useState([]);
 
-  const handleChange = (e) => setData({ ...data, [e.target.name]: e.target.value });
+  const updateMutation = useUpdateGuideMutation();
+  const deleteMutation = useDeleteGuideMutation();
+
+  useEffect(() => {
+    if (guide) {
+      setData({
+        ...guide,
+        contactPhone: guide?.contact?.phone || "",
+        contactEmail: guide?.contact?.email || "",
+        contactWebsite: guide?.contact?.website || "",
+        parsedLanguages: guide?.languages ? guide.languages.join(", ") : "",
+        parsedSpeciality: guide?.speciality ? guide.speciality.join(", ") : "",
+      });
+    }
+  }, [guide]);
+
+  const handleChange = (e) => {
+    setData({ ...data, [e.target.name]: e.target.value });
+  };
 
   const handleSave = async () => {
-    setIsPending(true);
-    try {
-      const formData = new FormData();
-      const payload = {
-        name: data.name,
-        bio: data.bio,
-        phoneNumber: data.phoneNumber,
-        pricePerDay: data.pricePerDay,
-        languages: typeof data.languages === "string" ? data.languages.split(",").map((s) => s.trim()) : data.languages,
-      };
+    const payload = {
+      title: data.title,
+      name: data.name,
+      subCategory: data.subCategory,
+      experienceYears: Number(data.experienceYears || 0),
+      fee: Number(data.fee || 0),
+    };
 
-      formData.append("data", JSON.stringify(payload));
-      await axiosClient.patch(`/services/guides/${data._id}`, formData);
-      queryClient.invalidateQueries({ queryKey: ["guides"] });
+    const formData = new FormData();
+    Object.keys(payload).forEach((k) => formData.append(k, payload[k]));
+
+    if (data.contactPhone || data.contactEmail) {
+      formData.append("contact", JSON.stringify({
+        phone: data.contactPhone,
+        email: data.contactEmail,
+        website: data.contactWebsite
+      }));
+    }
+    if (data.parsedLanguages) {
+      formData.append("languages", JSON.stringify(data.parsedLanguages.split(',').map(i=>i.trim()).filter(Boolean)));
+    }
+    if (data.parsedSpeciality) {
+      formData.append("speciality", JSON.stringify(data.parsedSpeciality.split(',').map(i=>i.trim()).filter(Boolean)));
+    }
+    if (newPhotoFiles.length > 0) {
+        newPhotoFiles.forEach(f => formData.append("GuidePhotos", f));
+    }
+    // We send existing photos state so the backend doesn't delete them. 
+    formData.append("existingPhotos", JSON.stringify(guide.photos || []));
+
+    try {
+      const targetId = guide.service?._id || guide._id;
+      await updateMutation.mutateAsync({ guideId: targetId, guideData: formData });
+      toast.success("Profile updated!");
       setIsEditing(false);
-      toast.success("Guide profile updated!");
-    } catch (_err) {
-      toast.error("Update failed");
-    } finally {
-      setIsPending(false);
+      setNewPhotoFiles([]);
+    } catch(err) {
+      toast.error(err?.response?.data?.message || "Failed to update");
     }
   };
 
-  const handleSoftDelete = async () => {
+  const handleDelete = async () => {
     try {
-      await axiosClient.delete(`/services/guides/${data._id}`, { params: { hard: false } });
-      queryClient.invalidateQueries({ queryKey: ["guides"] });
-      toast.success("Guide soft-deleted");
-      onBack();
-    } catch (_err) {
-      toast.error("Soft delete failed");
+      const targetId = guide?.service?._id || guide?._id;
+      await deleteMutation.mutateAsync(targetId);
+      toast.success("Profile deleted");
+      setSelectedGuide(null);
+    } catch(err) {
+       toast.error(err?.response?.data?.message || "Failed to delete");
     }
   };
 
-  const handleRestore = async () => {
-    try {
-      await axiosClient.patch(`/services/guides/restore/${data._id}`);
-      queryClient.invalidateQueries({ queryKey: ["guides"] });
-      setData({ ...data, isDeleted: false, deletedAt: null });
-      toast.success("Guide restored!");
-    } catch (_err) {
-      toast.error("Restore failed");
-    }
-  };
-
-  const handleHardDelete = async () => {
-    try {
-      await axiosClient.delete(`/services/guides/${data._id}`, { params: { hard: true } });
-      queryClient.invalidateQueries({ queryKey: ["guides"] });
-      toast.error("Guide permanently erased");
-      onBack();
-    } catch (_err) {
-      toast.error("Permanent delete failed");
-    }
-  };
+  const displayImages = guide?.photos || [];
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 font-sans">
-      <div className="h-16 border-b px-8 flex items-center justify-between bg-white sticky top-0 z-20">
-        <button onClick={onBack} className="flex items-center text-gray-600 font-semibold hover:text-gray-900">
-          <ArrowLeft size={18} className="mr-2" /> Back to Guides
-        </button>
-
-        <div className="flex items-center gap-2">
-          {data.isDeleted ? (
-            <button onClick={handleRestore} className="flex items-center px-4 py-2 rounded-xl bg-green-50 text-green-700 font-bold text-xs border border-green-200">
-              <RotateCcw size={14} className="mr-1.5" /> Restore Guide
-            </button>
-          ) : (
-            <button onClick={() => setDeleteMode("soft")} className="flex items-center px-4 py-2 rounded-xl bg-yellow-50 text-yellow-700 font-bold text-xs border border-yellow-200">
-              <Trash2 size={14} className="mr-1.5" /> Soft Delete
-            </button>
-          )}
-
-          <button onClick={() => setDeleteMode("hard")} className="flex items-center px-4 py-2 rounded-xl bg-red-50 text-red-600 font-bold text-xs border border-red-200">
-            <AlertTriangle size={14} className="mr-1.5" /> Permanent Delete
+    <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
+      <div className="w-full h-full flex flex-col bg-white">
+        <div className="h-16 border-b px-8 flex items-center justify-between">
+          <button onClick={() => setSelectedGuide(null)} className="flex items-center text-gray-600 hover:text-black">
+            <ArrowLeft size={20} className="mr-2" /> Back summary
           </button>
 
-          <button
-            onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
-            disabled={isPending}
-            className={`flex items-center px-6 py-2 rounded-xl font-bold text-xs ${
-              isEditing ? "bg-purple-600 text-white shadow-md" : "bg-gray-100 text-gray-700 border"
-            }`}
-          >
-            {isEditing ? <><Save size={14} className="mr-1.5" /> Save Changes</> : <><Edit2 size={14} className="mr-1.5" /> Edit All Fields</>}
-          </button>
-        </div>
-      </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
+              className={`flex items-center px-4 py-2 rounded-lg font-bold ${
+                isEditing ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-700"
+              }`}
+            >
+              {isEditing ? <><Save size={16} className="mr-2" /> Save</> : <><Edit2 size={16} className="mr-2" /> Edit</>}
+            </button>
 
-      <div className="flex-1 overflow-y-auto p-8 space-y-6 max-w-4xl mx-auto w-full">
-        <div className="bg-white p-6 rounded-2xl border space-y-4 shadow-sm">
-          <div className="flex justify-between items-center border-b pb-3">
-            <span className="text-xs font-mono text-gray-400">ID: {data._id}</span>
-            <span className={`text-xs px-3 py-1 rounded-full font-bold ${data.isDeleted ? "bg-red-100 text-red-700" : "bg-purple-100 text-purple-700"}`}>
-              {data.isDeleted ? "Status: Soft Deleted" : "Status: Active"}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase">Guide Name</label>
-              <input name="name" disabled={!isEditing} value={data.name || ""} onChange={handleChange} className="w-full p-2 border-b font-bold text-lg bg-transparent" />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase">Price Per Day (₹)</label>
-              <input name="pricePerDay" disabled={!isEditing} value={data.pricePerDay || ""} onChange={handleChange} className="w-full p-2 border rounded-xl text-sm" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase">Phone Number</label>
-              <input name="phoneNumber" disabled={!isEditing} value={data.phoneNumber || ""} onChange={handleChange} className="w-full p-2 border rounded-xl text-sm font-mono" />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase">Languages Spoken</label>
-              <input name="languages" disabled={!isEditing} value={Array.isArray(data.languages) ? data.languages.join(", ") : data.languages || ""} onChange={handleChange} className="w-full p-2 border rounded-xl text-sm" />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-bold text-gray-400 uppercase">Bio / Experience Details</label>
-            <textarea name="bio" disabled={!isEditing} value={data.bio || ""} onChange={handleChange} rows={4} className="w-full p-3 border rounded-xl text-sm resize-none" />
+            <button
+              onClick={handleDelete}
+              className="px-4 py-2 bg-red-50 text-red-600 rounded-lg flex items-center font-bold hover:bg-red-100 focus:outline-none"
+            >
+              <Trash2 size={16} className="mr-2" /> Delete 
+            </button>
           </div>
         </div>
 
-        {/* PHOTO ASSETS */}
-        <div className="bg-white p-6 rounded-2xl border shadow-sm space-y-4">
-          <h3 className="text-xs font-bold text-gray-700 uppercase flex items-center gap-2">
-            <ImageIcon size={16} /> Guide Photo Assets ({data.photos?.length || (data.profilePhoto ? 1 : 0)})
-          </h3>
-          <div className="grid grid-cols-4 gap-4">
-            {(data.photos || [data.profilePhoto]).filter(Boolean).map((photo, i) => (
-              <div key={i} className="aspect-square rounded-xl overflow-hidden border">
-                <img src={getImageUrl(photo)} className="w-full h-full object-cover" alt="" />
+        <div className="flex-1 overflow-y-auto p-8 space-y-6">
+          <input
+            name="name"
+            value={data.name || ""}
+            onChange={handleChange}
+            disabled={!isEditing}
+            className={`w-full text-4xl font-extrabold bg-transparent ${isEditing ? 'border-b-2 border-purple-500' : ''}`}
+          />
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-xl border mt-6">
+            <div>
+              <span className="text-xs font-bold text-gray-500 uppercase block mb-1">Title Display</span>
+              <input name="title" value={data.title || ""} onChange={handleChange} disabled={!isEditing} className="w-full bg-transparent font-medium" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-gray-500 uppercase block mb-1">Type</span>
+              <select 
+                name="subCategory" 
+                value={data.subCategory || ""} 
+                onChange={handleChange} 
+                disabled={!isEditing}
+                className="w-full bg-transparent font-medium disabled:opacity-100"
+              >
+                <option value="Guide">Individual Guide</option>
+                <option value="Travel Agencies">Travel Agency</option>
+              </select>
+            </div>
+            <div>
+              <span className="text-xs font-bold text-gray-500 uppercase block mb-1">Fee (₹)</span>
+              <input name="fee" type="number" step="1" value={data.fee || ""} onChange={handleChange} disabled={!isEditing} className="w-full bg-transparent font-medium" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-gray-500 uppercase block mb-1">Experience (Yrs)</span>
+              <input name="experienceYears" type="number" value={data.experienceYears || ""} onChange={handleChange} disabled={!isEditing} className="w-full bg-transparent font-medium" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+               <div>
+                <span className="text-sm font-bold text-gray-800 mb-2 block">Specialities</span>
+                <input
+                  name="parsedSpeciality"
+                  value={data.parsedSpeciality || ""}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  placeholder="e.g. Monuments, Food Tours"
+                  className="w-full border-b p-1 bg-transparent outline-none"
+                />
+               </div>
+
+               <div>
+                <span className="text-sm font-bold text-gray-800 mb-2 block">Languages</span>
+                <input
+                  name="parsedLanguages"
+                  value={data.parsedLanguages || ""}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  placeholder="e.g. English, French"
+                  className="w-full border-b p-1 bg-transparent outline-none"
+                />
+               </div>
+               
+               <div className="bg-gray-50 p-4 rounded-xl border space-y-3 mt-4">
+                 <h4 className="text-sm font-bold text-gray-800">Contact Details</h4>
+                 <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 w-16">Phone:</span>
+                    <input name="contactPhone" value={data.contactPhone || ""} onChange={handleChange} disabled={!isEditing} className="flex-1 bg-transparent border-b outline-none"/>
+                 </div>
+                 <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 w-16">Email:</span>
+                    <input name="contactEmail" value={data.contactEmail || ""} onChange={handleChange} disabled={!isEditing} className="flex-1 bg-transparent border-b outline-none"/>
+                 </div>
+                 <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 w-16">Web:</span>
+                    <input name="contactWebsite" value={data.contactWebsite || ""} onChange={handleChange} disabled={!isEditing} className="flex-1 bg-transparent border-b outline-none"/>
+                 </div>
+               </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                 <h4 className="text-sm font-bold text-gray-800 mb-2">Display Photos</h4>
+                 <div className="grid grid-cols-3 gap-3">
+                   {displayImages.length > 0 && newPhotoFiles.length === 0 && displayImages.map((photo, i) => (
+                      <div key={i} className="aspect-square rounded-xl overflow-hidden border">
+                        <img src={getImageUrl(photo)} alt={`display ${i}`} className="w-full h-full object-cover" />
+                      </div>
+                   ))}
+                   {newPhotoFiles.length > 0 && Array.from(newPhotoFiles).map((file, i) => (
+                      <div key={i} className="aspect-square rounded-xl overflow-hidden border">
+                        <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt={`new upload ${i}`} />
+                      </div>
+                   ))}
+                 </div>
+                 
+                 {isEditing && (
+                    <div className="mt-3">
+                      <input type="file" multiple id="gPhotoUpdate" onChange={(e) => {
+                const files = Array.from(e.target.files).slice(0, 2);
+                for (let f of files) {
+                  const v = validateMediaType(f, 'image');
+                  if (v !== true) return toast.error(v);
+                }
+                setNewPhotoFiles(files);
+              }} accept="image/*" className="hidden"/>
+                      <label htmlFor="gPhotoUpdate" className="text-purple-600 text-sm font-bold flex items-center gap-1 cursor-pointer w-fit bg-purple-50 py-1.5 px-3 rounded-lg"><UploadCloud size={16}/> Replace Photos (Max 2)</label>
+                    </div>
+                 )}
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {deleteMode && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-[400px] shadow-2xl">
-            <h3 className="text-lg font-bold">{deleteMode === "hard" ? "Permanent Delete?" : "Soft Delete?"}</h3>
-            <p className="text-sm text-gray-600 mt-2">
-              {deleteMode === "hard" ? "Erase this guide permanently from database?" : "Hide this guide from public search?"}
-            </p>
-            <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setDeleteMode(null)} className="px-4 py-2 border rounded-xl text-sm font-bold">Cancel</button>
-              <button onClick={deleteMode === "hard" ? handleHardDelete : handleSoftDelete} className="px-4 py-2 bg-red-600 text-white font-bold rounded-xl text-sm">
-                Confirm Delete
-              </button>
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

@@ -1,5 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { getAds, getAdsByPlacement, getAdStats } from "../api/ads.api";
+import { getAds, getAdsByPlacement, getAdStats, getCampaigns } from "../api/ads.api.js";
+
+export const useCampaignsQuery = () => {
+  return useQuery({
+    queryKey: ["campaigns"],
+    queryFn: getCampaigns,
+  });
+};
 
 export const useAdsQuery = () => {
   return useQuery({

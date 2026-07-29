@@ -16,7 +16,7 @@ export const getAdsByPlacement = async (placement, limit = 1) => {
 
 // 3. Bundled Advertiser + Ad Campaign Creation (FormData)
 export const createAds = async (formData) => {
-  const res = await axiosClient.post("/advertisment/bundled", formData, {
+  const res = await axiosClient.post("/advertisment/new", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -25,21 +25,32 @@ export const createAds = async (formData) => {
   return res.data;
 };
 
-// 4. Create Standalone Ad
-export const createSingleAd = async (adData) => {
-  const res = await axiosClient.post("/advertisment", adData);
+// 4. Create Campaign
+export const createCampaign = async (campaignData) => {
+  const res = await axiosClient.post("/advertisment/campaign", campaignData);
   return res.data;
 };
 
-// 5. Create Standalone Advertiser Profile
-export const createAdvertiser = async (advertiserData) => {
-  const res = await axiosClient.post("/advertisment/advertiser", advertiserData);
+// 5. Get Campaigns
+export const getCampaigns = async () => {
+  const res = await axiosClient.get("/advertisment/campaign");
   return res.data;
 };
 
 // 6. Pause / Update Ad Status ('active', 'paused', 'draft', 'ended')
 export const updateAdStatus = async (adId, status) => {
-  const res = await axiosClient.patch(`/advertisment/status/${adId}`, { status });
+  const res = await axiosClient.put(`/advertisment/status/${adId}`, { status });
+  return res.data;
+};
+
+// 6.5 Full Ad Update (FormData)
+export const updateAd = async ({ adId, formData }) => {
+  const res = await axiosClient.put(`/advertisment/${adId}`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    timeout: 300000,
+  });
   return res.data;
 };
 

@@ -1,197 +1,237 @@
-import React, { useState } from "react";
-import { MapPin, Plus, X, UploadCloud, Star, Utensils } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import axiosClient from "../api/axiosClient";
-import { useAddRestaurantMutation } from "../mutations/restaurantMutation";
+import React, { useState, useContext } from "react";
+import { MapPin, Plus, UploadCloud } from "lucide-react";
+import { PlaceContext } from "../contextApi/places.jsx";
+import RestaurantDetails from "./RestaurantDetails.jsx";
+import { useRestaurantsQuery } from "../queries/restaurantQueries.js";
+import { useAddRestaurantMutation } from "../mutations/restaurantMutation.js";
 import toast from "react-hot-toast";
+import { Req, RequiredNotice } from "../components/RequiredTag.jsx";
+import FormField from "../components/FormField.jsx";
+import { validators, runValidators, validateMediaType } from "../utils/validators.js";
 
-const getImageUrl = (photo) => {
-  if (!photo) return "https://picsum.photos/600/400";
-  if (typeof photo === "string") return photo;
-  return photo.url || photo.secure_url || "https://picsum.photos/600/400";
+const RestaurantCard = ({ restaurant }) => {
+  const { setClickedPlaceHandler } = useContext(PlaceContext);
+  const displayImage = restaurant?.photos?.[0]?.url || restaurant?.photos?.[0] || "https://via.placeholder.com/400x300?text=No+Image";
+
+  return (
+    <div
+      className="bg-white rounded-xl shadow-lg overflow-hidden border flex flex-col cursor-pointer group"
+      onClick={() => setClickedPlaceHandler(restaurant)}
+    >
+      <div className="relative h-56 bg-gray-900">
+        <img src={displayImage} alt={restaurant?.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+      </div>
+      <div className="p-5 flex flex-col flex-grow">
+        <div className="flex justify-between items-start mb-2">
+          <h3 className="font-bold text-xl">{restaurant?.title}</h3>
+          <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2 py-1 rounded">
+            {restaurant?.subCategory}
+          </span>
+        </div>
+        <p className="text-gray-500 text-sm mt-1 flex items-center">
+          <MapPin size={14} className="mr-1"/> {restaurant?.location}
+        </p>
+      </div>
+    </div>
+  );
 };
 
-const RestaurantCard = ({ restaurant, onSelect }) => (
-  <div
-    onClick={() => onSelect(restaurant)}
-    className={`bg-white rounded-2xl shadow-lg overflow-hidden border transition-all duration-300 hover:shadow-2xl flex flex-col h-full cursor-pointer group ${
-      restaurant.isDeleted ? "opacity-60 border-red-300 bg-red-50/30" : "border-gray-100"
-    }`}
-  >
-    <div className="relative h-56 bg-gray-900 overflow-hidden">
-      <img
-        src={getImageUrl(restaurant?.photos?.[0])}
-        alt={restaurant?.name}
-        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-      />
-      <div className="absolute top-3 left-3 z-20 flex gap-2">
-        <span className="bg-orange-600 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-md uppercase tracking-wider shadow">
-          {restaurant?.cuisine?.length ? (Array.isArray(restaurant.cuisine) ? restaurant.cuisine[0] : restaurant.cuisine) : "Restaurant"}
-        </span>
-        {restaurant.isDeleted && (
-          <span className="bg-red-600 text-white text-[10px] font-extrabold px-2 py-1 rounded-md uppercase tracking-wider shadow">
-            Soft Deleted
-          </span>
-        )}
-      </div>
+const Restaurants = () => {
+  const { data, isLoading, isError } = useRestaurantsQuery();
+  const { clickedPlace } = useContext(PlaceContext);
+  const addRestaurantMutation = useAddRestaurantMutation();
 
-      <div className="absolute bottom-3 right-3 z-20 bg-black/70 backdrop-blur-md text-white text-xs px-2.5 py-1 rounded-lg font-bold flex items-center gap-1">
-        <Star size={12} className="text-yellow-400 fill-yellow-400" />
-        {restaurant?.rating || "4.5"}
-      </div>
-    </div>
-
-    <div className="p-5 flex flex-col flex-grow">
-      <h3 className="font-extrabold text-lg text-gray-900 line-clamp-1">{restaurant?.name}</h3>
-      <div className="flex items-center text-gray-500 text-xs font-medium mt-1 mb-2">
-        <MapPin size={12} className="mr-1 text-orange-500 flex-shrink-0" />
-        <span className="line-clamp-1">{restaurant?.address || restaurant?.location?.address || "Address"}</span>
-      </div>
-      <p className="text-gray-600 text-xs line-clamp-2 flex-grow leading-relaxed">
-        {restaurant?.description || "No description provided."}
-      </p>
-      <div className="pt-3 mt-3 border-t border-gray-100 flex justify-between items-center text-[11px] font-bold text-gray-500">
-        <span className="text-orange-700">₹{restaurant?.averageCost || "500 - 1,500"} for two</span>
-        <span className="text-blue-600 hover:underline">Manage All Fields →</span>
-      </div>
-    </div>
-  </div>
-);
-
-const Restaurants = ({ setSelectedRestaurant }) => {
-  const [includeDeleted, setIncludeDeleted] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [search, setSearch] = useState("");
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["restaurants", includeDeleted],
-    queryFn: async () => {
-      const res = await axiosClient.get("/services/restaurants", { params: { includeDeleted } });
-      return res.data;
-    },
+  const [form, setForm] = useState({ 
+    title: "", location: "", subCategory: "Restaurants", 
+    rating: "", timings: "", averageCost: "",
+    phone: "", email: "", website: "", 
+    description: "", cuisine: "" 
   });
-
-  const { mutateAsync: addRestaurant, isPending } = useAddRestaurantMutation();
-
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    city: "Jhansi",
-    address: "",
-    contactNumber: "",
-    averageCost: "",
-    rating: "4.5",
-    cuisine: "",
-    openingHours: "10:00 AM - 11:00 PM",
-  });
-
+  
   const [photoFiles, setPhotoFiles] = useState([]);
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const RULES = {
+    title: [validators.required],
+    location: [validators.required],
+    phone: [validators.required, validators.phone],
+    email: [validators.email],
+    website: [validators.url],
+    rating: [validators.number({ min: 0, max: 5 })],
+    averageCost: [validators.number({ min: 0 })],
+  };
 
-  const handleSubmit = async () => {
-    if (!form.name || photoFiles.length === 0) {
-      toast.error("Restaurant name and at least 1 photo are required");
-      return;
-    }
+  const [touched, setTouched] = useState({});
+  const [fieldErrors, setFieldErrors] = useState({});
 
-    const formData = new FormData();
-    const payload = {
-      ...form,
-      cuisine: form.cuisine ? form.cuisine.split(",").map((s) => s.trim()) : [],
-    };
+  const validate = (name, value) => {
+    const rules = RULES[name];
+    if (!rules) return null;
+    return runValidators(value, rules, name);
+  };
 
-    formData.append("data", JSON.stringify(payload));
-    photoFiles.forEach((file) => formData.append("photos", file));
-
-    try {
-      await addRestaurant(formData);
-      toast.success("Restaurant added!");
-      setShowModal(false);
-      setPhotoFiles([]);
-    } catch (_err) {
-      toast.error("Failed to add restaurant");
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    if (touched[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: validate(name, value) }));
     }
   };
 
-  const restaurants = (data?.restaurants || []).filter((r) =>
-    r.name?.toLowerCase().includes(search.toLowerCase())
-  );
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    setTouched((prev) => ({ ...prev, [name]: true }));
+    setFieldErrors((prev) => ({ ...prev, [name]: validate(name, value) }));
+  };
 
-  if (isLoading) return <div className="p-8 font-bold text-center text-gray-500">Loading Restaurants...</div>;
+  const handleSubmit = async () => {
+    const requiredFields = ["title", "location", "phone"];
+    const optionalFields = ["email", "website", "subCategory", "rating", "timings", "averageCost", "description", "cuisine"];
+    const allFields = [...requiredFields, ...optionalFields];
+
+    const newTouched = {};
+    const newErrors = {};
+    let hasError = false;
+
+    allFields.forEach((field) => {
+      newTouched[field] = true;
+      const error = validate(field, form[field] || "");
+      newErrors[field] = error;
+      if (error) hasError = true;
+    });
+
+    setTouched(newTouched);
+    setFieldErrors(newErrors);
+
+    if (hasError || photoFiles.length === 0) {
+      if (photoFiles.length === 0) toast.error("Photo is required");
+      toast.error("Please fix the highlighted errors before submitting.");
+      return;
+    }
+
+    const payload = {
+      title: form.title,
+      location: form.location,
+      subCategory: form.subCategory,
+      rating: Number(form.rating),
+      timings: form.timings,
+      averageCost: Number(form.averageCost),
+      description: form.description,
+      contact: JSON.stringify({
+        phone: form.phone,
+        email: form.email,
+        website: form.website
+      }),
+      cuisine: JSON.stringify(form.cuisine.split(',').map(i=>i.trim()).filter(Boolean)),
+    };
+
+    const formData = new FormData();
+    Object.keys(payload).forEach((k) => formData.append(k, payload[k]));
+    photoFiles.forEach(f => formData.append("RestaurantPhotos", f));
+
+    try {
+      await addRestaurantMutation.mutateAsync(formData);
+      toast.success("Restaurant added successfully!");
+      setShowModal(false);
+      setPhotoFiles([]);
+      setForm({ title: "", location: "", subCategory: "Restaurants", rating: "", timings: "", averageCost: "", phone: "", email: "", website: "", description: "", cuisine: "" });
+      setTouched({});
+      setFieldErrors({});
+    } catch(err) {
+      toast.error(err?.response?.data?.message || "Failed to add restaurant");
+    }
+  };
+
+  if (isLoading) return <div className="flex justify-center items-center h-screen font-semibold">Loading Restaurants...</div>;
+  if (isError) return <div className="flex justify-center items-center h-screen text-red-500">Failed to load restaurants.</div>;
+  if (clickedPlace) return <RestaurantDetails />;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-6 font-sans">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border">
-          <input
-            type="text"
-            placeholder="Search restaurants by name..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-1/3 border p-2.5 rounded-xl text-sm outline-none focus:border-orange-500"
-          />
-
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700 bg-gray-100 px-3 py-2 rounded-xl border">
-              <input
-                type="checkbox"
-                checked={includeDeleted}
-                onChange={(e) => setIncludeDeleted(e.target.checked)}
-                className="rounded text-orange-600"
-              />
-              Show Soft-Deleted Records
-            </label>
-
-            <button
-              onClick={() => setShowModal(true)}
-              className="bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-orange-700 shadow-md"
-            >
-              <Plus size={16} /> Add Restaurant
-            </button>
-          </div>
+    <div className="min-h-screen bg-gray-50 py-12 px-4">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+           <h1 className="text-3xl font-black text-gray-900">Dining & Nightlife</h1>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {restaurants.map((restaurant) => (
-            <RestaurantCard key={restaurant._id} restaurant={restaurant} onSelect={setSelectedRestaurant} />
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {(data?.restaurants || []).map((r) => <RestaurantCard key={r._id} restaurant={r} />)}
         </div>
       </div>
 
+      <button onClick={() => setShowModal(true)} className="fixed bottom-8 right-8 bg-orange-600 text-white p-4 rounded-full shadow-lg hover:scale-105 transition-transform">
+        <Plus size={28} />
+      </button>
+
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto space-y-4">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h2 className="text-xl font-bold">New Restaurant Listing</h2>
-              <button onClick={() => setShowModal(false)}><X size={20} /></button>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-6 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">Add Dining Location</h2>
+              <button className="text-gray-500 hover:text-black" onClick={()=> setShowModal(false)}>Close</button>
             </div>
 
-            <input name="name" placeholder="Restaurant Name *" onChange={handleChange} className="w-full border p-2.5 rounded-xl text-sm" />
-            <textarea name="description" placeholder="Description..." onChange={handleChange} rows={3} className="w-full border p-2.5 rounded-xl text-sm resize-none" />
+            <RequiredNotice />
 
             <div className="grid grid-cols-2 gap-4">
-              <input name="averageCost" placeholder="Avg Cost for Two (₹)" onChange={handleChange} className="border p-2.5 rounded-xl text-sm" />
-              <input name="contactNumber" placeholder="Contact Number" onChange={handleChange} className="border p-2.5 rounded-xl text-sm" />
+              <FormField label="Restaurant Title" required error={fieldErrors.title?.error} hint={fieldErrors.title?.hint || "e.g. The Spicy Spoon"} touched={touched.title} valid={touched.title && !fieldErrors.title}>
+                <input name="title" placeholder="Restaurant Title" value={form.title} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
+              </FormField>
+              <FormField label="Location / Address" required error={fieldErrors.location?.error} hint={fieldErrors.location?.hint || "e.g. Main Street"} touched={touched.location} valid={touched.location && !fieldErrors.location}>
+                <input name="location" placeholder="Location/Address" value={form.location} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
+              </FormField>
+              
+              <FormField label="Category" optional hint="Type of dining">
+                <select name="subCategory" value={form.subCategory} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded">
+                  <option value="Restaurants">Restaurants</option>
+                  <option value="Cafes">Cafes</option>
+                  <option value="Bars">Bars</option>
+                  <option value="Fast Food">Fast Food</option>
+                </select>
+              </FormField>
+
+              <FormField label="Timings" optional hint="e.g. 9 AM - 11 PM">
+                <input name="timings" placeholder="e.g. 9 AM - 11 PM" value={form.timings} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
+              </FormField>
+              <FormField label="Rating" optional error={fieldErrors.rating?.error} hint={fieldErrors.rating?.hint || "0.0 - 5.0"} touched={touched.rating} valid={touched.rating && !fieldErrors.rating}>
+                <input type="number" step="0.1" name="rating" placeholder="0.0 - 5.0" value={form.rating} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
+              </FormField>
+              <FormField label="Average Cost" optional error={fieldErrors.averageCost?.error} hint={fieldErrors.averageCost?.hint || "Average Cost ($)"} touched={touched.averageCost} valid={touched.averageCost && !fieldErrors.averageCost}>
+                <input type="number" name="averageCost" placeholder="Average Cost ($)" value={form.averageCost} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
+              </FormField>
+
+              <FormField label="Contact Phone" required error={fieldErrors.phone?.error} hint={fieldErrors.phone?.hint || "Contact Phone"} touched={touched.phone} valid={touched.phone && !fieldErrors.phone}>
+                <input name="phone" placeholder="Contact Phone" value={form.phone} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
+              </FormField>
+              <FormField label="Contact Email" optional error={fieldErrors.email?.error} hint={fieldErrors.email?.hint || "Contact Email"} touched={touched.email} valid={touched.email && !fieldErrors.email}>
+                <input name="email" placeholder="Contact Email" value={form.email} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
+              </FormField>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <input name="cuisine" placeholder="Cuisines (comma separated)" onChange={handleChange} className="border p-2.5 rounded-xl text-sm" />
-              <input name="openingHours" placeholder="Opening Hours" defaultValue="10:00 AM - 11:00 PM" onChange={handleChange} className="border p-2.5 rounded-xl text-sm" />
-            </div>
+            <FormField label="Website URL" optional error={fieldErrors.website?.error} hint={fieldErrors.website?.hint || "https://..."} touched={touched.website} valid={touched.website && !fieldErrors.website}>
+              <input name="website" placeholder="https://..." value={form.website} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
+            </FormField>
+            <FormField label="Cuisine" optional hint="Comma separated, e.g. Italian, Mexican">
+              <input name="cuisine" placeholder="Comma separated, e.g. Italian, Mexican" value={form.cuisine} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
+            </FormField>
+            <FormField label="Description" optional hint="Description">
+              <textarea name="description" placeholder="Description" rows={3} value={form.description} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
+            </FormField>
 
-            <input name="address" placeholder="Full Address" onChange={handleChange} className="w-full border p-2.5 rounded-xl text-sm" />
-
-            <div className="border border-dashed p-4 rounded-xl text-center bg-gray-50">
-              <input type="file" multiple accept="image/*" id="restPhotos" onChange={(e) => setPhotoFiles(Array.from(e.target.files))} className="hidden" />
-              <label htmlFor="restPhotos" className="cursor-pointer text-xs font-bold text-orange-600 flex items-center justify-center gap-2">
-                <UploadCloud size={20} /> {photoFiles.length ? `${photoFiles.length} Photos Selected` : "Upload Restaurant Photos *"}
+            <div className="border border-dashed border-gray-300 p-4 rounded-xl text-center bg-gray-50 flex items-center justify-center">
+              <input type="file" multiple accept="image/*" id="restPhoto" onChange={(e) => {
+                const files = Array.from(e.target.files).slice(0, 4);
+                for (let f of files) {
+                  const v = validateMediaType(f, 'image');
+                  if (v !== true) return toast.error(v);
+                }
+                setPhotoFiles(files);
+              }} className="hidden" />
+              <label htmlFor="restPhoto" className="cursor-pointer text-sm font-bold text-orange-600 flex items-center gap-2">
+                <UploadCloud size={20} />
+                {photoFiles.length > 0 ? `${photoFiles.length} Photos Selected (Max 4)` : <span>Upload Cover Photos <Req /> (Max 4)</span>}
               </label>
             </div>
 
-            <button onClick={handleSubmit} disabled={isPending} className="w-full bg-orange-600 text-white py-3 rounded-xl font-bold shadow-md">
-              {isPending ? "Creating..." : "Save Restaurant Record"}
-            </button>
+            <button onClick={handleSubmit} className="w-full bg-orange-600 hover:bg-orange-700 transition-colors text-white py-3 rounded-xl font-bold mt-4">Create Entity</button>
           </div>
         </div>
       )}

@@ -14,3 +14,18 @@ export const addHotel = async (formData) => {
   });
   return res.data;
 };
+
+export const updateHotel = async (hotelId, formData) => {
+  const res = await axiosClient.put(`/services/hotel/${hotelId}`, formData, {
+    headers: {  
+      "Content-Type": "multipart/form-data",
+    },
+    timeout: 60000,
+  });
+  return res.data;
+};
+
+export const deleteHotel = async (hotelId) => {
+  const res = await axiosClient.delete(`/services/hotel/${hotelId}`);
+  return res.data;
+};

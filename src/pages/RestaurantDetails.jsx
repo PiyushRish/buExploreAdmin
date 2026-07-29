@@ -1,203 +1,240 @@
-import React, { useState } from "react";
-import { ArrowLeft, Save, Edit2, Trash2, AlertTriangle, RotateCcw, Image as ImageIcon } from "lucide-react";
-import axiosClient from "../api/axiosClient";
-import { useQueryClient } from "@tanstack/react-query";
+import React, { useState, useContext, useEffect } from "react";
+import { MapPin, Save, Edit2, ArrowLeft, Trash2, UploadCloud } from "lucide-react";
+import { PlaceContext } from "../contextApi/places.jsx";
+import { useDeleteRestaurantMutation, useUpdateRestaurantMutation } from "../mutations/restaurantMutation.js";
 import toast from "react-hot-toast";
+import { validateMediaType } from "../utils/validators.js";
 
-const getImageUrl = (photo) => {
-  if (!photo) return "https://picsum.photos/600/400";
-  if (typeof photo === "string") return photo;
-  return photo.url || photo.secure_url || "https://picsum.photos/600/400";
-};
-
-const RestaurantDetails = ({ restaurant, onBack }) => {
-  const queryClient = useQueryClient();
-  const [data, setData] = useState(restaurant);
+const RestaurantDetails = () => {
+  const { clickedPlace: restaurant, setClickedPlaceHandler } = useContext(PlaceContext);
+  
+  const [data, setData] = useState({});
   const [isEditing, setIsEditing] = useState(false);
-  const [deleteMode, setDeleteMode] = useState(null);
-  const [isPending, setIsPending] = useState(false);
+  const [newPhotoFiles, setNewPhotoFiles] = useState([]);
 
-  const handleChange = (e) => setData({ ...data, [e.target.name]: e.target.value });
+  useEffect(() => {
+    if (restaurant) {
+      setData({
+        ...restaurant,
+        contactPhone: restaurant?.contact?.phone || "",
+        contactEmail: restaurant?.contact?.email || "",
+        contactWebsite: restaurant?.contact?.website || "",
+        parsedCuisine: restaurant?.cuisine ? restaurant.cuisine.join(", ") : "",
+      });
+    }
+  }, [restaurant]);
+
+  const updateMutation = useUpdateRestaurantMutation();
+  const deleteMutation = useDeleteRestaurantMutation();
+
+  if (!restaurant) return null;
+
+  const handleChange = (e) => {
+    setData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
 
   const handleSave = async () => {
-    setIsPending(true);
-    try {
-      const formData = new FormData();
-      const payload = {
-        name: data.name,
-        description: data.description,
-        city: data.city,
-        address: data.address,
-        contactNumber: data.contactNumber,
-        averageCost: data.averageCost,
-        openingHours: data.openingHours,
-        rating: Number(data.rating) || 4.5,
-        cuisine: typeof data.cuisine === "string" ? data.cuisine.split(",").map((s) => s.trim()) : data.cuisine,
-      };
+    const payload = {
+      title: data.title,
+      location: data.location,
+      subCategory: data.subCategory,
+      rating: Number(data.rating || 0),
+      averageCost: Number(data.averageCost || 0),
+      timings: data.timings,
+      description: data.description,
+    };
 
-      formData.append("data", JSON.stringify(payload));
-      await axiosClient.patch(`/services/restaurants/${data._id}`, formData);
-      queryClient.invalidateQueries({ queryKey: ["restaurants"] });
+    const formData = new FormData();
+    formData.append("data", JSON.stringify(payload));
+    
+    if (data.contactPhone || data.contactEmail) {
+      formData.append("contact", JSON.stringify({
+        phone: data.contactPhone,
+        email: data.contactEmail,
+        website: data.contactWebsite
+      }));
+    }
+    
+    if (data.parsedCuisine) {
+      formData.append("cuisine", JSON.stringify(data.parsedCuisine.split(',').map(i=>i.trim()).filter(Boolean)));
+    }
+    
+    if (newPhotoFiles.length > 0) {
+        newPhotoFiles.forEach(f => formData.append("RestaurantPhotos", f));
+    }
+    formData.append("existingPhotos", JSON.stringify(restaurant.photos || []));
+
+    try {
+      const targetId = restaurant.service?._id || restaurant._id;
+      await updateMutation.mutateAsync({ id: targetId, formData });
+      toast.success("Restaurant updated successfully!");
       setIsEditing(false);
-      toast.success("Restaurant details updated!");
-    } catch (_err) {
-      toast.error("Failed to update restaurant");
-    } finally {
-      setIsPending(false);
+      setNewPhotoFiles([]);
+    } catch(err) {
+      toast.error(err?.response?.data?.message || "Failed to update");
     }
   };
 
-  const handleSoftDelete = async () => {
+  const handleDelete = async () => {
     try {
-      await axiosClient.delete(`/services/restaurants/${data._id}`, { params: { hard: false } });
-      queryClient.invalidateQueries({ queryKey: ["restaurants"] });
-      toast.success("Restaurant soft-deleted");
-      onBack();
-    } catch (_err) {
-      toast.error("Soft delete failed");
+      const targetId = restaurant?.service?._id || restaurant?._id;
+      await deleteMutation.mutateAsync(targetId);
+      toast.success("Dining record deleted");
+      setClickedPlaceHandler(null);
+    } catch(err) {
+       toast.error(err?.response?.data?.message || "Failed to delete");
     }
   };
 
-  const handleRestore = async () => {
-    try {
-      await axiosClient.patch(`/services/restaurants/restore/${data._id}`);
-      queryClient.invalidateQueries({ queryKey: ["restaurants"] });
-      setData({ ...data, isDeleted: false, deletedAt: null });
-      toast.success("Restaurant restored successfully!");
-    } catch (_err) {
-      toast.error("Restore failed");
-    }
-  };
-
-  const handleHardDelete = async () => {
-    try {
-      await axiosClient.delete(`/services/restaurants/${data._id}`, { params: { hard: true } });
-      queryClient.invalidateQueries({ queryKey: ["restaurants"] });
-      toast.error("Restaurant permanently deleted");
-      onBack();
-    } catch (_err) {
-      toast.error("Permanent delete failed");
-    }
-  };
+  const displayImages = restaurant?.photos || [];
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 font-sans">
-      <div className="h-16 border-b px-8 flex items-center justify-between bg-white sticky top-0 z-20">
-        <button onClick={onBack} className="flex items-center text-gray-600 font-semibold hover:text-gray-900">
-          <ArrowLeft size={18} className="mr-2" /> Back to Restaurants
-        </button>
-
-        <div className="flex items-center gap-2">
-          {data.isDeleted ? (
-            <button onClick={handleRestore} className="flex items-center px-4 py-2 rounded-xl bg-green-50 text-green-700 font-bold text-xs border border-green-200">
-              <RotateCcw size={14} className="mr-1.5" /> Restore Restaurant
-            </button>
-          ) : (
-            <button onClick={() => setDeleteMode("soft")} className="flex items-center px-4 py-2 rounded-xl bg-yellow-50 text-yellow-700 font-bold text-xs border border-yellow-200">
-              <Trash2 size={14} className="mr-1.5" /> Soft Delete
-            </button>
-          )}
-
-          <button onClick={() => setDeleteMode("hard")} className="flex items-center px-4 py-2 rounded-xl bg-red-50 text-red-600 font-bold text-xs border border-red-200">
-            <AlertTriangle size={14} className="mr-1.5" /> Permanent Delete
+    <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
+      <div className="w-full h-full flex flex-col bg-white">
+        <div className="h-16 border-b px-8 flex items-center justify-between">
+          <button onClick={() => setClickedPlaceHandler(null)} className="flex items-center text-gray-600 hover:text-black">
+            <ArrowLeft size={20} className="mr-2" /> Back summary
           </button>
 
-          <button
-            onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
-            disabled={isPending}
-            className={`flex items-center px-6 py-2 rounded-xl font-bold text-xs ${
-              isEditing ? "bg-orange-600 text-white shadow-md" : "bg-gray-100 text-gray-700 border"
-            }`}
-          >
-            {isEditing ? <><Save size={14} className="mr-1.5" /> Save Changes</> : <><Edit2 size={14} className="mr-1.5" /> Edit All Fields</>}
-          </button>
-        </div>
-      </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
+              className={`flex items-center px-4 py-2 rounded-lg font-bold ${
+                isEditing ? "bg-orange-600 text-white" : "bg-gray-100 text-gray-700"
+              }`}
+            >
+              {isEditing ? <><Save size={16} className="mr-2" /> Save</> : <><Edit2 size={16} className="mr-2" /> Edit</>}
+            </button>
 
-      <div className="flex-1 overflow-y-auto p-8 space-y-6 max-w-5xl mx-auto w-full">
-        <div className="bg-white p-6 rounded-2xl border shadow-sm space-y-4">
-          <div className="flex justify-between items-center border-b pb-3">
-            <span className="text-xs font-mono text-gray-400">ID: {data._id}</span>
-            <span className={`text-xs px-3 py-1 rounded-full font-bold ${data.isDeleted ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
-              {data.isDeleted ? "Status: Soft Deleted" : "Status: Active"}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase">Restaurant Name</label>
-              <input name="name" disabled={!isEditing} value={data.name || ""} onChange={handleChange} className="w-full p-2 border-b font-bold text-lg bg-transparent" />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase">Avg Cost For Two (₹)</label>
-              <input name="averageCost" disabled={!isEditing} value={data.averageCost || ""} onChange={handleChange} className="w-full p-2 border rounded-xl font-semibold" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase">Cuisines Offered</label>
-              <input name="cuisine" disabled={!isEditing} value={Array.isArray(data.cuisine) ? data.cuisine.join(", ") : data.cuisine || ""} onChange={handleChange} className="w-full p-2 border rounded-xl text-sm" />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase">Opening Hours</label>
-              <input name="openingHours" disabled={!isEditing} value={data.openingHours || ""} onChange={handleChange} className="w-full p-2 border rounded-xl text-sm" />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-bold text-gray-400 uppercase">Street Address</label>
-            <input name="address" disabled={!isEditing} value={data.address || ""} onChange={handleChange} className="w-full p-2 border rounded-xl text-sm" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase">Contact Phone Number</label>
-              <input name="contactNumber" disabled={!isEditing} value={data.contactNumber || ""} onChange={handleChange} className="w-full p-2 border rounded-xl text-sm font-mono" />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase">Rating Score (1-5)</label>
-              <input type="number" step="0.1" name="rating" disabled={!isEditing} value={data.rating || 4.5} onChange={handleChange} className="w-full p-2 border rounded-xl text-sm font-mono" />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-bold text-gray-400 uppercase">Full Description</label>
-            <textarea name="description" disabled={!isEditing} value={data.description || ""} onChange={handleChange} rows={3} className="w-full p-3 border rounded-xl text-sm resize-none" />
+            <button
+              onClick={handleDelete}
+              className="px-4 py-2 bg-red-50 text-red-600 rounded-lg flex items-center font-bold hover:bg-red-100 focus:outline-none"
+            >
+              <Trash2 size={16} className="mr-2" /> Delete 
+            </button>
           </div>
         </div>
 
-        {/* PHOTO ASSETS */}
-        <div className="bg-white p-6 rounded-2xl border shadow-sm space-y-4">
-          <h3 className="text-xs font-bold text-gray-700 uppercase flex items-center gap-2">
-            <ImageIcon size={16} /> Restaurant Gallery Photos ({data.photos?.length || 0})
-          </h3>
-          <div className="grid grid-cols-4 gap-4">
-            {(data.photos || []).map((photo, i) => (
-              <div key={i} className="aspect-square rounded-xl overflow-hidden border">
-                <img src={getImageUrl(photo)} className="w-full h-full object-cover" alt="" />
+        <div className="flex-1 overflow-y-auto p-8 space-y-6">
+          <input
+            name="title"
+            value={data.title || ""}
+            onChange={handleChange}
+            disabled={!isEditing}
+            className={`w-full text-4xl font-extrabold bg-transparent ${isEditing ? 'border-b-2 border-orange-500' : ''}`}
+          />
+
+          <div className="flex items-center">
+            <MapPin size={18} className="mr-2 text-orange-500" />
+            <input
+              name="location"
+              value={data.location || ""}
+              onChange={handleChange}
+              disabled={!isEditing}
+              className={`w-full max-w-sm bg-transparent ${isEditing ? 'border-b border-orange-500' : ''}`}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-xl border">
+            <div>
+              <span className="text-xs font-bold text-gray-500 uppercase block mb-1">Sub-Category</span>
+              <select 
+                name="subCategory" 
+                value={data.subCategory || ""} 
+                onChange={handleChange} 
+                disabled={!isEditing}
+                className="w-full bg-transparent font-medium disabled:opacity-100"
+              >
+                <option value="Restaurants">Restaurants</option>
+                <option value="Cafes">Cafes</option>
+                <option value="Bars">Bars</option>
+                <option value="Fast Food">Fast Food</option>
+              </select>
+            </div>
+            <div>
+              <span className="text-xs font-bold text-gray-500 uppercase block mb-1">Timings</span>
+              <input name="timings" value={data.timings || ""} onChange={handleChange} disabled={!isEditing} className="w-full bg-transparent font-medium" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-gray-500 uppercase block mb-1">Rating</span>
+              <input name="rating" type="number" step="0.1" value={data.rating || ""} onChange={handleChange} disabled={!isEditing} className="w-full bg-transparent font-medium" />
+            </div>
+             <div>
+              <span className="text-xs font-bold text-gray-500 uppercase block mb-1">Avg. Cost</span>
+              <input name="averageCost" type="number" value={data.averageCost || ""} onChange={handleChange} disabled={!isEditing} className="w-full bg-transparent font-medium" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+               <div>
+                <span className="text-sm font-bold text-gray-800 mb-2 block">Description</span>
+                <textarea
+                  name="description"
+                  value={data.description || ""}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  rows={4}
+                  className="w-full border p-3 rounded-xl bg-gray-50/50"
+                />
+               </div>
+               
+               <div className="bg-gray-50 p-4 rounded-xl border space-y-3">
+                 <h4 className="text-sm font-bold text-gray-800">Contact Details</h4>
+                 <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 w-16">Phone:</span>
+                    <input name="contactPhone" value={data.contactPhone || ""} onChange={handleChange} disabled={!isEditing} className="flex-1 bg-transparent border-b outline-none"/>
+                 </div>
+                 <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 w-16">Email:</span>
+                    <input name="contactEmail" value={data.contactEmail || ""} onChange={handleChange} disabled={!isEditing} className="flex-1 bg-transparent border-b outline-none"/>
+                 </div>
+                 <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 w-16">Web:</span>
+                    <input name="contactWebsite" value={data.contactWebsite || ""} onChange={handleChange} disabled={!isEditing} className="flex-1 bg-transparent border-b outline-none"/>
+                 </div>
+               </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-bold text-gray-800 mb-1">Cuisines (Comma separated)</h4>
+                <input name="parsedCuisine" value={data.parsedCuisine || ""} onChange={handleChange} disabled={!isEditing} className="w-full border-b p-1 bg-transparent outline-none"/>
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
-      {deleteMode && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-[400px] shadow-2xl">
-            <h3 className="text-lg font-bold">{deleteMode === "hard" ? "Permanent Delete?" : "Soft Delete?"}</h3>
-            <p className="text-sm text-gray-600 mt-2">
-              {deleteMode === "hard" ? "Erase this restaurant permanently from database?" : "Hide this restaurant from public view?"}
-            </p>
-            <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setDeleteMode(null)} className="px-4 py-2 border rounded-xl text-sm font-bold">Cancel</button>
-              <button onClick={deleteMode === "hard" ? handleHardDelete : handleSoftDelete} className="px-4 py-2 bg-red-600 text-white font-bold rounded-xl text-sm">
-                Confirm Delete
-              </button>
+              <div>
+                 <h4 className="text-sm font-bold text-gray-800 mb-2">Display Photos</h4>
+                 <div className="grid grid-cols-3 gap-3">
+                   {displayImages.length > 0 && newPhotoFiles.length === 0 && displayImages.map((photo, i) => (
+                      <div key={i} className="aspect-square rounded-xl overflow-hidden border">
+                        <img src={photo.url || photo} alt={`display ${i}`} className="w-full h-full object-cover" />
+                      </div>
+                   ))}
+                   {newPhotoFiles.length > 0 && Array.from(newPhotoFiles).map((file, i) => (
+                      <div key={i} className="aspect-square rounded-xl overflow-hidden border">
+                        <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt={`new upload ${i}`} />
+                      </div>
+                   ))}
+                 </div>
+                 
+                 {isEditing && (
+                    <div className="mt-3">
+                      <input type="file" multiple id="rPhotoUpdate" onChange={(e) => {
+                const files = Array.from(e.target.files).slice(0, 4);
+                for (let f of files) {
+                  const v = validateMediaType(f, 'image');
+                  if (v !== true) return toast.error(v);
+                }
+                setNewPhotoFiles(files);
+              }} accept="image/*" className="hidden"/>
+                      <label htmlFor="rPhotoUpdate" className="text-orange-600 text-sm font-bold flex items-center gap-1 cursor-pointer w-fit bg-orange-50 py-1.5 px-3 rounded-lg"><UploadCloud size={16}/> Replace Photos (Max 4)</label>
+                    </div>
+                 )}
+              </div>
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

@@ -39,7 +39,7 @@ export const GenericListHeader = ({
               onChange={(e) => onIncludeDeletedChange(e.target.checked)}
               className="w-4 h-4 text-blue-600 rounded cursor-pointer"
             />
-            Show Soft-Deleted
+            Show Only Deleted
           </label>
 
           <button

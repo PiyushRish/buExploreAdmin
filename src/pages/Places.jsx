@@ -13,6 +13,9 @@ import { PlaceContext } from "../contextApi/places.jsx";
 import { usePlacesQuery } from "../queries/placeQueries.js";
 import toast from "react-hot-toast";
 import { useAddPlaceMutation } from "../mutations/placeMutation.js";
+import { Req, RequiredNotice } from "../components/RequiredTag.jsx";
+import FormField from "../components/FormField.jsx";
+import { validators, runValidators, validateMediaType } from "../utils/validators.js";
 
 const getImageUrl = (photo) => {
   if (!photo) return "https://picsum.photos/600/400";
@@ -95,13 +98,13 @@ const PlaceCard = ({ place }) => {
 };
 
 const Places = () => {
-  const [includeDeleted, setIncludeDeleted] = useState(false);
+  const [onlyDeleted, setOnlyDeleted] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
 
-  // Unified Query: Fetches places passing includeDeleted flag
-  const { data, isLoading } = usePlacesQuery({ includeDeleted });
+  // Unified Query: Fetches places passing onlyDeleted flag explicitly
+  const { data, isLoading } = usePlacesQuery({ onlyDeleted, limit: 1000 });
   const { mutateAsync: addPlace, isPending } = useAddPlaceMutation();
 
   const allPlaces = data?.places || [];
@@ -131,15 +134,75 @@ const Places = () => {
     lng: "",
   });
 
-  const [photoFiles, setPhotoFiles] = useState([]);
-  const [videoFiles, setVideoFiles] = useState([]);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [videoFile, setVideoFile] = useState(null);
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
 
+  // Validation
+  const RULES = {
+    name:        [validators.required, validators.minLength(2)],
+    description: [validators.required],
+    category:    [validators.required],
+    city:        [validators.required],
+    address:     [validators.required],
+    ytVideoLink: [validators.youtubeUrl],
+    lat:         [validators.required, validators.latitude],
+    lng:         [validators.required, validators.longitude],
+  };
+  const [touched, setTouched]     = useState({});
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    setTouched((p) => ({ ...p, [name]: true }));
+    const result = runValidators(value, RULES[name] || [], name);
+    setFieldErrors((p) => ({ ...p, [name]: result }));
+  };
+
+  const handleChangeValidated = (e) => {
+    const { name, value } = e.target;
+    setForm((p) => ({ ...p, [name]: value }));
+    if (touched[name]) {
+      const result = runValidators(value, RULES[name] || [], name);
+      setFieldErrors((p) => ({ ...p, [name]: result }));
+    }
+  };
+
   const handleSubmit = async () => {
-    if (!form.name || !form.category || photoFiles.length === 0) {
-      toast.error("Name, category, and at least 1 photo are required");
+    const requiredFields = ["name", "description", "category", "city", "address", "lat", "lng"];
+    const optionalValidated = ["ytVideoLink"];
+    const allFields = [...requiredFields, ...optionalValidated];
+
+    const newTouched = {};
+    const newErrors  = {};
+    let hasError = false;
+
+    allFields.forEach((field) => {
+      newTouched[field] = true;
+      const result = runValidators(form[field] || "", RULES[field] || [], field);
+      newErrors[field] = result;
+      if (result) hasError = true;
+    });
+
+    setTouched(newTouched);
+    setFieldErrors(newErrors);
+
+    if (!form.category) {
+      toast.error("Please select a category.");
+      return;
+    }
+    if (!photoFile) {
+      toast.error("A place photo is required.");
+      return;
+    }
+    if (!videoFile) {
+      toast.error("A place video is required.");
+      return;
+    }
+    if (hasError) {
+      toast.error("Please fix the highlighted errors before submitting.");
       return;
     }
 
@@ -158,15 +221,15 @@ const Places = () => {
     };
 
     formData.append("data", JSON.stringify(payload));
-    photoFiles.forEach((f) => formData.append("placePhoto", f));
-    videoFiles.forEach((f) => formData.append("placeVideo", f));
+    formData.append("placePhoto", photoFile);
+    if (videoFile) formData.append("placeVideo", videoFile);
 
     try {
       await addPlace(formData);
       toast.success("Destination created successfully!");
       setShowModal(false);
-      setPhotoFiles([]);
-      setVideoFiles([]);
+      setPhotoFile(null);
+      setVideoFile(null);
     } catch (_err) {
       toast.error(_err?.response?.data?.message || "Failed to create destination");
     }
@@ -187,8 +250,8 @@ const Places = () => {
           searchValue={search}
           onSearchChange={setSearch}
           searchPlaceholder="Search destinations by name, description, or city..."
-          includeDeleted={includeDeleted}
-          onIncludeDeletedChange={setIncludeDeleted}
+          includeDeleted={onlyDeleted}
+          onIncludeDeletedChange={setOnlyDeleted}
           onAddClick={() => setShowModal(true)}
           addButtonLabel="Add Destination"
           categories={CATEGORIES.map(cat => ({ 
@@ -231,41 +294,42 @@ const Places = () => {
               </button>
             </div>
 
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
-                Destination Name *
-              </label>
+            {/* Required fields notice */}
+            <RequiredNotice />
+
+            <FormField label="Destination Name" required
+              error={fieldErrors.name?.error} hint={fieldErrors.name?.hint || "e.g. Jhansi Fort"}
+              touched={touched.name} valid={touched.name && !fieldErrors.name}>
               <input
                 name="name"
+                value={form.name}
                 placeholder="e.g. Jhansi Fort"
-                onChange={handleChange}
-                className="w-full border p-2.5 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
+                onChange={handleChangeValidated}
+                onBlur={handleBlur}
+                className="w-full p-2.5 rounded-xl text-sm font-semibold"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
-                Description
-              </label>
+            <FormField label="Description" required error={fieldErrors.description?.error} touched={touched.description} valid={touched.description && !fieldErrors.description}>
               <textarea
                 name="description"
+                value={form.description}
                 placeholder="Write full description..."
-                onChange={handleChange}
+                onChange={handleChangeValidated}
+                onBlur={handleBlur}
                 rows={3}
-                className="w-full border p-2.5 rounded-xl text-sm resize-none outline-none focus:border-blue-500"
+                className="w-full p-2.5 rounded-xl text-sm resize-none"
               />
-            </div>
+            </FormField>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
-                  Category *
-                </label>
+              <FormField label="Category" required hint="Select a category">
                 <select
                   name="category"
                   value={form.category}
-                  onChange={handleChange}
-                  className="w-full border p-2.5 rounded-xl text-sm bg-white font-semibold outline-none focus:border-blue-500"
+                  onChange={handleChangeValidated}
+                  onBlur={handleBlur}
+                  className="w-full p-2.5 rounded-xl text-sm bg-white font-semibold"
                 >
                   {CATEGORIES.map((cat) => (
                     <option key={cat} value={cat}>
@@ -273,94 +337,129 @@ const Places = () => {
                     </option>
                   ))}
                 </select>
-              </div>
+              </FormField>
 
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
-                  City
-                </label>
+              <FormField label="City" required error={fieldErrors.city?.error} touched={touched.city} valid={touched.city && !fieldErrors.city}>
                 <input
                   name="city"
+                  value={form.city}
                   defaultValue="Jhansi"
-                  onChange={handleChange}
-                  className="w-full border p-2.5 rounded-xl text-sm font-semibold outline-none focus:border-blue-500"
+                  onChange={handleChangeValidated}
+                  onBlur={handleBlur}
+                  className="w-full p-2.5 rounded-xl text-sm font-semibold"
                 />
-              </div>
+              </FormField>
             </div>
 
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
-                YouTube Video Link
-              </label>
+            <FormField label="YouTube Video Link" optional
+              error={fieldErrors.ytVideoLink?.error} hint={fieldErrors.ytVideoLink?.hint || "e.g. https://youtube.com/watch?v=..."}
+              touched={touched.ytVideoLink} valid={touched.ytVideoLink && !fieldErrors.ytVideoLink}>
               <input
                 name="ytVideoLink"
+                value={form.ytVideoLink}
                 placeholder="https://youtube.com/watch?v=..."
-                onChange={handleChange}
-                className="w-full border p-2.5 rounded-xl text-sm text-blue-600 outline-none focus:border-blue-500"
+                onChange={handleChangeValidated}
+                onBlur={handleBlur}
+                className="w-full p-2.5 rounded-xl text-sm text-blue-600"
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
-                Street Address / Landmark
-              </label>
+            <FormField label="Street Address / Landmark" required error={fieldErrors.address?.error} touched={touched.address} valid={touched.address && !fieldErrors.address}>
               <input
                 name="address"
+                value={form.address}
                 placeholder="e.g. Fort Road, Near Civil Lines"
-                onChange={handleChange}
-                className="w-full border p-2.5 rounded-xl text-sm outline-none focus:border-blue-500"
+                onChange={handleChangeValidated}
+                onBlur={handleBlur}
+                className="w-full p-2.5 rounded-xl text-sm"
               />
-            </div>
+            </FormField>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
-                  Latitude
-                </label>
+              <FormField label="Latitude" required
+                error={fieldErrors.lat?.error} hint={fieldErrors.lat?.hint || "e.g. 25.4484"}
+                touched={touched.lat} valid={touched.lat && !fieldErrors.lat}>
                 <input
                   type="number"
                   step="any"
                   name="lat"
+                  value={form.lat}
                   placeholder="25.4484"
-                  onChange={handleChange}
-                  className="w-full border p-2.5 rounded-xl text-sm font-mono outline-none focus:border-blue-500"
+                  onChange={handleChangeValidated}
+                  onBlur={handleBlur}
+                  className="w-full p-2.5 rounded-xl text-sm font-mono"
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
-                  Longitude
-                </label>
+              <FormField label="Longitude" required
+                error={fieldErrors.lng?.error} hint={fieldErrors.lng?.hint || "e.g. 78.5685"}
+                touched={touched.lng} valid={touched.lng && !fieldErrors.lng}>
                 <input
                   type="number"
                   step="any"
                   name="lng"
+                  value={form.lng}
                   placeholder="78.5685"
-                  onChange={handleChange}
-                  className="w-full border p-2.5 rounded-xl text-sm font-mono outline-none focus:border-blue-500"
+                  onChange={handleChangeValidated}
+                  onBlur={handleBlur}
+                  className="w-full p-2.5 rounded-xl text-sm font-mono"
                 />
-              </div>
+              </FormField>
             </div>
 
             {/* FILE UPLOADS */}
-            <div className="border border-dashed border-gray-300 p-4 rounded-xl text-center bg-gray-50">
-              <input
-                type="file"
-                multiple
-                accept="image/*"
-                id="photos"
-                onChange={(e) => setPhotoFiles(Array.from(e.target.files))}
-                className="hidden"
-              />
-              <label
-                htmlFor="photos"
-                className="cursor-pointer text-xs font-bold text-blue-600 flex items-center justify-center gap-2"
-              >
-                <UploadCloud size={18} />
-                {photoFiles.length
-                  ? `${photoFiles.length} Photos Selected`
-                  : "Upload Place Photos *"}
-              </label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="border border-dashed border-gray-300 p-4 rounded-xl text-center bg-gray-50">
+                <input
+                  type="file"
+                  accept="image/*"
+                  id="photos"
+                  onChange={(e) => {
+                    const f = e.target.files[0];
+                    if (f) {
+                      const v = validateMediaType(f, "image");
+                      if (v !== true) return toast.error(v);
+                      setPhotoFile(f);
+                    }
+                  }}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="photos"
+                  className="cursor-pointer text-xs font-bold text-blue-600 flex flex-col items-center justify-center gap-2"
+                >
+                  <UploadCloud size={18} />
+                  {photoFile
+                    ? `Photo Selected: ${photoFile.name}`
+                    : <><span>Upload Place Photo</span><Req /><span className="text-red-400 text-[10px]">(1 Max)</span></>}
+                </label>
+              </div>
+
+              <div className="border border-dashed border-gray-300 p-4 rounded-xl text-center bg-purple-50">
+                <input
+                  type="file"
+                  accept="video/*"
+                  id="videoUpload"
+                  onChange={(e) => {
+                    const f = e.target.files[0];
+                    if (f) {
+                      const v = validateMediaType(f, "video");
+                      if (v !== true) return toast.error(v);
+                      setVideoFile(f);
+                    }
+                  }}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="videoUpload"
+                  className="cursor-pointer text-xs font-bold text-purple-600 flex flex-col items-center justify-center gap-2"
+                >
+                  <UploadCloud size={18} />
+                  {videoFile
+                    ? `Video Selected: ${videoFile.name}`
+                    : <><span>Upload Place Video</span><Req /><span className="text-purple-400 text-[10px]">(1 Max)</span></>}
+                </label>
+              </div>
             </div>
 
             <button

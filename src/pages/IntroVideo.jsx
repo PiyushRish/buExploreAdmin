@@ -3,6 +3,9 @@ import { Film, Plus, X, UploadCloud, Trash2, CheckCircle2, AlertTriangle, Rotate
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axiosClient from "../api/axiosClient";
 import toast from "react-hot-toast";
+import { Req, RequiredNotice } from "../components/RequiredTag.jsx";
+import FormField from "../components/FormField.jsx";
+import { validators, runValidators, validateMediaType } from "../utils/validators.js";
 
 const IntroVideo = () => {
   const queryClient = useQueryClient();
@@ -23,6 +26,31 @@ const IntroVideo = () => {
   const [videoFile, setVideoFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
 
+  const RULES = {
+    title: [validators.required],
+  };
+
+  const [touched, setTouched] = useState({});
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const validate = (name, value) => {
+    const rules = RULES[name];
+    if (!rules) return null;
+    return runValidators(value, rules, name);
+  };
+
+  const handleBlur = (name, value) => {
+    setTouched((prev) => ({ ...prev, [name]: true }));
+    setFieldErrors((prev) => ({ ...prev, [name]: validate(name, value) }));
+  };
+
+  const handleChangeTitle = (e) => {
+    setTitle(e.target.value);
+    if (touched.title) {
+      setFieldErrors((prev) => ({ ...prev, title: validate("title", e.target.value) }));
+    }
+  };
+
   const createMutation = useMutation({
     mutationFn: async (formData) => {
       const res = await axiosClient.post("/admin/intro-video", formData, {
@@ -34,8 +62,12 @@ const IntroVideo = () => {
       queryClient.invalidateQueries({ queryKey: ["introVideos"] });
       toast.success("Intro video uploaded!");
       setShowModal(false);
+      setTitle("");
+      setDescription("");
       setVideoFile(null);
       setThumbnailFile(null);
+      setTouched({});
+      setFieldErrors({});
     },
     onError: () => toast.error("Failed to upload intro video"),
   });
@@ -73,8 +105,13 @@ const IntroVideo = () => {
   };
 
   const handleSubmit = () => {
-    if (!title || !videoFile) {
-      toast.error("Title and video file are required");
+    setTouched({ title: true });
+    const titleError = validate("title", title);
+    setFieldErrors({ title: titleError });
+
+    if (titleError || !videoFile) {
+      if (!videoFile) toast.error("Video file is required");
+      if (titleError) toast.error("Please fix the highlighted errors before submitting.");
       return;
     }
 
@@ -183,8 +220,14 @@ const IntroVideo = () => {
               <button onClick={() => setShowModal(false)}><X size={20} /></button>
             </div>
 
-            <input placeholder="Title *" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full border p-2.5 rounded-xl text-sm" />
-            <textarea placeholder="Description..." value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="w-full border p-2.5 rounded-xl text-sm resize-none" />
+            <RequiredNotice />
+
+            <FormField label="Title" required error={fieldErrors.title?.error} hint={fieldErrors.title?.hint || "Title"} touched={touched.title} valid={touched.title && !fieldErrors.title}>
+              <input name="title" placeholder="Title" value={title} onChange={handleChangeTitle} onBlur={(e) => handleBlur("title", e.target.value)} className="w-full border p-2.5 rounded-xl text-sm" />
+            </FormField>
+            <FormField label="Description" optional hint="Description...">
+              <textarea placeholder="Description..." value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="w-full border p-2.5 rounded-xl text-sm resize-none" />
+            </FormField>
 
             <label className="flex items-center gap-2 text-xs font-bold text-gray-700">
               <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="rounded text-blue-600" />
@@ -192,9 +235,16 @@ const IntroVideo = () => {
             </label>
 
             <div className="border border-dashed p-4 rounded-xl text-center bg-gray-50">
-              <input type="file" accept="video/*" id="introVidFile" onChange={(e) => setVideoFile(e.target.files[0])} className="hidden" />
+              <input type="file" accept="video/*" id="introVidFile" onChange={(e) => {
+                const f = e.target.files[0];
+                if (f) {
+                  const v = validateMediaType(f, "video");
+                  if (v !== true) return toast.error(v);
+                  setVideoFile(f);
+                }
+              }} className="hidden" />
               <label htmlFor="introVidFile" className="cursor-pointer text-xs font-bold text-blue-600 flex items-center justify-center gap-2">
-                <UploadCloud size={20} /> {videoFile ? videoFile.name : "Select Video File (MP4, MOV) *"}
+                <UploadCloud size={20} /> {videoFile ? videoFile.name : <span>Select Video File (MP4, MOV) <Req /></span>}
               </label>
             </div>
 

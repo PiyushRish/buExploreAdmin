@@ -13,14 +13,14 @@ const Notification = () => {
   const { data, isLoading } = useQuery({
     queryKey: ["notifications"],
     queryFn: async () => {
-      const res = await axiosClient.get("/notification");
+      const res = await axiosClient.get("/notification/getAllNotification");
       return res.data;
     },
   });
 
   const sendMutation = useMutation({
     mutationFn: async (payload) => {
-      const res = await axiosClient.post("/notification", payload);
+      const res = await axiosClient.post("/notification/send", payload);
       return res.data;
     },
     onSuccess: () => {
