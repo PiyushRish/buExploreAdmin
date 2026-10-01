@@ -2,8 +2,8 @@ import axios from "axios";
 import toast from "react-hot-toast";
 
 const axiosClient = axios.create({
-  // baseURL: "https://buexplorebackend.onrender.com/api", // Base URL
-  baseURL: "http://localhost:5500/api", // Development URL
+  baseURL: "https://buexplorebackend.onrender.com/api", // Base URL
+  // baseURL: "http://localhost:5500/api", // Development URL
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",

@@ -2,6 +2,7 @@ import React, { useState, useContext } from "react";
 import {
   MapPin, Bell, User, Car, Megaphone, MessageSquare, AlertCircle,
   Film, Video, Menu, X, ChevronLeft, LayoutDashboard, Mic,
+  Compass, Sparkles,
 } from "lucide-react";
 
 import Places from "./Places.jsx";
@@ -17,21 +18,25 @@ import Users from "./Users.jsx";
 import Podcast from "./Podcast.jsx";
 import IntroVideoPage from "./IntroVideo.jsx";
 import ReelsFeed from "./ReelsFeed.jsx";
+import ToursPage from "./Tours.jsx";
+import SurpriseEventsPage from "./SurpriseEvents.jsx";
 import { PlaceContext } from "../contextApi/places.jsx";
 
 const navItems = [
-  { name: "Places",      icon: MapPin },
-  { name: "Hotels",      icon: MapPin },
-  { name: "Restaurants", icon: MapPin },
-  { name: "Guides",      icon: User },
-  { name: "Vehicles",    icon: Car },
-  { name: "Ads",         icon: Megaphone },
-  { name: "Testimonials",icon: MessageSquare },
-  { name: "Notifications",icon: Bell },
-  { name: "Users",       icon: User },
-  { name: "Podcasts",    icon: Mic },
-  { name: "Intro Video", icon: Video },
-  { name: "Reels Feed",  icon: Film },
+  { name: "Places",          icon: MapPin },
+  { name: "Hotels",          icon: MapPin },
+  { name: "Restaurants",     icon: MapPin },
+  { name: "Guides & Agency", icon: User },
+  { name: "Tours & Plans",   icon: Compass },
+  { name: "Surprise Events", icon: Sparkles },
+  { name: "Vehicles",        icon: Car },
+  { name: "Ads",             icon: Megaphone },
+  { name: "Testimonials",    icon: MessageSquare },
+  { name: "Notifications",   icon: Bell },
+  { name: "Users",           icon: User },
+  { name: "Podcasts",        icon: Mic },
+  { name: "Intro Video",     icon: Video },
+  { name: "Reels Feed",      icon: Film },
 ];
 
 const DashBoard = () => {
@@ -173,17 +178,19 @@ const DashBoard = () => {
                 ? <PlaceDetails onBack={() => setClickedPlaceHandler(null)} />
                 : <Places />
             )}
-            {activeTab === "Hotels"        && <Hotels />}
-            {activeTab === "Restaurants"   && <Restaurants />}
-            {activeTab === "Guides"        && <Guides />}
-            {activeTab === "Vehicles"      && <Vehicle />}
-            {activeTab === "Ads"           && <Ads />}
-            {activeTab === "Testimonials"  && <TestimonialsPage />}
-            {activeTab === "Notifications" && <Notifications />}
-            {activeTab === "Users"         && <Users />}
-            {activeTab === "Podcasts"      && <Podcast />}
-            {activeTab === "Intro Video"   && <IntroVideoPage />}
-            {activeTab === "Reels Feed"    && <ReelsFeed />}
+            {activeTab === "Hotels font-medium" || activeTab === "Hotels" && <Hotels />}
+            {activeTab === "Restaurants flex"  || activeTab === "Restaurants" && <Restaurants />}
+            {(activeTab === "Guides & Agency"  || activeTab === "Guides") && <Guides />}
+            {activeTab === "Tours & Plans"     && <ToursPage />}
+            {activeTab === "Surprise Events"   && <SurpriseEventsPage />}
+            {activeTab === "Vehicles"          && <Vehicle />}
+            {activeTab === "Ads"               && <Ads />}
+            {activeTab === "Testimonials"      && <TestimonialsPage />}
+            {activeTab === "Notifications"     && <Notifications />}
+            {activeTab === "Users"             && <Users />}
+            {activeTab === "Podcasts"          && <Podcast />}
+            {activeTab === "Intro Video"       && <IntroVideoPage />}
+            {activeTab === "Reels Feed"        && <ReelsFeed />}
           </div>
         </main>
       </div>
