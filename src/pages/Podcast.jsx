@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Mic, Plus, X, UploadCloud, Film, Image as ImageIcon, Trash2, Play, Youtube, Link } from "lucide-react";
+import { Mic, Plus, X, UploadCloud, Film, Image as ImageIcon, Trash2, Play, Youtube, Link, Maximize2, ExternalLink } from "lucide-react";
 import { usePodcastsQuery } from "../queries/podcastQueries.js";
 import { useAddPodcastMutation, useDeletePodcastMutation } from "../mutations/podcastMutation.js";
 import { useAddYoutubeVideoMutation, useDeleteYoutubeVideoMutation } from "../mutations/youtubeVideoMutation.js";
@@ -17,6 +17,7 @@ const Podcast = () => {
   const [form, setForm] = useState({ title: "" });
   const [videoFile, setVideoFile] = useState(null);
   const [imageFile, setImageFile] = useState(null);
+  const [activeVideoModal, setActiveVideoModal] = useState(null);
 
   const addYtMutation = useAddYoutubeVideoMutation();
   const deleteYtMutation = useDeleteYoutubeVideoMutation();
@@ -165,24 +166,66 @@ const Podcast = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {podcasts.map((podcast) => (
-            <div key={podcast._id} className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden flex flex-col">
-              <div className="relative h-48 bg-gray-900 flex items-center justify-center">
-                {podcast.PodcastImage?.url ? (
-                  <img src={podcast.PodcastImage.url} alt="thumbnail" className="w-full h-full object-cover opacity-60" />
-                ) : (
-                  <Mic size={40} className="text-indigo-400 opacity-50" />
-                )}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white border border-white/40">
-                    <Play size={20} className="ml-1" />
+            <div key={podcast._id} className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden flex flex-col hover:shadow-xl transition-shadow">
+              {podcast.PodcastVideo?.url ? (
+                <div className="relative bg-black h-56 flex items-center justify-center overflow-hidden group">
+                  <video
+                    src={podcast.PodcastVideo.url}
+                    poster={podcast.PodcastImage?.url || undefined}
+                    controls
+                    preload="metadata"
+                    className="w-full h-full object-contain bg-black"
+                  />
+                  <div className="absolute top-2 left-2 pointer-events-none z-10">
+                    <span className="bg-indigo-600/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm shadow flex items-center gap-1">
+                      <Film size={11} /> Video Episode
+                    </span>
+                  </div>
+                  <div className="absolute top-2 right-2 flex gap-1 z-10">
+                    <button
+                      onClick={() => setActiveVideoModal(podcast)}
+                      className="bg-black/70 hover:bg-black/90 text-white p-1.5 rounded-lg text-xs backdrop-blur-sm transition-all flex items-center gap-1 shadow hover:scale-105"
+                      title="Watch Fullscreen / Modal"
+                    >
+                      <Maximize2 size={13} />
+                    </button>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="relative h-48 bg-gray-900 flex items-center justify-center">
+                  {podcast.PodcastImage?.url ? (
+                    <img src={podcast.PodcastImage.url} alt="thumbnail" className="w-full h-full object-cover" />
+                  ) : (
+                    <Mic size={40} className="text-indigo-400 opacity-50" />
+                  )}
+                </div>
+              )}
+
               <div className="p-5 flex-grow">
                 <h3 className="font-bold text-lg text-gray-900 line-clamp-2">{podcast.title}</h3>
                 <p className="text-xs font-mono text-gray-500 mt-2">
                   Uploaded: {new Date(podcast.createdAt).toLocaleDateString()}
                 </p>
+
+                {podcast.PodcastVideo?.url && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      onClick={() => setActiveVideoModal(podcast)}
+                      className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Play size={13} className="fill-indigo-600" /> Watch Episode
+                    </button>
+                    <a
+                      href={podcast.PodcastVideo.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 p-2 rounded-xl transition-colors"
+                      title="Open Video in New Tab"
+                    >
+                      <ExternalLink size={14} />
+                    </a>
+                  </div>
+                )}
 
                 {podcast.youtubeVideos && podcast.youtubeVideos.length > 0 && (
                   <div className="mt-4 space-y-2">
@@ -230,7 +273,7 @@ const Podcast = () => {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
               <h2 className="text-xl font-bold">Upload Podcast</h2>
               <button onClick={() => setShowModal(false)} className="text-gray-500 hover:text-black">
@@ -256,6 +299,14 @@ const Podcast = () => {
               <label htmlFor="pThumbnail" className="cursor-pointer text-xs font-bold text-indigo-600 flex flex-col items-center justify-center gap-2">
                 <ImageIcon size={20} /> {imageFile ? `thumbnail: ${imageFile.name}` : "Upload Cover Image (Optional)"}
               </label>
+              {imageFile && (
+                <div className="mt-2 relative inline-block">
+                  <img src={URL.createObjectURL(imageFile)} alt="preview" className="max-h-24 mx-auto rounded-lg object-cover border" />
+                  <button type="button" onClick={() => setImageFile(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 text-xs">
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="border border-dashed p-4 rounded-xl text-center bg-indigo-50">
@@ -270,6 +321,14 @@ const Podcast = () => {
               <label htmlFor="pVideo" className="cursor-pointer text-xs font-bold text-indigo-700 flex flex-col items-center justify-center gap-2">
                 <Film size={20} /> {videoFile ? `Media: ${videoFile.name}` : <span>Upload Podcast Video / Audio <Req /></span>}
               </label>
+              {videoFile && (
+                <div className="mt-2 relative">
+                  <video src={URL.createObjectURL(videoFile)} controls className="max-h-36 mx-auto rounded-lg bg-black w-full" />
+                  <button type="button" onClick={() => setVideoFile(null)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 text-xs">
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
             </div>
 
             <button
@@ -279,6 +338,60 @@ const Podcast = () => {
             >
               {addMutation.isPending ? "Uploading Media..." : "Publish Episode"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {activeVideoModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 text-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-gray-800">
+            <div className="flex justify-between items-center p-4 border-b border-gray-800">
+              <div className="flex items-center gap-2">
+                <Film size={18} className="text-indigo-400" />
+                <h3 className="font-bold text-base truncate max-w-md">{activeVideoModal.title}</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                {activeVideoModal.PodcastVideo?.url && (
+                  <a
+                    href={activeVideoModal.PodcastVideo.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-gray-800 transition-colors text-xs flex items-center gap-1"
+                    title="Open Video in New Tab"
+                  >
+                    <ExternalLink size={16} />
+                  </a>
+                )}
+                <button
+                  onClick={() => setActiveVideoModal(null)}
+                  className="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-gray-800 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="p-4 bg-black flex items-center justify-center min-h-[300px]">
+              {activeVideoModal.PodcastVideo?.url ? (
+                <video
+                  src={activeVideoModal.PodcastVideo.url}
+                  poster={activeVideoModal.PodcastImage?.url || undefined}
+                  controls
+                  autoPlay
+                  className="w-full max-h-[70vh] rounded-lg shadow-lg"
+                />
+              ) : (
+                <p className="text-gray-400 text-sm">No video URL available</p>
+              )}
+            </div>
+            <div className="p-4 bg-gray-900/90 border-t border-gray-800 flex justify-between items-center text-xs text-gray-400">
+              <span>Uploaded on {new Date(activeVideoModal.createdAt).toLocaleDateString()}</span>
+              <button
+                onClick={() => setActiveVideoModal(null)}
+                className="bg-gray-800 hover:bg-gray-700 text-white font-bold px-4 py-2 rounded-xl transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
