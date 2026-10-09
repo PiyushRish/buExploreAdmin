@@ -1,10 +1,23 @@
 import axios from "axios";
 import toast from "react-hot-toast";
 
+const resolveBaseUrl = () => {
+  if (import.meta.env?.VITE_BACKEND_URL) {
+    return import.meta.env.VITE_BACKEND_URL;
+  }
+  if (
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1")
+  ) {
+    return "http://localhost:5500/api";
+  }
+  return "https://buexplorebackend.onrender.com/api";
+};
+
 const axiosClient = axios.create({
-  baseURL: "https://buexplorebackend.onrender.com/api", // Base URL
-  // baseURL: "http://localhost:5500/api", // Development URL
-  timeout: 10000,
+  baseURL: resolveBaseUrl(),
+  timeout: 15000,
   headers: {
     "Content-Type": "application/json",
   },

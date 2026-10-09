@@ -1,5 +1,5 @@
 import React, { useState, useContext } from "react";
-import { Car, Plus, UploadCloud } from "lucide-react";
+import { Car, Plus, UploadCloud, X } from "lucide-react";
 import { PlaceContext } from "../contextApi/places.jsx";
 import VehicleDetails from "./VehicleDetails.jsx";
 import { useVehiclesQuery } from "../queries/vehicleQueries.js";
@@ -8,6 +8,8 @@ import toast from "react-hot-toast";
 import { Req, RequiredNotice } from "../components/RequiredTag.jsx";
 import FormField from "../components/FormField.jsx";
 import { validators, runValidators, validateMediaType } from "../utils/validators.js";
+import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
+import { useNotificationDraft } from "../utils/useNotificationDraft.js";
 
 const VehicleCard = ({ vehicle }) => {
   const { setClickedPlaceHandler } = useContext(PlaceContext);
@@ -40,6 +42,7 @@ const Vehicles = () => {
   const { data, isLoading, isError } = useVehiclesQuery();
   const { clickedPlace } = useContext(PlaceContext);
   const addMutation = useAddVehicleMutation();
+  const { notif, setNotif, sendIfEnabled, resetNotif } = useNotificationDraft("vehicle");
 
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ 
@@ -128,13 +131,15 @@ const Vehicles = () => {
     photoFiles.forEach(f => formData.append("VehiclePhotos", f));
 
     try {
-      await addMutation.mutateAsync(formData);
+      const result = await addMutation.mutateAsync(formData);
+      await sendIfEnabled({ serviceId: result?.vehicle?._id || result?._id });
       toast.success("Vehicle added successfully!");
       setShowModal(false);
       setPhotoFiles([]);
       setForm({ title: "", subCategory: "Car Rentals", vehicleType: "", seats: "", price: "", transmissionType: "", fuelType: "", phone: "", email: "", website: "", description: "" });
       setTouched({});
       setFieldErrors({});
+      resetNotif();
     } catch(err) {
       toast.error(err?.response?.data?.message || "Failed to add vehicle");
     }
@@ -160,76 +165,183 @@ const Vehicles = () => {
       </button>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-6 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Add Rental Vehicle</h2>
-              <button className="text-gray-500 hover:text-black" onClick={()=> setShowModal(false)}>Close</button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl border border-slate-100">
+            {/* Sticky Header */}
+            <div className="sticky top-0 z-20 flex justify-between items-center px-6 py-4 bg-white/95 backdrop-blur border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center shadow-xs">
+                  <Car size={22} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900">Add Rental Vehicle</h2>
+                  <p className="text-xs text-slate-500 font-medium">List a car rental, tourist bus, cab, or EV service on BUXplore</p>
+                </div>
+              </div>
+              <button
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition"
+                onClick={() => setShowModal(false)}
+              >
+                <X size={20} />
+              </button>
             </div>
 
-            <RequiredNotice />
+            {/* Scrollable Modal Content */}
+            <div className="p-6 sm:p-8 space-y-6 overflow-y-auto flex-1">
+              <RequiredNotice />
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField label="Vehicle Title / Model" required error={fieldErrors.title?.error} hint={fieldErrors.title?.hint || "Vehicle Title/Model"} touched={touched.title} valid={touched.title && !fieldErrors.title}>
-                <input name="title" placeholder="Vehicle Title/Model" value={form.title} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
-              </FormField>
+              {/* SECTION 1: Vehicle Identity & Classification */}
+              <div className="bg-slate-50/60 border border-slate-200/80 rounded-2xl p-5 space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-600"></span>
+                  1. Vehicle Specification
+                </h3>
 
-              <FormField label="Vehicle Category" optional hint="Type of rental">
-                <select name="subCategory" value={form.subCategory} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded">
-                  <option value="Car Rentals">Car Rentals</option>
-                  <option value="Bus Rentals">Bus Rentals</option>
-                  <option value="Taxi">Taxi</option>
-                </select>
-              </FormField>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="sm:col-span-2">
+                    <FormField label="Vehicle Title / Model" required error={fieldErrors.title?.error} hint={fieldErrors.title?.hint || "e.g. Innova Crysta 7-Seater"} touched={touched.title} valid={touched.title && !fieldErrors.title}>
+                      <input name="title" placeholder="e.g. Innova Crysta" value={form.title} onChange={handleChange} onBlur={handleBlur} className="w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 bg-white focus:border-red-500 focus:ring-2 focus:ring-red-100 transition outline-hidden" />
+                    </FormField>
+                  </div>
 
-              <FormField label="Vehicle Type" optional hint="e.g. SUV, Sedan">
-                <input name="vehicleType" placeholder="e.g. SUV, Sedan" value={form.vehicleType} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
-              </FormField>
-              <FormField label="Seats" optional error={fieldErrors.seats?.error} hint={fieldErrors.seats?.hint || "e.g. 5"} touched={touched.seats} valid={touched.seats && !fieldErrors.seats}>
-                <input type="number" name="seats" placeholder="e.g. 5" value={form.seats} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
-              </FormField>
+                  <div className="sm:col-span-1">
+                    <FormField label="Rental Category" optional hint="Type of service">
+                      <select name="subCategory" value={form.subCategory} onChange={handleChange} onBlur={handleBlur} className="w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 bg-white focus:border-red-500 focus:ring-2 focus:ring-red-100 transition outline-hidden">
+                        <option value="Car Rentals">Car Rentals</option>
+                        <option value="Bus Rentals">Bus Rentals</option>
+                        <option value="Taxi">Taxi</option>
+                      </select>
+                    </FormField>
+                  </div>
+                </div>
 
-              <FormField label="Price /day or /km" optional error={fieldErrors.price?.error} hint={fieldErrors.price?.hint || "Price"} touched={touched.price} valid={touched.price && !fieldErrors.price}>
-                <input type="number" name="price" placeholder="Price" value={form.price} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
-              </FormField>
-              <FormField label="Transmission" optional hint="Auto/Manual">
-                <input name="transmissionType" placeholder="Auto/Manual" value={form.transmissionType} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
-              </FormField>
-              <FormField label="Fuel Type" optional hint="Petrol/Diesel/EV">
-                <input name="fuelType" placeholder="Petrol/Diesel/EV" value={form.fuelType} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
-              </FormField>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField label="Body Type" optional hint="e.g. SUV, Sedan, Mini-Bus">
+                    <input name="vehicleType" placeholder="e.g. SUV, Sedan" value={form.vehicleType} onChange={handleChange} onBlur={handleBlur} className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-red-500 focus:ring-2 focus:ring-red-100 transition outline-hidden" />
+                  </FormField>
 
-              <FormField label="Contact Phone" required error={fieldErrors.phone?.error} hint={fieldErrors.phone?.hint || "Contact Phone"} touched={touched.phone} valid={touched.phone && !fieldErrors.phone}>
-                <input name="phone" placeholder="Contact Phone" value={form.phone} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
-              </FormField>
-              <FormField label="Contact Email" optional error={fieldErrors.email?.error} hint={fieldErrors.email?.hint || "Contact Email"} touched={touched.email} valid={touched.email && !fieldErrors.email}>
-                <input name="email" placeholder="Contact Email" value={form.email} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
-              </FormField>
+                  <FormField label="Seating Capacity" optional error={fieldErrors.seats?.error} hint={fieldErrors.seats?.hint || "e.g. 7"} touched={touched.seats} valid={touched.seats && !fieldErrors.seats}>
+                    <input type="number" name="seats" placeholder="e.g. 7" value={form.seats} onChange={handleChange} onBlur={handleBlur} className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-red-500 focus:ring-2 focus:ring-red-100 transition outline-hidden font-mono" />
+                  </FormField>
+                </div>
+              </div>
+
+              {/* SECTION 2: Pricing & Powertrain */}
+              <div className="bg-slate-50/60 border border-slate-200/80 rounded-2xl p-5 space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  2. Pricing, Fuel & Transmission
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <FormField label="Price Rate (₹ /day or /km)" optional error={fieldErrors.price?.error} hint={fieldErrors.price?.hint || "e.g. 2500"} touched={touched.price} valid={touched.price && !fieldErrors.price}>
+                    <input type="number" name="price" placeholder="2500" value={form.price} onChange={handleChange} onBlur={handleBlur} className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition outline-hidden font-mono" />
+                  </FormField>
+
+                  <FormField label="Transmission" optional hint="Automatic / Manual">
+                    <input name="transmissionType" placeholder="Automatic / Manual" value={form.transmissionType} onChange={handleChange} onBlur={handleBlur} className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition outline-hidden" />
+                  </FormField>
+
+                  <FormField label="Fuel Type" optional hint="Diesel / Petrol / EV / CNG">
+                    <input name="fuelType" placeholder="Diesel / Petrol / EV" value={form.fuelType} onChange={handleChange} onBlur={handleBlur} className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition outline-hidden" />
+                  </FormField>
+                </div>
+              </div>
+
+              {/* SECTION 3: Contact & Links */}
+              <div className="bg-slate-50/60 border border-slate-200/80 rounded-2xl p-5 space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                  3. Contact & Booking Links
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <FormField label="Contact Phone" required error={fieldErrors.phone?.error} hint={fieldErrors.phone?.hint || "+91 98765 43210"} touched={touched.phone} valid={touched.phone && !fieldErrors.phone}>
+                    <input name="phone" placeholder="+91 98765 43210" value={form.phone} onChange={handleChange} onBlur={handleBlur} className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-hidden" />
+                  </FormField>
+
+                  <FormField label="Contact Email" optional error={fieldErrors.email?.error} hint={fieldErrors.email?.hint || "rentals@example.com"} touched={touched.email} valid={touched.email && !fieldErrors.email}>
+                    <input name="email" placeholder="rentals@example.com" value={form.email} onChange={handleChange} onBlur={handleBlur} className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-hidden" />
+                  </FormField>
+
+                  <FormField label="Booking Website" optional error={fieldErrors.website?.error} hint={fieldErrors.website?.hint || "https://..."} touched={touched.website} valid={touched.website && !fieldErrors.website}>
+                    <input name="website" placeholder="https://..." value={form.website} onChange={handleChange} onBlur={handleBlur} className="w-full px-3.5 py-2.5 rounded-xl text-sm text-blue-600 border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-hidden" />
+                  </FormField>
+                </div>
+              </div>
+
+              {/* SECTION 4: Description */}
+              <div className="bg-slate-50/60 border border-slate-200/80 rounded-2xl p-5 space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                  4. Vehicle Description & Features
+                </h3>
+
+                <FormField label="Description" optional hint="AC, luggage capacity, driver included, outstation availability...">
+                  <textarea name="description" placeholder="Describe vehicle conditions, driver options, luggage space, sanitization standards..." rows={3} value={form.description} onChange={handleChange} onBlur={handleBlur} className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition outline-hidden resize-none" />
+                </FormField>
+              </div>
+
+              {/* SECTION 5: Visual Gallery */}
+              <div className="bg-slate-50/60 border border-slate-200/80 rounded-2xl p-5 space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-pink-500"></span>
+                  5. Vehicle Photos
+                </h3>
+
+                <div className="border-2 border-dashed border-red-200 hover:border-red-400 p-5 rounded-2xl text-center bg-red-50/40 hover:bg-red-50 transition cursor-pointer flex flex-col items-center justify-center">
+                  <input type="file" multiple accept="image/*" id="vehPhoto" onChange={(e) => {
+                    const files = Array.from(e.target.files).slice(0, 3);
+                    for (let f of files) {
+                      const v = validateMediaType(f, 'image');
+                      if (v !== true) return toast.error(v);
+                    }
+                    setPhotoFiles(files);
+                  }} className="hidden" />
+                  <label htmlFor="vehPhoto" className="cursor-pointer w-full text-xs font-bold text-red-700 flex flex-col items-center justify-center gap-2">
+                    <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+                      <UploadCloud size={20} />
+                    </div>
+                    {photoFiles.length > 0 ? (
+                      <div className="space-y-1">
+                        <p className="font-bold text-emerald-700">✓ {photoFiles.length} Photo(s) Selected</p>
+                        <p className="text-[11px] text-slate-500">Click to change selection (Max 3)</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-sm font-bold">Upload Vehicle Photos <Req /></p>
+                        <p className="text-[10px] text-slate-400 font-normal mt-0.5">JPG, PNG, WebP up to 3 photos</p>
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              {/* SECTION 6: Push Notification Broadcast */}
+              <NotificationDraftSection
+                serviceType="vehicle"
+                entityName={form.title}
+                value={notif}
+                onChange={setNotif}
+              />
             </div>
 
-            <FormField label="Website URL" optional error={fieldErrors.website?.error} hint={fieldErrors.website?.hint || "https://..."} touched={touched.website} valid={touched.website && !fieldErrors.website}>
-              <input name="website" placeholder="https://..." value={form.website} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
-            </FormField>
-            <FormField label="Description" optional hint="Description">
-              <textarea name="description" placeholder="Description" rows={3} value={form.description} onChange={handleChange} onBlur={handleBlur} className="w-full border p-2 rounded" />
-            </FormField>
-
-            <div className="border border-dashed border-gray-300 p-4 rounded-xl text-center bg-gray-50 flex items-center justify-center">
-              <input type="file" multiple accept="image/*" id="vehPhoto" onChange={(e) => {
-                const files = Array.from(e.target.files).slice(0, 3);
-                for (let f of files) {
-                  const v = validateMediaType(f, 'image');
-                  if (v !== true) return toast.error(v);
-                }
-                setPhotoFiles(files);
-              }} className="hidden" />
-              <label htmlFor="vehPhoto" className="cursor-pointer text-sm font-bold text-red-600 flex items-center gap-2">
-                <UploadCloud size={20} />
-                {photoFiles.length > 0 ? `${photoFiles.length} Photos Selected (Max 3)` : <span>Upload Cover Photos <Req /> (Max 3)</span>}
-              </label>
+            {/* Sticky Footer */}
+            <div className="sticky bottom-0 z-20 flex justify-between items-center px-6 py-4 bg-white/95 backdrop-blur border-t border-slate-100 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                className="px-6 py-2.5 bg-red-600 hover:bg-red-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2"
+              >
+                Add Rental Vehicle
+              </button>
             </div>
-
-            <button onClick={handleSubmit} className="w-full bg-red-600 hover:bg-red-700 transition-colors text-white py-3 rounded-xl font-bold mt-4">Create Entity</button>
           </div>
         </div>
       )}

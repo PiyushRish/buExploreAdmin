@@ -42,6 +42,15 @@ const Testimonials = () => {
     });
   };
 
+  const handleDelete = (id) => {
+    if (window.confirm("Are you sure you want to remove this testimonial?")) {
+      deleteMutation.mutate(id, {
+        onSuccess: () => toast.success("Testimonial removed successfully"),
+        onError: (err) => toast.error(err?.response?.data?.message || "Failed to remove testimonial"),
+      });
+    }
+  };
+
   const testimonials = data?.testimonials || data?.data || [];
 
   if (isLoading) return <div className="p-8 font-bold text-center text-gray-500">Loading Testimonials...</div>;
@@ -85,7 +94,11 @@ const Testimonials = () => {
 
               <div className="pt-4 mt-4 border-t flex justify-between items-center text-[10px] text-gray-400 font-mono">
                 <span>{new Date(t.date || t.createdAt || Date.now()).toLocaleString()}</span>
-                <button onClick={() => deleteMutation.mutate(t._id)} className="text-xs font-bold text-red-600 flex items-center gap-1 hover:underline">
+                <button
+                  onClick={() => handleDelete(t._id)}
+                  disabled={deleteMutation.isPending}
+                  className="text-xs font-bold text-red-600 flex items-center gap-1 hover:underline disabled:opacity-50 cursor-pointer"
+                >
                   <Trash2 size={14} /> Remove Review
                 </button>
               </div>

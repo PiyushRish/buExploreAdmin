@@ -1,9 +1,12 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import {
-  MapPin, Bell, User, Car, Megaphone, MessageSquare, AlertCircle,
+  MapPin, Bell, User, Users as UsersIcon, Car, Megaphone, MessageSquare, AlertCircle,
   Film, Video, Menu, X, ChevronLeft, LayoutDashboard, Mic,
   Compass, Sparkles,
 } from "lucide-react";
+import { io } from "socket.io-client";
+import axiosClient from "../api/axiosClient.js";
+import { useUserStatsQuery } from "../queries/userQueries.js";
 
 import Places from "./Places.jsx";
 import Hotels from "./Hotels.jsx";
@@ -44,6 +47,40 @@ const DashBoard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);   // mobile drawer
   const [collapsed, setCollapsed]   = useState(false);     // desktop icon-only mode
   const { clickedPlace, setClickedPlaceHandler } = useContext(PlaceContext);
+
+  const { data: userStats } = useUserStatsQuery();
+  const [liveUsersCount, setLiveUsersCount] = useState(null);
+
+  useEffect(() => {
+    let socket;
+    try {
+      const socketServer =
+        import.meta.env?.VITE_SOCKET_URL ||
+        (axiosClient?.defaults?.baseURL
+          ? axiosClient.defaults.baseURL.replace(/\/api\/?$/, "")
+          : "http://localhost:5500");
+
+      socket = io(socketServer, {
+        transports: ["websocket", "polling"],
+        reconnectionAttempts: 5,
+      });
+      socket.emit("getLiveUsers");
+      socket.on("userCountLatest", (count) => {
+        if (typeof count === "number") {
+          setLiveUsersCount(count);
+        }
+      });
+    } catch (e) {
+      // fallback to polling userStats
+    }
+
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, []);
+
+  const totalUsers = userStats?.totalUsers ?? userStats?.userCount ?? 0;
+  const onlineUsers = liveUsersCount !== null ? liveUsersCount : (userStats?.onlineUsers ?? userStats?.onlineCount ?? 0);
 
   const handleNav = (name) => {
     setActiveTab(name);
@@ -149,7 +186,7 @@ const DashBoard = () => {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {/* Top bar */}
-        <header className="flex items-center gap-4 h-14 px-4 bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
+        <header className="flex items-center gap-3 sm:gap-4 h-14 px-4 bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
           {/* Hamburger (mobile only) */}
           <button
             className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100"
@@ -158,14 +195,53 @@ const DashBoard = () => {
             <Menu size={20} />
           </button>
 
-          <h2 className="font-black text-slate-800 text-sm sm:text-base flex-1 truncate">{activeTab}</h2>
+          <h2 className="font-black text-slate-800 text-sm sm:text-base truncate mr-auto">
+            {activeTab}
+          </h2>
 
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-block text-xs text-slate-400 font-medium bg-slate-100 px-3 py-1 rounded-full">
-              Admin
-            </span>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
-              A
+          {/* User Metrics Counters */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Live Online Users Badge */}
+            <button
+              onClick={() => handleNav("Users")}
+              className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200/90 rounded-full shadow-xs text-xs transition-all duration-150 cursor-pointer"
+              title="Real-time online users (Click to view users)"
+            >
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              </span>
+              <span className="font-black text-emerald-800 text-xs sm:text-sm tabular-nums">
+                {onlineUsers}
+              </span>
+              <span className="text-[11px] text-emerald-700 font-semibold hidden sm:inline">
+                Online
+              </span>
+            </button>
+
+            {/* Total Users Count Badge */}
+            <button
+              onClick={() => handleNav("Users")}
+              className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200/90 rounded-full shadow-xs text-xs transition-all duration-150 cursor-pointer"
+              title="Total registered users (Click to view users)"
+            >
+              <UsersIcon size={14} className="text-indigo-600" />
+              <span className="font-black text-indigo-900 text-xs sm:text-sm tabular-nums">
+                {totalUsers}
+              </span>
+              <span className="text-[11px] text-indigo-700 font-semibold hidden sm:inline">
+                Total Users
+              </span>
+            </button>
+
+            {/* Admin Badge */}
+            <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+              <span className="hidden md:inline-block text-xs text-slate-500 font-semibold bg-slate-100 px-2.5 py-0.5 rounded-full">
+                Admin
+              </span>
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                A
+              </div>
             </div>
           </div>
         </header>

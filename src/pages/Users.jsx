@@ -4,6 +4,7 @@ import { useUsersQuery } from "../queries/userQueries";
 import { useSoftDeleteUserMutation, useRestoreUserMutation } from "../mutations/userMutation";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
+import axiosClient from "../api/axiosClient.js";
 
 const Users = () => {
   const [filterTab, setFilterTab] = useState("all"); // "all", "active", "deleted"
@@ -12,12 +13,28 @@ const Users = () => {
   const { data, isLoading } = useUsersQuery({ includeDeleted: true });
 
   useEffect(() => {
-    const socket = io("http://localhost:5500");
-    socket.emit("getLiveUsers");
-    socket.on("userCountLatest", (count) => {
-      setLiveUsers(count);
-    });
-    return () => socket.disconnect();
+    let socket;
+    try {
+      const socketServer =
+        import.meta.env?.VITE_SOCKET_URL ||
+        (axiosClient?.defaults?.baseURL
+          ? axiosClient.defaults.baseURL.replace(/\/api\/?$/, "")
+          : "http://localhost:5500");
+
+      socket = io(socketServer, {
+        transports: ["websocket", "polling"],
+        reconnectionAttempts: 5,
+      });
+      socket.emit("getLiveUsers");
+      socket.on("userCountLatest", (count) => {
+        if (typeof count === "number") setLiveUsers(count);
+      });
+    } catch (e) {
+      // fallback
+    }
+    return () => {
+      if (socket) socket.disconnect();
+    };
   }, []);
   
   const deleteMutation = useSoftDeleteUserMutation();
