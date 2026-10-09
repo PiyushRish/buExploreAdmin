@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MessageSquare, Plus, X, Trash2, Star, User, UploadCloud } from "lucide-react";
+import { MessageSquare, Plus, X, Trash2, Star, User, UploadCloud, Heart } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useCreateTestimonialMutation, useDeleteTestimonialMutation } from "../mutations/testimonialMutation.js";
 import axiosClient from "../api/axiosClient.js";
@@ -93,7 +93,12 @@ const Testimonials = () => {
               </div>
 
               <div className="pt-4 mt-4 border-t flex justify-between items-center text-[10px] text-gray-400 font-mono">
-                <span>{new Date(t.date || t.createdAt || Date.now()).toLocaleString()}</span>
+                <div className="flex items-center gap-3">
+                  <span>{new Date(t.date || t.createdAt || Date.now()).toLocaleDateString()}</span>
+                  <span className="flex items-center gap-1 text-pink-600 font-semibold text-xs">
+                    <Heart size={13} className="fill-pink-500 text-pink-500" /> {t.likes || 0}
+                  </span>
+                </div>
                 <button
                   onClick={() => handleDelete(t._id)}
                   disabled={deleteMutation.isPending}
