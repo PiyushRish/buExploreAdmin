@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { Megaphone, Plus, X, UploadCloud, Film, ArrowLeft, Folder } from "lucide-react";
+import { Megaphone, Plus, X, UploadCloud, Film, ArrowLeft, Folder, Loader2 } from "lucide-react";
 import { useAdsQuery, useCampaignsQuery } from "../queries/adsQueries.js";
 import { useCreateAdMutation, useCreateCampaignMutation } from "../mutations/adsMutation.js";
 import toast from "react-hot-toast";
@@ -7,6 +7,7 @@ import AdDetails from "./AdDetails.jsx";
 import { RequiredNotice } from "../components/RequiredTag.jsx";
 import FormField from "../components/FormField.jsx";
 import { validators, runValidators, validateMediaType } from "../utils/validators.js";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
 
 const getImageUrl = (photo) => {
   if (!photo) return null;
@@ -495,8 +496,23 @@ const Ads = () => {
               </div>
             )}
 
-            <button onClick={handleAdSubmit} disabled={createAdMutation.isPending} className="w-full bg-purple-600 text-white py-3 rounded-xl font-bold shadow-md">
-              {createAdMutation.isPending ? "Processing..." : "Publish Ad Placement"}
+            {createAdMutation.isPending && (
+              <UploadProgressBar isUploading={createAdMutation.isPending} />
+            )}
+
+            <button
+              onClick={handleAdSubmit}
+              disabled={createAdMutation.isPending}
+              className="w-full bg-purple-600 hover:bg-purple-700 active:scale-98 text-white py-3 rounded-xl font-bold shadow-md transition disabled:bg-purple-300 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {createAdMutation.isPending ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Uploading Ad Assets...</span>
+                </>
+              ) : (
+                <span>Publish Ad Placement</span>
+              )}
             </button>
           </div>
         </div>

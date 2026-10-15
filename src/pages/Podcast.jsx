@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Mic, Plus, X, UploadCloud, Film, Image as ImageIcon, Trash2, Play, Youtube, Link, Maximize2, ExternalLink } from "lucide-react";
+import { Mic, Plus, X, UploadCloud, Film, Image as ImageIcon, Trash2, Play, Youtube, Link, Maximize2, ExternalLink, Loader2 } from "lucide-react";
 import { usePodcastsQuery } from "../queries/podcastQueries.js";
 import { useAddPodcastMutation, useDeletePodcastMutation } from "../mutations/podcastMutation.js";
 import { useAddYoutubeVideoMutation, useDeleteYoutubeVideoMutation } from "../mutations/youtubeVideoMutation.js";
@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { Req, RequiredNotice } from "../components/RequiredTag.jsx";
 import FormField from "../components/FormField.jsx";
 import { validators, runValidators, validateMediaType } from "../utils/validators.js";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
 
 const Podcast = () => {
   const { data, isLoading } = usePodcastsQuery();
@@ -331,12 +332,23 @@ const Podcast = () => {
               )}
             </div>
 
+            {addMutation.isPending && (
+              <UploadProgressBar isUploading={addMutation.isPending} />
+            )}
+
             <button
               onClick={handleSubmit}
               disabled={addMutation.isPending}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold shadow-md transition-colors"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white py-3 rounded-xl font-bold shadow-md transition disabled:bg-indigo-300 flex items-center justify-center gap-2 cursor-pointer"
             >
-              {addMutation.isPending ? "Uploading Media..." : "Publish Episode"}
+              {addMutation.isPending ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Uploading Episode Media...</span>
+                </>
+              ) : (
+                <span>Publish Episode</span>
+              )}
             </button>
           </div>
         </div>

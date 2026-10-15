@@ -15,6 +15,7 @@ import {
   RotateCcw,
   CheckCircle,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import {
   getSurpriseEvents,
@@ -28,11 +29,13 @@ import toast from "react-hot-toast";
 import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
 import { useNotificationDraft } from "../utils/useNotificationDraft.js";
 import SurpriseEventDetailsModal from "../components/SurpriseEventDetailsModal.jsx";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
 
 const SurpriseEventsPage = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [filterTab, setFilterTab] = useState("active"); // "active" | "trash" | "all"
   const { notif, setNotif, sendIfEnabled, resetNotif } = useNotificationDraft("surprise_event");
@@ -69,6 +72,7 @@ const SurpriseEventsPage = () => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    setIsPublishing(true);
     try {
       const data = new FormData();
       data.append("title", formData.title);
@@ -105,6 +109,8 @@ const SurpriseEventsPage = () => {
       fetchEvents();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to publish event");
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -569,6 +575,12 @@ const SurpriseEventsPage = () => {
                   value={notif}
                   onChange={setNotif}
                 />
+
+                {isPublishing && (
+                  <div className="pt-2">
+                    <UploadProgressBar isUploading={isPublishing} />
+                  </div>
+                )}
               </div>
 
               {/* Sticky Footer */}
@@ -576,15 +588,26 @@ const SurpriseEventsPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-5 py-2.5 border border-slate-200 rounded-xl text-slate-600 font-bold hover:bg-slate-50 text-sm transition"
+                  disabled={isPublishing}
+                  className="px-5 py-2.5 border border-slate-200 rounded-xl text-slate-600 font-bold hover:bg-slate-50 text-sm transition disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-98 text-white font-bold rounded-xl text-sm shadow-md transition flex items-center gap-2"
+                  disabled={isPublishing}
+                  className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-98 text-white font-bold rounded-xl text-sm shadow-md transition disabled:bg-purple-300 flex items-center gap-2 cursor-pointer"
                 >
-                  <Sparkles size={16} /> Publish Surprise Event
+                  {isPublishing ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Publishing Event Assets...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={16} /> <span>Publish Surprise Event</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

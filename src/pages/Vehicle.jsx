@@ -1,5 +1,5 @@
 import React, { useState, useContext } from "react";
-import { Car, Plus, UploadCloud, X } from "lucide-react";
+import { Car, Plus, UploadCloud, X, Loader2 } from "lucide-react";
 import { PlaceContext } from "../contextApi/places.jsx";
 import VehicleDetails from "./VehicleDetails.jsx";
 import { useVehiclesQuery } from "../queries/vehicleQueries.js";
@@ -10,6 +10,7 @@ import FormField from "../components/FormField.jsx";
 import { validators, runValidators, validateMediaType } from "../utils/validators.js";
 import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
 import { useNotificationDraft } from "../utils/useNotificationDraft.js";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
 
 const VehicleCard = ({ vehicle }) => {
   const { setClickedPlaceHandler } = useContext(PlaceContext);
@@ -324,6 +325,12 @@ const Vehicles = () => {
                 value={notif}
                 onChange={setNotif}
               />
+
+              {addMutation.isPending && (
+                <div className="pt-2">
+                  <UploadProgressBar isUploading={addMutation.isPending} />
+                </div>
+              )}
             </div>
 
             {/* Sticky Footer */}
@@ -331,15 +338,24 @@ const Vehicles = () => {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition"
+                disabled={addMutation.isPending}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
-                className="px-6 py-2.5 bg-red-600 hover:bg-red-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2"
+                disabled={addMutation.isPending}
+                className="px-6 py-2.5 bg-red-600 hover:bg-red-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition disabled:bg-red-300 flex items-center gap-2 cursor-pointer"
               >
-                Add Rental Vehicle
+                {addMutation.isPending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Uploading Vehicle Assets...</span>
+                  </>
+                ) : (
+                  <span>Add Rental Vehicle</span>
+                )}
               </button>
             </div>
           </div>

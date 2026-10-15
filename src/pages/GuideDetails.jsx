@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { User, MapPin, Star, UploadCloud, Save, X, Edit2, ShieldAlert, ArrowLeft, Trash2 } from "lucide-react";
+import { User, MapPin, Star, UploadCloud, Save, X, Edit2, ShieldAlert, ArrowLeft, Trash2, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { validateMediaType } from "../utils/validators.js";
 import { useUpdateGuideMutation, useDeleteGuideMutation } from "../mutations/guideMutation";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
 
 const getImageUrl = (photo) => {
   if (!photo) return "";
@@ -93,28 +94,45 @@ const GuideDetails = ({ guide, setSelectedGuide }) => {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
       <div className="w-full h-full flex flex-col bg-white">
-        <div className="h-16 border-b px-8 flex items-center justify-between">
-          <button onClick={() => setSelectedGuide(null)} className="flex items-center text-gray-600 hover:text-black">
-            <ArrowLeft size={20} className="mr-2" /> Back summary
-          </button>
-
-          <div className="flex gap-3">
-            <button
-              onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
-              className={`flex items-center px-4 py-2 rounded-lg font-bold ${
-                isEditing ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-700"
-              }`}
-            >
-              {isEditing ? <><Save size={16} className="mr-2" /> Save</> : <><Edit2 size={16} className="mr-2" /> Edit</>}
+        <div className="border-b px-8 py-3 bg-white sticky top-0 z-20">
+          <div className="flex items-center justify-between">
+            <button onClick={() => setSelectedGuide(null)} className="flex items-center text-gray-600 hover:text-black">
+              <ArrowLeft size={20} className="mr-2" /> Back summary
             </button>
 
-            <button
-              onClick={handleDelete}
-              className="px-4 py-2 bg-red-50 text-red-600 rounded-lg flex items-center font-bold hover:bg-red-100 focus:outline-none"
-            >
-              <Trash2 size={16} className="mr-2" /> Delete 
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
+                disabled={updateMutation.isPending}
+                className={`flex items-center px-4 py-2 rounded-lg font-bold transition ${
+                  isEditing ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                } disabled:opacity-50`}
+              >
+                {updateMutation.isPending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin mr-2" /> Saving...
+                  </>
+                ) : isEditing ? (
+                  <>
+                    <Save size={16} className="mr-2" /> Save
+                  </>
+                ) : (
+                  <>
+                    <Edit2 size={16} className="mr-2" /> Edit
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending || updateMutation.isPending}
+                className="px-4 py-2 bg-red-50 text-red-600 rounded-lg flex items-center font-bold hover:bg-red-100 focus:outline-none disabled:opacity-50"
+              >
+                <Trash2 size={16} className="mr-2" /> Delete 
+              </button>
+            </div>
           </div>
+          <UploadProgressBar isUploading={updateMutation.isPending} className="mt-2" />
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 space-y-6">

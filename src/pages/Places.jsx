@@ -7,6 +7,8 @@ import {
   Check,
   RefreshCw,
   Tag,
+  Star,
+  Loader2,
 } from "lucide-react";
 import { GenericListHeader } from "../components/layout/GenericListHeader.jsx";
 import { PlaceContext } from "../contextApi/places.jsx";
@@ -18,6 +20,7 @@ import FormField from "../components/FormField.jsx";
 import { validators, runValidators, validateMediaType } from "../utils/validators.js";
 import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
 import { useNotificationDraft } from "../utils/useNotificationDraft.js";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
 
 const getImageUrl = (photo) => {
   if (!photo) return "https://picsum.photos/600/400";
@@ -34,7 +37,7 @@ const CATEGORIES = [
   "Treasures",
 ];
 
-const PlaceCard = ({ place }) => {
+const PlaceCard = ({ place, onNavigateToReviews }) => {
   const { setClickedPlaceHandler } = useContext(PlaceContext);
   const coverImage = getImageUrl(place?.photos?.[0]);
 
@@ -90,16 +93,32 @@ const PlaceCard = ({ place }) => {
 
         <div className="pt-3 mt-3 border-t border-gray-100 flex justify-between items-center text-[10px] font-bold text-gray-400">
           <span>CITY: {place?.city || "Jhansi"}</span>
-          <span className="text-blue-600 font-bold hover:underline">
-            Manage All Fields →
-          </span>
+          <div className="flex items-center gap-2">
+            {onNavigateToReviews && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNavigateToReviews(place);
+                }}
+                className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-md transition font-bold cursor-pointer"
+                title="View & moderate reviews"
+              >
+                <Star size={11} className="text-amber-500 fill-amber-400" />
+                <span>Reviews {place.reviews?.length > 0 ? `(${place.reviews.length})` : ""}</span>
+              </button>
+            )}
+            <span className="text-blue-600 font-bold hover:underline">
+              Manage All Fields →
+            </span>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-const Places = () => {
+const Places = ({ onNavigateToReviews }) => {
   const [onlyDeleted, setOnlyDeleted] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [search, setSearch] = useState("");
@@ -277,7 +296,11 @@ const Places = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {places.map((place) => (
-              <PlaceCard key={place._id} place={place} />
+              <PlaceCard
+                key={place._id}
+                place={place}
+                onNavigateToReviews={onNavigateToReviews}
+              />
             ))}
           </div>
         )}
@@ -579,6 +602,13 @@ const Places = () => {
                 value={notif}
                 onChange={setNotif}
               />
+
+              {/* Upload Progress Indicator when uploading */}
+              {isPending && (
+                <div className="pt-2">
+                  <UploadProgressBar isUploading={isPending} />
+                </div>
+              )}
             </div>
 
             {/* Sticky Footer */}
@@ -586,16 +616,24 @@ const Places = () => {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition"
+                disabled={isPending}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={isPending}
-                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition disabled:bg-blue-300 flex items-center gap-2"
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition disabled:bg-blue-300 flex items-center gap-2 cursor-pointer"
               >
-                {isPending ? "Saving..." : "Save Destination"}
+                {isPending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Uploading Assets...</span>
+                  </>
+                ) : (
+                  <span>Save Destination</span>
+                )}
               </button>
             </div>
           </div>

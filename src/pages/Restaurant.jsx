@@ -1,5 +1,5 @@
 import React, { useState, useContext } from "react";
-import { MapPin, Plus, UploadCloud, X, Utensils } from "lucide-react";
+import { MapPin, Plus, UploadCloud, X, Utensils, Loader2 } from "lucide-react";
 import { PlaceContext } from "../contextApi/places.jsx";
 import RestaurantDetails from "./RestaurantDetails.jsx";
 import { useRestaurantsQuery } from "../queries/restaurantQueries.js";
@@ -10,6 +10,7 @@ import FormField from "../components/FormField.jsx";
 import { validators, runValidators, validateMediaType } from "../utils/validators.js";
 import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
 import { useNotificationDraft } from "../utils/useNotificationDraft.js";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
 
 const RestaurantCard = ({ restaurant }) => {
   const { setClickedPlaceHandler } = useContext(PlaceContext);
@@ -330,6 +331,12 @@ const Restaurants = () => {
                 value={notif}
                 onChange={setNotif}
               />
+
+              {addRestaurantMutation.isPending && (
+                <div className="pt-2">
+                  <UploadProgressBar isUploading={addRestaurantMutation.isPending} />
+                </div>
+              )}
             </div>
 
             {/* Sticky Footer */}
@@ -337,15 +344,24 @@ const Restaurants = () => {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition"
+                disabled={addRestaurantMutation.isPending}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
-                className="px-6 py-2.5 bg-orange-600 hover:bg-orange-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2"
+                disabled={addRestaurantMutation.isPending}
+                className="px-6 py-2.5 bg-orange-600 hover:bg-orange-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition disabled:bg-orange-300 flex items-center gap-2 cursor-pointer"
               >
-                Create Dining Venue
+                {addRestaurantMutation.isPending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Uploading Venue Assets...</span>
+                  </>
+                ) : (
+                  <span>Create Dining Venue</span>
+                )}
               </button>
             </div>
           </div>

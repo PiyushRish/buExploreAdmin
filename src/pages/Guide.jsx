@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { User, Globe, Star, Plus, X, UploadCloud, Languages, Building, MapPin, Clock, Phone, Mail } from "lucide-react";
+import { User, Globe, Star, Plus, X, UploadCloud, Languages, Building, MapPin, Clock, Phone, Mail, Loader2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axiosClient from "../api/axiosClient";
 import { getAgencies, addAgency } from "../api/agency.api";
@@ -11,6 +11,7 @@ import FormField from "../components/FormField.jsx";
 import { validators, runValidators, validateMediaType } from "../utils/validators.js";
 import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
 import { useNotificationDraft } from "../utils/useNotificationDraft.js";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
 
 const getImageUrl = (photo) => {
   if (!photo) return "https://picsum.photos/400/400";
@@ -127,9 +128,11 @@ const Guide = () => {
     description: "",
   });
   const [agencyPhotos, setAgencyPhotos] = useState([]);
+  const [isAddingAgency, setIsAddingAgency] = useState(false);
 
   const handleCreateAgency = async (e) => {
     e.preventDefault();
+    setIsAddingAgency(true);
     try {
       const data = new FormData();
       data.append("name", agencyForm.name);
@@ -155,6 +158,8 @@ const Guide = () => {
       queryClient.invalidateQueries(["agencies"]);
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to create agency");
+    } finally {
+      setIsAddingAgency(false);
     }
   };
 
@@ -429,6 +434,11 @@ const Guide = () => {
                     </label>
                   </div>
                 </div>
+                {isAddingAgency && (
+                  <div className="pt-2">
+                    <UploadProgressBar isUploading={isAddingAgency} />
+                  </div>
+                )}
               </div>
 
               {/* Sticky Footer */}
@@ -436,15 +446,24 @@ const Guide = () => {
                 <button
                   type="button"
                   onClick={() => setShowAgencyModal(false)}
-                  className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition"
+                  disabled={isAddingAgency}
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold rounded-xl text-sm shadow-md transition"
+                  disabled={isAddingAgency}
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold rounded-xl text-sm shadow-md transition disabled:bg-indigo-300 flex items-center gap-2 cursor-pointer"
                 >
-                  Create Agency
+                  {isAddingAgency ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Uploading Agency Assets...</span>
+                    </>
+                  ) : (
+                    <span>Create Agency</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -650,21 +669,32 @@ const Guide = () => {
             </div>
 
             {/* Sticky Footer */}
-            <div className="sticky bottom-0 z-20 flex justify-between items-center px-6 py-4 bg-white/95 backdrop-blur border-t border-slate-100 shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowGuideModal(false)}
-                className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateGuide}
-                disabled={isAddingGuide}
-                className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition disabled:bg-purple-300 flex items-center gap-2"
-              >
-                {isAddingGuide ? "Saving..." : "Save Guide Profile"}
-              </button>
+            <div className="sticky bottom-0 z-20 flex flex-col gap-2 px-6 py-4 bg-white/95 backdrop-blur border-t border-slate-100 shrink-0">
+              <UploadProgressBar isUploading={isAddingGuide} />
+              <div className="flex justify-between items-center">
+                <button
+                  type="button"
+                  onClick={() => setShowGuideModal(false)}
+                  disabled={isAddingGuide}
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateGuide}
+                  disabled={isAddingGuide}
+                  className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition disabled:bg-purple-300 flex items-center gap-2"
+                >
+                  {isAddingGuide ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Uploading & Saving Guide...</span>
+                    </>
+                  ) : (
+                    "Save Guide Profile"
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

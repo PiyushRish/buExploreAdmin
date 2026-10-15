@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { MessageSquare, Plus, X, Trash2, Star, User, UploadCloud, Heart } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { MessageSquare, Plus, X, Trash2, Star, User, UploadCloud, Heart, Loader2 } from "lucide-react";
 import { useCreateTestimonialMutation, useDeleteTestimonialMutation } from "../mutations/testimonialMutation.js";
 import axiosClient from "../api/axiosClient.js";
 import toast from "react-hot-toast";
 import { validateMediaType } from "../utils/validators.js";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
 
 const Testimonials = () => {
   const [showModal, setShowModal] = useState(false);
@@ -136,8 +136,25 @@ const Testimonials = () => {
               </label>
             </div>
 
-            <button onClick={handleCreate} disabled={addMutation.isPending} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-md mt-4">
-              Publish Testimonial
+            {addMutation.isPending && (
+              <div className="mt-3">
+                <UploadProgressBar isUploading={addMutation.isPending} />
+              </div>
+            )}
+
+            <button
+              onClick={handleCreate}
+              disabled={addMutation.isPending}
+              className="w-full bg-blue-600 hover:bg-blue-700 active:scale-98 text-white py-3 rounded-xl font-bold shadow-md mt-4 transition disabled:bg-blue-300 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {addMutation.isPending ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Publishing Testimonial...</span>
+                </>
+              ) : (
+                <span>Publish Testimonial</span>
+              )}
             </button>
           </div>
         </div>

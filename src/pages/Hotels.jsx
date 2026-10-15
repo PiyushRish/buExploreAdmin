@@ -1,5 +1,5 @@
 import React, { useState, useContext } from "react";
-import { MapPin, Plus, ArrowLeft, UploadCloud, X, Building } from "lucide-react";
+import { MapPin, Plus, ArrowLeft, UploadCloud, X, Building, Loader2 } from "lucide-react";
 import { PlaceContext } from "../contextApi/places.jsx";
 import HotelDetails from "./HotelDetails.jsx";
 import { useHotelsQuery } from "../queries/hotelQueries.js";
@@ -10,6 +10,7 @@ import FormField from "../components/FormField.jsx";
 import { validators, runValidators, validateMediaType } from "../utils/validators.js";
 import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
 import { useNotificationDraft } from "../utils/useNotificationDraft.js";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
 
 const HotelCard = ({ hotel }) => {
   const { setClickedPlaceHandler } = useContext(PlaceContext);
@@ -343,6 +344,12 @@ const Hotels = () => {
                 value={notif}
                 onChange={setNotif}
               />
+
+              {addHotelMutation.isPending && (
+                <div className="pt-2">
+                  <UploadProgressBar isUploading={addHotelMutation.isPending} />
+                </div>
+              )}
             </div>
 
             {/* Sticky Footer */}
@@ -350,15 +357,24 @@ const Hotels = () => {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition"
+                disabled={addHotelMutation.isPending}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
-                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition flex items-center gap-2"
+                disabled={addHotelMutation.isPending}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition disabled:bg-blue-300 flex items-center gap-2 cursor-pointer"
               >
-                Create Property
+                {addHotelMutation.isPending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Uploading Property Assets...</span>
+                  </>
+                ) : (
+                  <span>Create Property</span>
+                )}
               </button>
             </div>
           </div>

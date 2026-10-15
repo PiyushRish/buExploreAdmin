@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Save, Trash2, Eye, MousePointer, ExternalLink, Image as ImageIcon, Video, UploadCloud, X } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Eye, MousePointer, ExternalLink, Image as ImageIcon, Video, UploadCloud, X, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useDeleteAdMutation, useUpdateAdMutation } from "../mutations/adsMutation";
 import axiosClient from "../api/axiosClient";
@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import FormField from "../components/FormField";
 import { validators, runValidators, validateMediaType } from "../utils/validators";
 import { RequiredNotice, Req } from "../components/RequiredTag";
+import UploadProgressBar from "../components/UploadProgressBar";
 
 const STATUS_OPTIONS = ["active", "paused", "draft", "scheduled", "ended"];
 
@@ -154,20 +155,31 @@ const AdDetails = ({ ad, onBack }) => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 font-sans">
-      <div className="h-16 border-b px-8 flex items-center justify-between bg-white sticky top-0 z-20">
-        <button onClick={onBack} className="flex items-center text-gray-600 font-semibold hover:text-gray-900">
-          <ArrowLeft size={18} className="mr-2" /> Back to Campaign
-        </button>
-
-        <div className="flex items-center gap-3">
-          <button onClick={handleDelete} className="flex items-center px-4 py-2 rounded-xl bg-red-50 text-red-600 font-bold text-xs border border-red-200">
-            <Trash2 size={14} className="mr-1.5" /> Permanent Delete Ad
+      <div className="border-b px-8 py-3 bg-white sticky top-0 z-20">
+        <div className="flex items-center justify-between">
+          <button onClick={onBack} className="flex items-center text-gray-600 font-semibold hover:text-gray-900">
+            <ArrowLeft size={18} className="mr-2" /> Back to Campaign
           </button>
 
-          <button onClick={handleSave} disabled={updateAdMutation.isPending} className="flex items-center px-6 py-2 rounded-xl bg-purple-600 text-white font-bold text-xs shadow-md">
-            <Save size={14} className="mr-1.5" /> Save Changes
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={handleDelete} disabled={updateAdMutation.isPending || deleteAdMutation.isPending} className="flex items-center px-4 py-2 rounded-xl bg-red-50 text-red-600 font-bold text-xs border border-red-200 disabled:opacity-50">
+              <Trash2 size={14} className="mr-1.5" /> Permanent Delete Ad
+            </button>
+
+            <button onClick={handleSave} disabled={updateAdMutation.isPending} className="flex items-center px-6 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition disabled:bg-purple-300">
+              {updateAdMutation.isPending ? (
+                <>
+                  <Loader2 size={14} className="animate-spin mr-1.5" /> Saving Changes...
+                </>
+              ) : (
+                <>
+                  <Save size={14} className="mr-1.5" /> Save Changes
+                </>
+              )}
+            </button>
+          </div>
         </div>
+        <UploadProgressBar isUploading={updateAdMutation.isPending} className="mt-3" />
       </div>
 
       <div className="flex-1 overflow-y-auto p-8 space-y-8 max-w-5xl mx-auto w-full">

@@ -2,13 +2,14 @@ import React, { useState, useContext, useEffect } from "react";
 import {
   MapPin, Bell, User, Users as UsersIcon, Car, Megaphone, MessageSquare, AlertCircle,
   Film, Video, Menu, X, ChevronLeft, LayoutDashboard, Mic,
-  Compass, Sparkles,
+  Compass, Sparkles, Star,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import axiosClient from "../api/axiosClient.js";
 import { useUserStatsQuery } from "../queries/userQueries.js";
 
 import Places from "./Places.jsx";
+import PlaceReviews from "./PlaceReviews.jsx";
 import Hotels from "./Hotels.jsx";
 import Restaurants from "./Restaurant.jsx";
 import Guides from "./Guide.jsx";
@@ -27,6 +28,7 @@ import { PlaceContext } from "../contextApi/places.jsx";
 
 const navItems = [
   { name: "Places",          icon: MapPin },
+  { name: "Place Reviews",   icon: Star },
   { name: "Hotels",          icon: MapPin },
   { name: "Restaurants",     icon: MapPin },
   { name: "Guides & Agency", icon: User },
@@ -251,8 +253,29 @@ const DashBoard = () => {
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 min-h-full p-3 sm:p-4 md:p-6">
             {activeTab === "Places" && (
               clickedPlace
-                ? <PlaceDetails onBack={() => setClickedPlaceHandler(null)} />
-                : <Places />
+                ? <PlaceDetails
+                    onBack={() => setClickedPlaceHandler(null)}
+                    onNavigateToReviews={(place) => {
+                      setClickedPlaceHandler(place);
+                      setActiveTab("Place Reviews");
+                    }}
+                  />
+                : <Places
+                    onNavigateToReviews={(place) => {
+                      setClickedPlaceHandler(place);
+                      setActiveTab("Place Reviews");
+                    }}
+                  />
+            )}
+            {activeTab === "Place Reviews" && (
+              <PlaceReviews
+                initialPlace={clickedPlace}
+                onBackToPlace={() => {
+                  if (clickedPlace) {
+                    setActiveTab("Places");
+                  }
+                }}
+              />
             )}
             {activeTab === "Hotels font-medium" || activeTab === "Hotels" && <Hotels />}
             {activeTab === "Restaurants flex"  || activeTab === "Restaurants" && <Restaurants />}

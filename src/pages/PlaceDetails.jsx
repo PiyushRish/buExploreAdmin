@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from "react";
 import {
   Image as ImageIcon, Film, ExternalLink,
-  Globe, Compass, Tag, Calendar, Eye, Heart, UploadCloud, AlertTriangle
+  Globe, Compass, Tag, Calendar, Eye, Heart, UploadCloud, AlertTriangle, Star, MessageSquare
 } from "lucide-react";
 import { GenericDetailsHeader } from "../components/layout/GenericDetailsHeader.jsx";
 import { PlaceContext } from "../contextApi/places.jsx";
@@ -12,6 +12,7 @@ import {
 } from "../mutations/placeMutation.js";
 import toast from "react-hot-toast";
 import { validateMediaType } from "../utils/validators.js";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
 
 const getImageUrl = (photo) => {
   if (!photo) return "https://picsum.photos/600/400";
@@ -19,7 +20,7 @@ const getImageUrl = (photo) => {
   return photo.url || photo.secure_url || "https://picsum.photos/600/400";
 };
 
-const PlaceDetails = () => {
+const PlaceDetails = ({ onBack, onNavigateToReviews }) => {
   const { clickedPlace, setClickedPlaceHandler } = useContext(PlaceContext);
 
   const [data, setData] = useState(clickedPlace || {});
@@ -151,6 +152,10 @@ const PlaceDetails = () => {
 
         {/* CONTENT FIELD CONTAINER */}
         <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-gray-50/50">
+          {updatePlaceMutation.isPending && (
+            <UploadProgressBar isUploading={updatePlaceMutation.isPending} />
+          )}
+
           {/* STATUS BADGES & ID */}
           <div className="flex items-center justify-between bg-white p-4 rounded-2xl border shadow-sm">
             <div className="flex items-center gap-3">
@@ -169,6 +174,22 @@ const PlaceDetails = () => {
             </div>
 
             <div className="flex items-center gap-4 text-xs font-bold text-gray-600">
+              {onNavigateToReviews && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToReviews(data)}
+                  className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl border border-indigo-200 shadow-xs transition cursor-pointer"
+                  title="View and moderate reviews for this place"
+                >
+                  <Star size={13} className="text-amber-500 fill-amber-400" />
+                  <span>Moderate Reviews</span>
+                  {data.reviews?.length > 0 && (
+                    <span className="bg-indigo-200/80 text-indigo-900 text-[10px] px-1.5 py-0.2 rounded-full font-black">
+                      {data.reviews.length}
+                    </span>
+                  )}
+                </button>
+              )}
               <span className="flex items-center gap-1">
                 <Heart size={14} className="text-red-500 fill-red-500" />
                 Likes:
