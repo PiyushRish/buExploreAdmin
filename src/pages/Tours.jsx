@@ -25,7 +25,7 @@ const ToursPage = () => {
     try {
       const data = await getAllTours();
       setTours(data.tours || []);
-    } catch (err) {
+    } catch (_err) {
       toast.error("Failed to load tour requests");
     } finally {
       setLoading(false);
@@ -66,7 +66,7 @@ const ToursPage = () => {
       toast.success("Tour request deleted");
       if (selectedTour?._id === id) setSelectedTour(null);
       fetchTours();
-    } catch (err) {
+    } catch (_err) {
       toast.error("Failed to delete tour");
     }
   };

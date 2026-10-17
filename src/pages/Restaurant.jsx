@@ -43,6 +43,7 @@ const Restaurants = () => {
   const { data, isLoading, isError } = useRestaurantsQuery();
   const { clickedPlace } = useContext(PlaceContext);
   const addRestaurantMutation = useAddRestaurantMutation();
+  const { notif, setNotif, sendIfEnabled, resetNotif } = useNotificationDraft("restaurant");
 
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ 

@@ -138,7 +138,7 @@ const PlaceDetails = ({ onBack, onNavigateToReviews }) => {
       <div className="w-[70%] h-full flex flex-col bg-white border-r shadow-sm z-10">
         
         <GenericDetailsHeader
-          onBack={() => setClickedPlaceHandler(null)}
+          onBack={onBack || (() => setClickedPlaceHandler(null))}
           isDeleted={data.isDeleted}
           isEditing={isEditing}
           isPending={updatePlaceMutation.isPending}

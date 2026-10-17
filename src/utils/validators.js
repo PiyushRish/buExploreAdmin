@@ -55,7 +55,7 @@ export const validators = {
 
   youtubeUrl: (value, label = "YouTube URL") => {
     if (!value) return null;
-    const re = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w\-]+/;
+    const re = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/;
     if (!re.test(value.trim())) {
       return { error: `${label} must be a valid YouTube link.`, hint: "e.g. https://youtube.com/watch?v=abc123" };
     }

@@ -20,10 +20,8 @@ import {
 import {
   getSurpriseEvents,
   addSurpriseEvent,
-  deleteSurpriseEvent,
   softDeleteSurpriseEvent,
   restoreSurpriseEvent,
-  hardDeleteSurpriseEvent,
 } from "../api/surpriseEvents.api";
 import toast from "react-hot-toast";
 import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
@@ -59,7 +57,7 @@ const SurpriseEventsPage = () => {
       const data = await getSurpriseEvents({ includeDeleted: "true" });
       const rawList = data?.events || data?.data || (Array.isArray(data) ? data : []);
       setEvents(rawList);
-    } catch (err) {
+    } catch (_err) {
       toast.error("Failed to load surprise events");
     } finally {
       setLoading(false);

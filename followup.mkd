@@ -1,0 +1,240 @@
+# BuXplore Admin & Backend — Followup & Master Changes Log
+
+> **File:** `followup.mkd`  
+> **Last Updated:** 2026-10-17  
+> **Purpose:** Persistent single source of truth for all architectural updates, API mappings, dynamic schemas, and admin UI integrations across BuExplore. Review this document before making further changes to avoid round trips and maintain full backward compatibility.
+
+---
+
+## 📑 Table of Contents
+
+1. [Executive Summary of Changes](#1-executive-summary-of-changes)
+2. [Upload Progress & Creation Feedback Architecture](#2-upload-progress--creation-feedback-architecture)
+3. [Emergency 24/7 Response Services Subsystem](#3-emergency-247-response-services-subsystem)
+4. [Dynamic Service Templates & Subservice Builder](#4-dynamic-service-templates--subservice-builder)
+5. [Content Moderation & Reports Subsystem](#5-content-moderation--reports-subsystem)
+6. [Notification 3-Day Retention & Read Receipts](#6-notification-3-day-retention--read-receipts)
+7. [Admin Portal (`buExploreAdmin`) Navigation & Page Mappings](#7-admin-portal-buexploreadmin-navigation--page-mappings)
+8. [Security Hardening & NoSQL Injection Protection](#8-security-hardening--nosql-injection-protection)
+9. [Frontend Engineer Integration Reference](#9-frontend-engineer-integration-reference)
+
+---
+
+## 1. Executive Summary of Changes
+
+### Today's Core Additions:
+1. **Dynamic Service Schema & Subservice Template Builder**:
+   - Replaced rigid, hardcoded key-value pairs with a dynamic template engine for any subservice (`cafe`, `pub`, `vehicle_rental`, `hospital`, `resort`, `event_hall`, etc.).
+   - Admin can define reusable subservice templates with customizable field types (`text`, `number`, `boolean`, `multiselect`, `textarea`, `time_range`, `tags`).
+   - Admin can instantiate listings from a template, add extra fields on the fly, remove unwanted fields, and publish with status `published` or `draft`.
+   - Integrated with Cloudflare R2 for up to 10 photos (`ServicePhotos`).
+2. **Emergency Response Directory**:
+   - Comprehensive 24/7 directory for `Ambulance`, `Police`, `Fire Station`, and `Hospital`.
+   - Includes response times, equipment (`O2 Oxygen`, `Ventilator`, `ICU`, `Blood Bank`), GPS navigation, and 1-tap call event tracking (`callCount`).
+3. **Content Moderation & Reports**:
+   - Community reporting workflow for Place Reviews and Testimonials (`nsfw`, `spam`, `hate_speech`, `harassment`, `fishy_scam`).
+   - Admin dashboard with overview metrics, dismissal, and content soft-delete.
+4. **Notification Retention Period**:
+   - Updated from 24h to **3 days** (259,200 seconds) in configuration, cron cleanup, and MongoDB TTL index via `collMod`.
+5. **Universal Creation Feedback & Loaders**:
+   - Real-time upload progress bar (`UploadProgressBar`) and spinner feedback on all admin modal submit buttons.
+
+---
+
+## 2. Upload Progress & Creation Feedback Architecture
+
+To give the admin instant visual feedback on multi-megabyte media uploads (R2 photos and videos):
+
+### A. Global Upload Interceptor (`buExploreAdmin/src/api/axiosClient.js`)
+- Axios request interceptor automatically attaches an `onUploadProgress` listener to all `multipart/form-data` requests.
+- Calculates loaded bytes vs. total bytes, percentage (0% to 100%), and friendly status text:
+  - `0% - 85%`: *"Uploading media (X%)..."*
+  - `85% - 99%`: *"Almost done uploading..."*
+  - `100%`: *"Upload complete! Saving & processing on Cloudflare R2 / Server..."*
+- Dispatches events to `UploadProgressContext` via `notifyUploadProgress`.
+
+### B. Global Floating Widget (`components/GlobalUploadProgressWidget.jsx`)
+- Fixed at the bottom-right corner of the screen.
+- Displays live percentage badge, byte counter (e.g., `4.2 MB / 8.5 MB`), animated spinner, and success/error state.
+
+### C. In-Modal Creation Progress (`components/UploadProgressBar.jsx`)
+- Embedded in the sticky footer of all creation modals.
+- Features smooth gradient track (`bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500`) with dynamic width.
+- Submit buttons automatically show `<Loader2 size={16} className="animate-spin" />` and descriptive text (`"Uploading Assets & Saving..."`), while disabling double-clicks (`disabled={isSaving}`).
+
+---
+
+## 3. Emergency 24/7 Response Services Subsystem
+
+### Backend Implementation
+* **Model:** `BuExploreBackend/models/Emergency.js`
+* **Controller:** `BuExploreBackend/controllers/serviceController.js`
+* **Routes:** Mounted under `/api/services` in `BuExploreBackend/routes/serviceRoutes.js`:
+  - `POST /api/services/createEmergency` (Admin, multipart with `EmergencyPhotos`)
+  - `GET /api/services/emergency` (Public, multi-filter: `subCategory`, `city`, `is24x7`, `liveStatus`, `search`, pagination)
+  - `GET /api/services/emergency/subCategory/:subCategory` (Shortcut for tabs)
+  - `GET /api/services/emergency/:id` (Details + view counter increment)
+  - `PUT /api/services/emergency/:id` (Admin update)
+  - `DELETE /api/services/emergency/:id` (Admin delete with R2 cleanup)
+  - `POST /api/services/emergency/call/:id` (1-tap dial tracking, increments `callCount`)
+
+### Admin Portal Implementation
+* **Page:** `buExploreAdmin/src/pages/Emergency.jsx`
+* **API Client:** `buExploreAdmin/src/api/emergency.api.js`
+* **Hooks:** `buExploreAdmin/src/queries/emergencyQueries.js` & `buExploreAdmin/src/mutations/emergencyMutation.js`
+* **Features:**
+  - Subcategory tabs: Ambulance (Rose), Police (Blue), Fire Station (Amber), Hospital (Emerald).
+  - 1-tap call counter badge and direct dialing hyperlink.
+  - Equipment checkboxes (Oxygen Support, Ventilator, ICU, Trauma Center, Blood Bank).
+  - Multi-photo Cloudflare R2 dropzone with live upload progress.
+
+---
+
+## 4. Dynamic Service Templates & Subservice Builder
+
+### Architecture & Motivation
+Instead of creating rigid Mongoose models every time a new business type is added (e.g. pub, bakery, bike rental, yoga center), the dynamic engine lets admins configure schema definitions on the fly:
+
+1. **`models/ServiceTemplate.js`**:
+   - `templateName`: Human-readable name (e.g., *"Artisan Cafe & Bakery"*).
+   - `category`: Base category enum (`restaurants/bars`, `hotel/resorts`, `vehicle`, `emergency`, `events`, `shopping`, `others`).
+   - `subService`: Slug (e.g., `cafe`, `pub`, `car_rental`).
+   - `fields`: Array of field definitions (`fieldKey`, `label`, `fieldType`, `options`, `defaultValue`, `required`, `section`).
+   - `defaultPreset`: Initial JSON values for quick setup.
+2. **`models/CustomService.js`**:
+   - `service`: Reference to base `Service` record (ensures unified platform search).
+   - `template`: Optional reference to the origin `ServiceTemplate`.
+   - `title`, `category`, `subService`, `contact`, `location`.
+   - `customDetails`: Dynamic key-value pairs (sanitized).
+   - `fieldDefinitions`: Snapshot of schema definitions for accurate client-side form and badge rendering.
+   - `status`: `"published"` (publicly visible) or `"draft"` (admin-only).
+   - `photos`: MediaAsset array on Cloudflare R2.
+   - `views` & `clicks`: Live analytics counters.
+
+### Endpoints
+* `POST /api/services/templates` (Admin create template)
+* `GET /api/services/templates` (List templates, filter by `category`, `subService`, `search`)
+* `GET /api/services/templates/:id`
+* `PUT /api/services/templates/:id`
+* `DELETE /api/services/templates/:id`
+* `POST /api/services/templates/seed-defaults` (Seed production starter templates)
+* `POST /api/services/custom` (Admin publish dynamic listing with R2 photos)
+* `GET /api/services/custom` (List dynamic listings, filtered by category, subservice, status, city)
+* `GET /api/services/custom/:id`
+* `PUT /api/services/custom/:id`
+* `DELETE /api/services/custom/:id`
+* `POST /api/services/custom/:id/click` (Track 1-tap clicks/calls)
+
+### Admin Portal Implementation
+* **Page:** `buExploreAdmin/src/pages/ServiceTemplates.jsx`
+* **API Client:** `buExploreAdmin/src/api/serviceTemplate.api.js`
+* **Hooks:** `buExploreAdmin/src/queries/serviceTemplateQueries.js` & `buExploreAdmin/src/mutations/serviceTemplateMutation.js`
+* **UI Features:**
+  - **Tab 1: Subservice Templates**: Manage schemas and run "Seed Defaults" with 1 click.
+  - **Tab 2: Published Custom Listings**: Pick a base template, adjust prefilled fields, dynamically add extra attributes via "+ Add Detail", or delete attributes, then upload R2 photos and publish.
+
+---
+
+## 5. Content Moderation & Reports Subsystem
+
+### Overview
+Community reporting engine for flagging abusive comments, NSFW photos, fishy scams, or spam.
+* **Backend Model:** `BuExploreBackend/models/Report.js`
+* **Backend Endpoints:**
+  - `GET /api/reports/all` (Admin list reports with filters: `status`, `reason`, `targetType`)
+  - `GET /api/reports/stats` (Admin overview: `totalReports`, `pending`, `investigating`, `resolved`, `dismissed`)
+  - `PATCH /api/reports/:id/action` (Admin take action: `dismiss`, `investigate`, `soft_delete_content`)
+* **Admin Portal:** `buExploreAdmin/src/pages/Reports.jsx` (accessible from dashboard sidebar).
+
+---
+
+## 6. Notification 3-Day Retention & Read Receipts
+
+### Retention Update
+- **Old Retention:** 24 hours (86,400 seconds).
+- **New Retention:** **3 days** (259,200 seconds / 72 hours).
+- **Files Modified:**
+  - `BuExploreBackend/config/notificationConfig.js`: `RETENTION_DAYS = 3`, `RETENTION_SECONDS = 259200`.
+  - `BuExploreBackend/utils/cronJobs.js`: Automated hourly cleanup for records older than 3 days.
+  - `BuExploreBackend/services/notificationService.js`: Database query threshold set to 3 days.
+  - MongoDB TTL index updated via `collMod` to expire at `259200` seconds.
+
+---
+
+## 7. Admin Portal (`buExploreAdmin`) Navigation & Page Mappings
+
+The admin dashboard (`buExploreAdmin/src/pages/DashBoard.jsx`) maps to the following sidebar items:
+
+| Label in Sidebar | Icon | Component | Purpose |
+|---|---|---|---|
+| **Places** | `MapPin` | `Places.jsx` | Place discovery, destinations, and multi-photo uploads |
+| **Place Reviews** | `Star` | `PlaceReviews.jsx` | 50-word community reviews, like/unlike stats, moderation |
+| **Hotels** | `MapPin` | `Hotels.jsx` | Hotel, resort, and guest house listings |
+| **Restaurants** | `MapPin` | `Restaurant.jsx` | Dining venues, cuisines, price range, hours |
+| **Emergency 24/7** *(NEW)* | `ShieldAlert` | `Emergency.jsx` | Ambulance, police, fire, hospital directory & 1-tap call tracking |
+| **Service Templates** *(NEW)* | `Layers` | `ServiceTemplates.jsx` | Dynamic subservice schema builder & custom listing publisher |
+| **Guides & Agency** | `User` | `Guide.jsx` | Verified tour guides and travel agency profiles |
+| **Tours & Plans** | `Compass` | `Tours.jsx` | Custom user tour inquiries and itinerary reviews |
+| **Surprise Events** | `Sparkles` | `SurpriseEvents.jsx` | Multi-photo, multi-video surprise events with soft/hard deletion |
+| **Vehicles** | `Car` | `Vehicle.jsx` | Rental cars, bikes, and rates |
+| **Ads** | `Megaphone` | `Ads.jsx` | Sponsored native video/image ad campaigns interleaved in feed |
+| **Testimonials** | `MessageSquare` | `TestimonialAdmin.jsx` | Public tourist reviews, like counters, and approval status |
+| **Reports & Safety** *(NEW)* | `Shield` | `Reports.jsx` | Moderation queue for flagged reviews and testimonials |
+| **Notifications** | `Bell` | `Notifications.jsx` | Push notification broadcaster, 3-day history log, read status |
+| **Users** | `User` | `Users.jsx` | User profiles, roles, soft-delete, and restore |
+| **Podcasts** | `Mic` | `Podcast.jsx` | Audio podcasts and media feeds |
+| **Intro Video** | `Video` | `IntroVideo.jsx` | Promotional video banner management |
+| **Reels Feed** | `Film` | `ReelsFeed.jsx` | Fast vertical video feed with interleaved ads |
+
+---
+
+## 8. Security Hardening & NoSQL Injection Protection
+
+Dynamic schemas accept arbitrary keys from admins, creating a potential vector for MongoDB operator injection and prototype pollution. We established strict defensive measures in `BuExploreBackend/utils/securitySanitizer.js`:
+
+1. **Blocked Keys:**
+   - Any key beginning with `$` (e.g., `$where`, `$gt`, `$ne`, `$regex`, `$expr`) is rejected with `400 Bad Request`.
+   - Prototype pollution targets (`__proto__`, `constructor`, `prototype`) are immediately blocked.
+   - Keys containing dots (`.`) are disallowed to prevent arbitrary path-traversal overwrites.
+2. **Recursive Sanitization:**
+   - Deeply inspects nested objects, arrays, and primitive strings.
+   - Strips null bytes (`\0`) and escapes dangerous characters in values.
+3. **Admin Verification:**
+   - All schema mutations (`POST /templates`, `PUT /templates/:id`, `DELETE /templates/:id`, `POST /custom`) are gated by `isAuthenticated` and `isAdmin` middleware.
+
+---
+
+## 9. Frontend Engineer Integration Reference
+
+### How the Frontend Renders Dynamic Listings
+1. Call `GET /api/services/templates` to get available subservice templates and icons.
+2. Call `GET /api/services/custom?category=restaurants/bars&subService=cafe` to fetch listings.
+3. The response includes `customDetails` and `fieldDefinitions`:
+   ```json
+   {
+     "title": "The Roasted Bean Artisan Cafe",
+     "category": "restaurants/bars",
+     "subService": "cafe",
+     "customDetails": {
+       "cuisine": ["Specialty Coffee", "Italian"],
+       "avgCostForTwo": 650,
+       "wifiAvailable": true,
+       "liveMusic": true,
+       "petFriendly": true,
+       "specialRoast": "Ethiopian Yirgacheffe"
+     },
+     "fieldDefinitions": [
+       { "fieldKey": "wifiAvailable", "label": "Wi-Fi Available", "fieldType": "boolean" },
+       { "fieldKey": "liveMusic", "label": "Live Music Nights", "fieldType": "boolean" }
+     ],
+     "photos": [
+       { "url": "https://pub-...r2.dev/services/custom/cafe/1.webp" }
+     ]
+   }
+   ```
+4. **Dynamic Rendering Rule:**
+   - Iterate over `customDetails` key-value pairs.
+   - If a boolean is `true`, render a badge with a checkmark or icon.
+   - If an array, render tag pills.
+   - If a number or string, render a label-value row.
+   - Call `POST /api/services/custom/:id/click` when a user taps "Call" or "Visit Website".

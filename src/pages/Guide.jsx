@@ -8,7 +8,6 @@ import toast from "react-hot-toast";
 import GuideDetails from "./GuideDetails.jsx";
 import { Req, RequiredNotice } from "../components/RequiredTag.jsx";
 import FormField from "../components/FormField.jsx";
-import { validators, runValidators, validateMediaType } from "../utils/validators.js";
 import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
 import { useNotificationDraft } from "../utils/useNotificationDraft.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";

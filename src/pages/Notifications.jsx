@@ -15,7 +15,6 @@ import {
   getNotifications,
   sendNotification,
   deleteNotification,
-  markAsRead,
   markAllAsRead,
 } from "../api/notification.api";
 import toast from "react-hot-toast";

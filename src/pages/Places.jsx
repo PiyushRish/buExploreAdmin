@@ -159,9 +159,6 @@ const Places = ({ onNavigateToReviews }) => {
   const [photoFile, setPhotoFile] = useState(null);
   const [videoFile, setVideoFile] = useState(null);
 
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
-
   // Validation
   const RULES = {
     name:        [validators.required, validators.minLength(2)],

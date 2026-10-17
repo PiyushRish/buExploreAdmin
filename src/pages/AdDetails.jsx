@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { ArrowLeft, Save, Trash2, Eye, MousePointer, ExternalLink, Image as ImageIcon, Video, UploadCloud, X, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useDeleteAdMutation, useUpdateAdMutation } from "../mutations/adsMutation";

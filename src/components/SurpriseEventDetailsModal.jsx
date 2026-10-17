@@ -38,8 +38,6 @@ const SurpriseEventDetailsModal = ({
   onUpdated,
   onDeleted,
 }) => {
-  if (!isOpen || !event) return null;
-
   const [mode, setMode] = useState("view"); // "view" | "edit"
   const [selectedVideoIdx, setSelectedVideoIdx] = useState(0);
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0);
@@ -47,20 +45,20 @@ const SurpriseEventDetailsModal = ({
 
   // Edit form state
   const [editForm, setEditForm] = useState({
-    title: event.title || "",
-    description: event.description || "",
-    city: event.city || "Jhansi",
-    location: event.location || "",
-    eventType: event.eventType || "festival",
-    eventDate: event.eventDate
+    title: event?.title || "",
+    description: event?.description || "",
+    city: event?.city || "Jhansi",
+    location: event?.location || "",
+    eventType: event?.eventType || "festival",
+    eventDate: event?.eventDate
       ? new Date(event.eventDate).toISOString().split("T")[0]
       : "",
-    endDate: event.endDate
+    endDate: event?.endDate
       ? new Date(event.endDate).toISOString().split("T")[0]
       : "",
-    entryFee: event.dynamicMetadata?.entryFee || "Free",
-    organizer: event.dynamicMetadata?.organizer || "",
-    isActive: event.isActive !== undefined ? event.isActive : true,
+    entryFee: event?.dynamicMetadata?.entryFee || "Free",
+    organizer: event?.dynamicMetadata?.organizer || "",
+    isActive: event?.isActive !== undefined ? event.isActive : true,
   });
 
   const [removedPhotoIds, setRemovedPhotoIds] = useState([]);
@@ -175,6 +173,8 @@ const SurpriseEventDetailsModal = ({
       setIsSubmitting(false);
     }
   };
+
+  if (!isOpen || !event) return null;
 
   const activePhotos = (event.photos || []).filter(
     (p) => !removedPhotoIds.includes(p.public_id)

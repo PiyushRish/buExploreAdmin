@@ -29,7 +29,7 @@ const Users = () => {
       socket.on("userCountLatest", (count) => {
         if (typeof count === "number") setLiveUsers(count);
       });
-    } catch (e) {
+    } catch (_e) {
       // fallback
     }
     return () => {

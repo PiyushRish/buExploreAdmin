@@ -9,8 +9,6 @@ const GlobalUploadProgressWidget = () => {
   const {
     isUploading,
     percent,
-    loaded,
-    total,
     formattedLoaded,
     formattedTotal,
     status,

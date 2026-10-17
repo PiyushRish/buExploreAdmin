@@ -24,24 +24,31 @@ import IntroVideoPage from "./IntroVideo.jsx";
 import ReelsFeed from "./ReelsFeed.jsx";
 import ToursPage from "./Tours.jsx";
 import SurpriseEventsPage from "./SurpriseEvents.jsx";
+import EmergencyPage from "./Emergency.jsx";
+import ServiceTemplatesPage from "./ServiceTemplates.jsx";
+import ReportsPage from "./Reports.jsx";
 import { PlaceContext } from "../contextApi/places.jsx";
+import { ShieldAlert, Layers, Shield } from "lucide-react";
 
 const navItems = [
-  { name: "Places",          icon: MapPin },
-  { name: "Place Reviews",   icon: Star },
-  { name: "Hotels",          icon: MapPin },
-  { name: "Restaurants",     icon: MapPin },
-  { name: "Guides & Agency", icon: User },
-  { name: "Tours & Plans",   icon: Compass },
-  { name: "Surprise Events", icon: Sparkles },
-  { name: "Vehicles",        icon: Car },
-  { name: "Ads",             icon: Megaphone },
-  { name: "Testimonials",    icon: MessageSquare },
-  { name: "Notifications",   icon: Bell },
-  { name: "Users",           icon: User },
-  { name: "Podcasts",        icon: Mic },
-  { name: "Intro Video",     icon: Video },
-  { name: "Reels Feed",      icon: Film },
+  { name: "Places",            icon: MapPin },
+  { name: "Place Reviews",     icon: Star },
+  { name: "Hotels",            icon: MapPin },
+  { name: "Restaurants",       icon: MapPin },
+  { name: "Emergency 24/7",    icon: ShieldAlert },
+  { name: "Service Templates", icon: Layers },
+  { name: "Guides & Agency",   icon: User },
+  { name: "Tours & Plans",     icon: Compass },
+  { name: "Surprise Events",   icon: Sparkles },
+  { name: "Vehicles",          icon: Car },
+  { name: "Ads",               icon: Megaphone },
+  { name: "Testimonials",      icon: MessageSquare },
+  { name: "Reports & Safety",  icon: Shield },
+  { name: "Notifications",     icon: Bell },
+  { name: "Users",             icon: User },
+  { name: "Podcasts",          icon: Mic },
+  { name: "Intro Video",       icon: Video },
+  { name: "Reels Feed",        icon: Film },
 ];
 
 const DashBoard = () => {
@@ -72,7 +79,7 @@ const DashBoard = () => {
           setLiveUsersCount(count);
         }
       });
-    } catch (e) {
+    } catch (_e) {
       // fallback to polling userStats
     }
 
@@ -107,7 +114,9 @@ const DashBoard = () => {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
-        {navItems.map(({ name, icon: Icon }) => {
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const name = item.name;
           const isActive = activeTab === name;
           return (
             <button
@@ -279,12 +288,15 @@ const DashBoard = () => {
             )}
             {activeTab === "Hotels font-medium" || activeTab === "Hotels" && <Hotels />}
             {activeTab === "Restaurants flex"  || activeTab === "Restaurants" && <Restaurants />}
+            {activeTab === "Emergency 24/7"    && <EmergencyPage />}
+            {activeTab === "Service Templates" && <ServiceTemplatesPage />}
             {(activeTab === "Guides & Agency"  || activeTab === "Guides") && <Guides />}
             {activeTab === "Tours & Plans"     && <ToursPage />}
             {activeTab === "Surprise Events"   && <SurpriseEventsPage />}
             {activeTab === "Vehicles"          && <Vehicle />}
             {activeTab === "Ads"               && <Ads />}
             {activeTab === "Testimonials"      && <TestimonialsPage />}
+            {activeTab === "Reports & Safety"  && <ReportsPage />}
             {activeTab === "Notifications"     && <Notifications />}
             {activeTab === "Users"             && <Users />}
             {activeTab === "Podcasts"          && <Podcast />}
