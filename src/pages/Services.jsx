@@ -269,37 +269,28 @@ const ServicesPage = () => {
     return SERVICE_CATEGORIES.find((c) => c.key === selectedCategoryKey) || null;
   }, [selectedCategoryKey]);
 
-  // Subservices list for the selected category folder
+  // Subservices list for the selected category folder (Actual created subservices only)
   const currentCategorySubservices = useMemo(() => {
     if (!selectedCategoryKey) return [];
 
     const catTemplates = allTemplates.filter((t) => t.category === selectedCategoryKey);
     const presets = RELATABLE_SUBSERVICES_BY_CATEGORY[selectedCategoryKey] || [];
+    const presetMap = new Map(presets.map((p) => [p.slug.toLowerCase(), p]));
 
     const map = new Map();
 
-    presets.forEach((preset) => {
-      map.set(preset.slug.toLowerCase(), {
-        name: preset.name,
-        slug: preset.slug.toLowerCase(),
-        description: preset.description,
-        template: null,
-        isActive: true,
-        isPreset: true,
-      });
-    });
-
     catTemplates.forEach((t) => {
-      const slug = (t.subService || "").toLowerCase();
+      const slug = (t.subService || "").toLowerCase().trim();
       if (!slug) return;
-      const existing = map.get(slug);
+      if (map.has(slug)) return; // Prevent duplicate rows if database has duplicate records
+
+      const preset = presetMap.get(slug);
       map.set(slug, {
-        name: existing ? existing.name : t.templateName.replace(/ Blueprint$/i, ""),
+        name: preset ? preset.name : (t.templateName || slug).replace(/ Blueprint$/i, ""),
         slug,
-        description: t.description || existing?.description || "",
+        description: t.description || preset?.description || "",
         template: t,
         isActive: t.isActive !== false,
-        isPreset: !!existing,
       });
     });
 
@@ -323,6 +314,30 @@ const ServicesPage = () => {
 
     return list;
   }, [selectedCategoryKey, allTemplates, searchQuery, subserviceStatusFilter, selectedSubserviceSlug]);
+
+  // Uncreated preset suggestions for "+ Create Subservice" (Excludes any preset that is ALREADY created!)
+  const availablePresets = useMemo(() => {
+    if (!selectedCategoryKey) return [];
+    const existingSlugs = new Set(
+      allTemplates
+        .filter((t) => t.category === selectedCategoryKey)
+        .map((t) => (t.subService || "").toLowerCase().trim())
+    );
+    const presets = RELATABLE_SUBSERVICES_BY_CATEGORY[selectedCategoryKey] || [];
+    return presets.filter((p) => !existingSlugs.has(p.slug.toLowerCase().trim()));
+  }, [selectedCategoryKey, allTemplates]);
+
+  // Real-time duplicate slug validation
+  const isSlugTaken = useMemo(() => {
+    if (!selectedCategoryKey) return false;
+    const cleanSlug = subserviceForm.slug.trim().toLowerCase().replace(/[\s.-]+/g, "_");
+    if (!cleanSlug) return false;
+    return allTemplates.some((t) => {
+      if (t.category !== selectedCategoryKey) return false;
+      if (editingSubservice && t._id === editingSubservice.template?._id) return false;
+      return (t.subService || "").toLowerCase().trim() === cleanSlug;
+    });
+  }, [subserviceForm.slug, selectedCategoryKey, allTemplates, editingSubservice]);
 
   // Currently Selected Subservice Object (when inside level 3)
   const currentSubservice = useMemo(() => {
@@ -425,6 +440,11 @@ const ServicesPage = () => {
     const cleanSlug = subserviceForm.slug.trim().toLowerCase().replace(/[\s.-]+/g, "_");
     if (!cleanSlug) {
       toast.error("Please enter a relatable slug");
+      return;
+    }
+
+    if (isSlugTaken) {
+      toast.error(`A subservice with slug "${cleanSlug}" already exists in ${selectedCategory?.name}! Duplicate subservices are not allowed.`);
       return;
     }
 
@@ -980,88 +1000,133 @@ const ServicesPage = () => {
           </div>
 
           {/* Subservices List (Clicking opens Level 3) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {currentCategorySubservices.map((subservice) => {
-              const objectsCount = allCustomServices.filter(
-                (o) => o.category === selectedCategoryKey && o.subService === subservice.slug
-              ).length;
+          {currentCategorySubservices.length === 0 ? (
+            <div className="py-16 text-center bg-white rounded-3xl border border-dashed border-slate-200 p-8 space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center mx-auto">
+                <Layers size={22} />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-base font-black text-slate-800">
+                  No subservices created yet for {selectedCategory.name}
+                </h4>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  Click "+ Create Subservice" above to define a new subservice class for this service.
+                </p>
+              </div>
 
-              return (
-                <div
-                  key={subservice.slug}
-                  onClick={() => {
-                    setSelectedSubserviceSlug(subservice.slug);
-                    setSearchQuery("");
-                  }}
-                  className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer flex flex-col justify-between space-y-4 group"
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 className="font-black text-slate-900 text-base leading-snug group-hover:text-indigo-600 transition">
-                            {subservice.name}
-                          </h3>
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-100 text-slate-600">
-                            slug: {subservice.slug}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                          {subservice.description || "Subservice category class"}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        {subservice.isActive ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-700">
-                            🟢 Live
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-700">
-                            🔒 Private
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={(e) => handleToggleSubserviceStatus(subservice, e)}
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition cursor-pointer ${
-                            subservice.isActive
-                              ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200"
-                              : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
-                          }`}
-                          title={subservice.isActive ? "Take offline / set to private (hide from mobile app users)" : "Publish live to mobile app"}
-                        >
-                          {subservice.isActive ? "🔒 Set Private" : "🟢 Set Live"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-500">
-                      {objectsCount} Listing Object{objectsCount !== 1 ? "s" : ""}
-                    </span>
-
-                    <div className="flex items-center gap-2">
+              {availablePresets.length > 0 && (
+                <div className="pt-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+                    Quick-Start with an Available Starter Category:
+                  </span>
+                  <div className="flex flex-wrap justify-center gap-2 max-w-xl mx-auto">
+                    {availablePresets.map((preset) => (
                       <button
+                        key={preset.slug}
                         type="button"
-                        onClick={(e) => handleOpenEditSubservice(subservice, e)}
-                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                        title="Edit Subservice Category"
+                        onClick={() => {
+                          setEditingSubservice(null);
+                          setSubserviceForm({
+                            name: preset.name,
+                            slug: preset.slug,
+                            description: preset.description,
+                            isActive: true,
+                          });
+                          setShowSubserviceModal(true);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition cursor-pointer"
                       >
-                        <Edit size={14} />
+                        + {preset.name}
                       </button>
-
-                      <div className="flex items-center gap-1 text-xs font-bold text-indigo-600 group-hover:translate-x-1 transition">
-                        <span>Open Subservice</span>
-                        <ChevronRight size={14} />
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {currentCategorySubservices.map((subservice) => {
+                const objectsCount = allCustomServices.filter(
+                  (o) => o.category === selectedCategoryKey && o.subService === subservice.slug
+                ).length;
+
+                return (
+                  <div
+                    key={subservice.slug}
+                    onClick={() => {
+                      setSelectedSubserviceSlug(subservice.slug);
+                      setSearchQuery("");
+                    }}
+                    className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer flex flex-col justify-between space-y-4 group"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h3 className="font-black text-slate-900 text-base leading-snug group-hover:text-indigo-600 transition">
+                              {subservice.name}
+                            </h3>
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-100 text-slate-600">
+                              slug: {subservice.slug}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                            {subservice.description || "Subservice category class"}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          {subservice.isActive ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-700">
+                              🟢 Live
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-700">
+                              🔒 Private
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => handleToggleSubserviceStatus(subservice, e)}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition cursor-pointer ${
+                              subservice.isActive
+                                ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200"
+                                : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
+                            }`}
+                            title={subservice.isActive ? "Take offline / set to private (hide from mobile app users)" : "Publish live to mobile app"}
+                          >
+                            {subservice.isActive ? "🔒 Set Private" : "🟢 Set Live"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500">
+                        {objectsCount} Listing Object{objectsCount !== 1 ? "s" : ""}
+                      </span>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => handleOpenEditSubservice(subservice, e)}
+                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                          title="Edit Subservice Category"
+                        >
+                          <Edit size={14} />
+                        </button>
+
+                        <div className="flex items-center gap-1 text-xs font-bold text-indigo-600 group-hover:translate-x-1 transition">
+                          <span>Open Subservice</span>
+                          <ChevronRight size={14} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : (
         /* ════════════════════════════════════════════════════════════
@@ -1436,13 +1501,13 @@ const ServicesPage = () => {
             </div>
 
             <form onSubmit={handleSaveSubservice} className="p-6 space-y-4">
-              {!editingSubservice && (
+              {!editingSubservice && availablePresets.length > 0 && (
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-                    Relatable Presets for {selectedCategory.name}:
+                    Recommended Presets ({availablePresets.length} available to create):
                   </span>
                   <div className="flex flex-wrap gap-1.5">
-                    {(RELATABLE_SUBSERVICES_BY_CATEGORY[selectedCategoryKey] || []).map((preset) => (
+                    {availablePresets.map((preset) => (
                       <button
                         key={preset.slug}
                         type="button"
@@ -1483,7 +1548,7 @@ const ServicesPage = () => {
                       slug: prev.slug || val.toLowerCase().replace(/[\s.-]+/g, "_"),
                     }));
                   }}
-                  placeholder="e.g. Resorts & Retreats"
+                  placeholder="e.g. Heritage Palaces & Forts"
                   className="w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 bg-white focus:border-indigo-500 outline-hidden transition"
                 />
               </div>
@@ -1502,9 +1567,19 @@ const ServicesPage = () => {
                       slug: e.target.value.toLowerCase().replace(/[\s.-]+/g, "_"),
                     })
                   }
-                  placeholder="e.g. resort"
-                  className="w-full px-3.5 py-2.5 rounded-xl text-sm font-mono font-bold text-indigo-700 border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 outline-hidden transition"
+                  placeholder="e.g. heritage_palace"
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-sm font-mono font-bold text-indigo-700 border transition outline-hidden ${
+                    isSlugTaken
+                      ? "border-rose-400 bg-rose-50/50"
+                      : "border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500"
+                  }`}
                 />
+                {isSlugTaken && (
+                  <div className="flex items-center gap-1.5 mt-1.5 p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs font-bold animate-in fade-in">
+                    <AlertTriangle size={13} className="shrink-0 text-rose-600" />
+                    <span>A subservice with slug "{subserviceForm.slug}" already exists in {selectedCategory?.name}. Duplicate subservices are not allowed.</span>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1541,8 +1616,8 @@ const ServicesPage = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={createTemplateMut.isPending || updateTemplateMut.isPending}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 transition cursor-pointer flex items-center gap-1.5"
+                  disabled={isSlugTaken || createTemplateMut.isPending || updateTemplateMut.isPending}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {createTemplateMut.isPending || updateTemplateMut.isPending ? (
                     <Loader2 size={14} className="animate-spin" />
