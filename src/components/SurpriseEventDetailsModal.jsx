@@ -57,10 +57,78 @@ const SurpriseEventDetailsModal = ({
     endDate: event?.endDate
       ? new Date(event.endDate).toISOString().split("T")[0]
       : "",
-    entryFee: event?.dynamicMetadata?.entryFee || "Free",
-    organizer: event?.dynamicMetadata?.organizer || "",
     isActive: event?.isActive !== undefined ? event.isActive : true,
   });
+
+  // Dynamic Key-Value Custom Variables for Event
+  const [customVariables, setCustomVariables] = useState(() => {
+    if (!event?.dynamicMetadata) {
+      return [
+        { key: "entryFee", value: "Free" },
+        { key: "organizer", value: "City Culture Club" },
+      ];
+    }
+    const pairs = Object.entries(event.dynamicMetadata).map(([key, value]) => ({
+      key,
+      value: typeof value === "object" ? JSON.stringify(value) : String(value ?? ""),
+    }));
+    return pairs.length > 0
+      ? pairs
+      : [
+          { key: "entryFee", value: "Free" },
+          { key: "organizer", value: "City Culture Club" },
+        ];
+  });
+
+  React.useEffect(() => {
+    if (!event) return;
+    setEditForm({
+      title: event.title || "",
+      description: event.description || "",
+      city: event.city || "Jhansi",
+      location: event.location || "",
+      eventType: event.eventType || "festival",
+      eventDate: event.eventDate
+        ? new Date(event.eventDate).toISOString().split("T")[0]
+        : "",
+      endDate: event.endDate
+        ? new Date(event.endDate).toISOString().split("T")[0]
+        : "",
+      isActive: event.isActive !== undefined ? event.isActive : true,
+    });
+
+    const pairs = event.dynamicMetadata
+      ? Object.entries(event.dynamicMetadata).map(([key, value]) => ({
+          key,
+          value: typeof value === "object" ? JSON.stringify(value) : String(value ?? ""),
+        }))
+      : [];
+    setCustomVariables(
+      pairs.length > 0
+        ? pairs
+        : [
+            { key: "entryFee", value: "Free" },
+            { key: "organizer", value: "City Culture Club" },
+          ]
+    );
+  }, [event]);
+
+  const handleAddCustomVariable = (key = "", value = "") => {
+    setCustomVariables((prev) => [
+      ...prev,
+      { key: key || `custom_${Date.now()}`, value: value || "" },
+    ]);
+  };
+
+  const handleUpdateCustomVariable = (index, field, val) => {
+    setCustomVariables((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: val } : item))
+    );
+  };
+
+  const handleRemoveCustomVariable = (index) => {
+    setCustomVariables((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const [removedPhotoIds, setRemovedPhotoIds] = useState([]);
   const [removedVideoIds, setRemovedVideoIds] = useState([]);
@@ -154,6 +222,14 @@ const SurpriseEventDetailsModal = ({
         );
       }
 
+      const dynamicMetadata = {};
+      customVariables.forEach((cv) => {
+        const cleanKey = (cv.key || "").trim();
+        if (cleanKey) {
+          dynamicMetadata[cleanKey] = cv.value;
+        }
+      });
+
       const payload = {
         title: editForm.title,
         description: editForm.description,
@@ -163,11 +239,7 @@ const SurpriseEventDetailsModal = ({
         eventDate: editForm.eventDate,
         endDate: editForm.endDate || undefined,
         isActive: editForm.isActive,
-        dynamicMetadata: {
-          ...(event.dynamicMetadata || {}),
-          entryFee: editForm.entryFee,
-          organizer: editForm.organizer,
-        },
+        dynamicMetadata,
         photos: [...keptPhotos, ...uploadedNewPhotos],
         videos: [...keptVideos, ...uploadedNewVideos],
       };
@@ -570,7 +642,7 @@ const SurpriseEventDetailsModal = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Event Date *
@@ -599,34 +671,6 @@ const SurpriseEventDetailsModal = ({
                       className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition outline-hidden"
                     />
                   </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Entry Fee
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.entryFee}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, entryFee: e.target.value })
-                      }
-                      className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition outline-hidden"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Organizer
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.organizer}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, organizer: e.target.value })
-                      }
-                      className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition outline-hidden"
-                    />
-                  </div>
                 </div>
 
                 <div>
@@ -645,9 +689,129 @@ const SurpriseEventDetailsModal = ({
                 </div>
               </div>
 
+              {/* 2. Custom Key-Value Variables */}
+              <div className="bg-slate-50/60 border border-slate-200 rounded-2xl p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                      2. Custom Variables & Regional Attributes (Key-Value Pairs)
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Occasional regional happenings vary widely. Add or update any key-value attributes on the fly without changing models or code.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAddCustomVariable()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs self-start sm:self-auto cursor-pointer"
+                  >
+                    <Plus size={13} /> Add Variable
+                  </button>
+                </div>
+
+                {/* Suggestion Chips */}
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                    Quick Suggestions (Click to Add):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { key: "entryFee", label: "Entry Fee" },
+                      { key: "organizer", label: "Organizer" },
+                      { key: "timings", label: "Timings" },
+                      { key: "dressCode", label: "Dress Code" },
+                      { key: "chiefGuest", label: "Chief Guest" },
+                      { key: "specialAttraction", label: "Special Attraction" },
+                      { key: "ageLimit", label: "Age Limit" },
+                      { key: "foodStalls", label: "Food Stalls" },
+                      { key: "parkingInfo", label: "Parking Info" },
+                      { key: "registrationUrl", label: "Registration Link" },
+                    ].map((item) => {
+                      const exists = customVariables.some(
+                        (cv) => cv.key.toLowerCase() === item.key.toLowerCase()
+                      );
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          disabled={exists}
+                          onClick={() => handleAddCustomVariable(item.key, "")}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
+                            exists
+                              ? "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+                              : "bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 cursor-pointer"
+                          }`}
+                        >
+                          <span>+ {item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Key-Value Editor List */}
+                {customVariables.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
+                    No custom variables added yet. Click a suggestion above or "+ Add Variable" to define attributes.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {customVariables.map((cv, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs"
+                      >
+                        <div className="w-1/3 min-w-[120px]">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">
+                            Attribute / Key
+                          </label>
+                          <input
+                            type="text"
+                            value={cv.key}
+                            onChange={(e) =>
+                              handleUpdateCustomVariable(idx, "key", e.target.value)
+                            }
+                            placeholder="e.g. dressCode"
+                            className="w-full px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-800 border border-slate-200 bg-slate-50 focus:bg-white focus:border-purple-500 outline-hidden transition"
+                          />
+                        </div>
+
+                        <div className="flex-1">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">
+                            Value
+                          </label>
+                          <input
+                            type="text"
+                            value={cv.value}
+                            onChange={(e) =>
+                              handleUpdateCustomVariable(idx, "value", e.target.value)
+                            }
+                            placeholder="e.g. Traditional Wear / Free / 6 PM Onwards"
+                            className="w-full px-2.5 py-1.5 rounded-lg text-xs text-slate-700 border border-slate-200 bg-slate-50 focus:bg-white focus:border-purple-500 outline-hidden transition"
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCustomVariable(idx)}
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition self-end shrink-0 cursor-pointer"
+                          title="Remove variable"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Manage Existing Photos */}
               <div className="bg-slate-50/60 border border-slate-200 rounded-2xl p-5 space-y-3">
                 <h4 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-pink-500"></span>
+                  3. Existing Photos ({activePhotos.length})
+                </h4>
                   <span className="w-2 h-2 rounded-full bg-pink-500"></span>
                   2. Existing Photos ({activePhotos.length})
                 </h4>
@@ -700,7 +864,7 @@ const SurpriseEventDetailsModal = ({
               <div className="bg-slate-50/60 border border-slate-200 rounded-2xl p-5 space-y-3">
                 <h4 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                  3. Existing Videos ({activeVideos.length})
+                  4. Existing Videos ({activeVideos.length})
                 </h4>
 
                 {activeVideos.length > 0 ? (

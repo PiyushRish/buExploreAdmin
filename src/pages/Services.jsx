@@ -1081,14 +1081,14 @@ const Services = () => {
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-sm sm:text-base font-black text-slate-900">
-                    Surprise Events (Occasional Regional Happenings)
+                    Regional Surprise Events (Occasional Regional Happenings)
                   </h3>
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-pink-100 text-pink-700 border border-pink-200">
-                    Vast Domain · Standalone Service
+                    Vast Regional Domain · Standalone Service
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-                  Surprise Events does not have subservices — it is an expansive service for occasional regional happenings (cultural nights, seasonal festivals, secret gigs, flash mobs, and exhibitions).
+                  Surprise Events does not have subservices — it is an expansive service covering a vast domain of occasional regional happenings (festivals, cultural celebrations, pop-ups, laser shows, exhibitions & sporadic gatherings). Flexible key-value variables adapt to any event format.
                 </p>
               </div>
             </div>

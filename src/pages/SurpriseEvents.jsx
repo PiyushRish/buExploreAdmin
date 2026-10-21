@@ -52,6 +52,33 @@ const SurpriseEventsPage = () => {
     organizer: "City Culture Club",
   });
 
+  // Dynamic Key-Value Custom Variables for Admin
+  const [customVariables, setCustomVariables] = useState([
+    { key: "entryFee", label: "Entry Fee", value: "Free" },
+    { key: "organizer", label: "Organizer", value: "City Culture Club" },
+  ]);
+
+  const handleAddCustomVariable = (suggestedKey = "", suggestedLabel = "") => {
+    setCustomVariables((prev) => [
+      ...prev,
+      {
+        key: suggestedKey || `custom_${Date.now()}`,
+        label: suggestedLabel || suggestedKey || "Custom Variable",
+        value: "",
+      },
+    ]);
+  };
+
+  const handleUpdateCustomVariable = (index, field, val) => {
+    setCustomVariables((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: val } : item))
+    );
+  };
+
+  const handleRemoveCustomVariable = (index) => {
+    setCustomVariables((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const fetchEvents = async () => {
     setLoading(true);
     try {
@@ -92,6 +119,14 @@ const SurpriseEventsPage = () => {
         );
       }
 
+      const dynamicMetadata = {};
+      customVariables.forEach((cv) => {
+        const cleanKey = (cv.key || cv.label || "").trim();
+        if (cleanKey) {
+          dynamicMetadata[cleanKey] = cv.value;
+        }
+      });
+
       const payload = {
         title: formData.title,
         description: formData.description,
@@ -99,10 +134,7 @@ const SurpriseEventsPage = () => {
         location: formData.location,
         eventType: formData.eventType,
         eventDate: formData.eventDate,
-        dynamicMetadata: {
-          entryFee: formData.entryFee,
-          organizer: formData.organizer,
-        },
+        dynamicMetadata,
         photos: uploadedPhotoAssets,
         videos: uploadedVideoAssets,
       };
@@ -112,6 +144,10 @@ const SurpriseEventsPage = () => {
       toast.success("Surprise Event published successfully!");
       setShowAddModal(false);
       resetNotif();
+      setCustomVariables([
+        { key: "entryFee", label: "Entry Fee", value: "Free" },
+        { key: "organizer", label: "Organizer", value: "City Culture Club" },
+      ]);
       fetchEvents();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to publish event");
@@ -150,12 +186,17 @@ const SurpriseEventsPage = () => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <Sparkles className="text-purple-600" size={24} />
-            City Surprise Events
-          </h2>
-          <p className="text-xs text-slate-500">
-            Publish dynamic city & nearby popup events with flexible metadata, photos & videos
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <Sparkles className="text-purple-600" size={24} />
+              Regional Surprise Events
+            </h2>
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200">
+              Vast Regional Domain · Occasional Happenings
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mt-1 max-w-2xl">
+            A standalone service for occasional regional happenings across Bundelkhand (festivals, pop-ups, cultural nights, secret gigs & celebrations). This service does not have subservices — dynamic key-value variables adapt to any event format.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -285,17 +326,31 @@ const SurpriseEventsPage = () => {
 
                   <div className="space-y-1.5 text-xs text-slate-500 pt-2 border-t border-slate-100">
                     <div className="flex items-center gap-2">
-                      <MapPin size={14} className="text-purple-600" />
-                      <span>{event.location}, {event.city}</span>
+                      <MapPin size={14} className="text-purple-600 shrink-0" />
+                      <span className="truncate">{event.location}, {event.city}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Calendar size={14} className="text-purple-600" />
+                      <Calendar size={14} className="text-purple-600 shrink-0" />
                       <span>{new Date(event.eventDate).toLocaleDateString()}</span>
                     </div>
-                    {event.dynamicMetadata?.entryFee && (
-                      <div className="flex items-center gap-2">
-                        <Tag size={14} className="text-emerald-600" />
-                        <span>Fee: {event.dynamicMetadata.entryFee}</span>
+
+                    {/* Dynamic Key-Value Variable Badges */}
+                    {event.dynamicMetadata && Object.keys(event.dynamicMetadata).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1.5">
+                        {Object.entries(event.dynamicMetadata).map(([key, val]) => {
+                          if (val === undefined || val === null || val === "") return null;
+                          return (
+                            <span
+                              key={key}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-100 text-[10px] font-semibold"
+                            >
+                              <span className="text-slate-400 capitalize">{key}:</span>
+                              <span className="truncate max-w-[120px] font-bold">
+                                {typeof val === "object" ? JSON.stringify(val) : String(val)}
+                              </span>
+                            </span>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -444,7 +499,7 @@ const SurpriseEventsPage = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
                         Event Date <span className="text-red-500">*</span>
@@ -454,28 +509,6 @@ const SurpriseEventsPage = () => {
                         required
                         value={formData.eventDate}
                         onChange={(e) => setFormData({ ...formData, eventDate: e.target.value })}
-                        className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition outline-hidden"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Entry Fee</label>
-                      <input
-                        type="text"
-                        value={formData.entryFee}
-                        onChange={(e) => setFormData({ ...formData, entryFee: e.target.value })}
-                        placeholder="e.g., Free or ₹100"
-                        className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition outline-hidden"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Organizer</label>
-                      <input
-                        type="text"
-                        value={formData.organizer}
-                        onChange={(e) => setFormData({ ...formData, organizer: e.target.value })}
-                        placeholder="e.g., City Culture Club"
                         className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition outline-hidden"
                       />
                     </div>
@@ -503,11 +536,128 @@ const SurpriseEventsPage = () => {
                   </div>
                 </div>
 
-                {/* SECTION 3: Banner / Photos */}
+                {/* SECTION 3: Dynamic Key-Value Custom Variables */}
+                <div className="bg-slate-50/60 border border-slate-200/80 rounded-2xl p-5 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                        3. Custom Variables & Regional Attributes (Key-Value Pairs)
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Occasional regional happenings vary widely. Add any flexible key-value attributes on the fly without changing models or code.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleAddCustomVariable()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs self-start sm:self-auto cursor-pointer"
+                    >
+                      <Plus size={13} /> Add Variable
+                    </button>
+                  </div>
+
+                  {/* Suggestion Chips */}
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Quick Suggestions (Click to Add):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { key: "entryFee", label: "Entry Fee" },
+                        { key: "organizer", label: "Organizer" },
+                        { key: "timings", label: "Timings" },
+                        { key: "dressCode", label: "Dress Code" },
+                        { key: "chiefGuest", label: "Chief Guest" },
+                        { key: "specialAttraction", label: "Special Attraction" },
+                        { key: "ageLimit", label: "Age Limit" },
+                        { key: "foodStalls", label: "Food Stalls" },
+                        { key: "parkingInfo", label: "Parking Info" },
+                        { key: "registrationUrl", label: "Registration Link" },
+                      ].map((item) => {
+                        const exists = customVariables.some(
+                          (cv) => cv.key.toLowerCase() === item.key.toLowerCase()
+                        );
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            disabled={exists}
+                            onClick={() => handleAddCustomVariable(item.key, item.label)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
+                              exists
+                                ? "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+                                : "bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 cursor-pointer"
+                            }`}
+                          >
+                            <span>+ {item.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Key-Value Editor List */}
+                  {customVariables.length === 0 ? (
+                    <div className="py-6 text-center text-xs text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
+                      No custom variables added yet. Click a suggestion above or "+ Add Variable" to define attributes.
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {customVariables.map((cv, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2 p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs"
+                        >
+                          <div className="w-1/3 min-w-[120px]">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">
+                              Attribute / Key
+                            </label>
+                            <input
+                              type="text"
+                              value={cv.key}
+                              onChange={(e) =>
+                                handleUpdateCustomVariable(idx, "key", e.target.value)
+                              }
+                              placeholder="e.g. dressCode"
+                              className="w-full px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-800 border border-slate-200 bg-slate-50 focus:bg-white focus:border-purple-500 outline-hidden transition"
+                            />
+                          </div>
+
+                          <div className="flex-1">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">
+                              Value
+                            </label>
+                            <input
+                              type="text"
+                              value={cv.value}
+                              onChange={(e) =>
+                                handleUpdateCustomVariable(idx, "value", e.target.value)
+                              }
+                              placeholder="e.g. Traditional Wear / Free / 6 PM Onwards"
+                              className="w-full px-2.5 py-1.5 rounded-lg text-xs text-slate-700 border border-slate-200 bg-slate-50 focus:bg-white focus:border-purple-500 outline-hidden transition"
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCustomVariable(idx)}
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition self-end shrink-0 cursor-pointer"
+                            title="Remove variable"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* SECTION 4: Event Media (Multiple Photos & Videos) */}
                 <div className="bg-slate-50/60 border border-slate-200/80 rounded-2xl p-5 space-y-4">
                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-pink-500"></span>
-                    3. Event Media (Multiple Photos & Videos)
+                    4. Event Media (Multiple Photos & Videos)
                   </h4>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
