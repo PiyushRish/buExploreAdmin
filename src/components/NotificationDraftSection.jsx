@@ -26,6 +26,8 @@ export const SERVICE_LABELS = {
   surprise_event: "Surprise Event",
   tour: "Tour / Plan",
   vehicle: "Vehicle / Rental",
+  emergency: "Emergency 24/7",
+  shopping: "Store / Shopping",
   podcast: "Podcast Episode",
   general: "Service",
 };
@@ -67,6 +69,14 @@ export const DEFAULT_NOTIF = {
   vehicle: (name) => ({
     title: `Ride Now: ${name || "New Vehicle"}`,
     message: `Getting around just got easier. ${name || "A new vehicle option"} is now listed on BUXplore — book your ride and explore freely!`,
+  }),
+  emergency: (name) => ({
+    title: `Emergency Service: ${name || "New Facility"}`,
+    message: `24/7 Emergency assistance available: ${name || "this service"} is now registered on BUXplore. Save and note its contact details for quick access.`,
+  }),
+  shopping: (name) => ({
+    title: `Local Shopping & Crafts: ${name || "New Store"}`,
+    message: `Discover authentic local goods: ${name || "this store"} is now featured on BUXplore. Explore local handicrafts, souvenirs, and specialty items!`,
   }),
   podcast: (name) => ({
     title: `New Episode: ${name || "New Podcast"}`,

@@ -23,9 +23,12 @@ import {
 } from "../mutations/serviceTemplateMutation.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
 import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
+import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
+import { useNotificationDraft } from "../utils/useNotificationDraft.js";
+import { sendNotification } from "../api/notification.api.js";
 
 /* ─── 8 SERVICE CATEGORIES CONFIGURATION ─── */
-export const SERVICE_CATEGORIES = [
+const SERVICE_CATEGORIES = [
   {
     key: "hotel/resorts",
     name: "Hotels & Resorts",
@@ -109,7 +112,7 @@ export const SERVICE_CATEGORIES = [
 ];
 
 /* ─── PREBUILT BLUEPRINTS FOR EVERY SERVICE CATEGORY ─── */
-export const PREBUILT_TEMPLATES_BY_CATEGORY = {
+const PREBUILT_TEMPLATES_BY_CATEGORY = {
   "hotel/resorts": [
     {
       templateName: "Luxury Resort & Heritage Palace",
@@ -349,6 +352,23 @@ const Services = () => {
   const [customFieldsList, setCustomFieldsList] = useState([]);
   const [photoFiles, setPhotoFiles] = useState([]);
   const [existingPhotos, setExistingPhotos] = useState([]);
+
+  // ==========================================
+  // Push Notification Linkage
+  // ==========================================
+  const notifServiceType = useMemo(() => {
+    const cat = subserviceForm.category || selectedFolderKey;
+    if (cat === "hotel/resorts") return "hotel";
+    if (cat === "restaurants/bars") return "restaurant";
+    if (cat === "vehicle") return "vehicle";
+    if (cat === "emergency") return "emergency";
+    if (cat === "guide/travel agency") return "guide";
+    if (cat === "events") return "surprise_event";
+    if (cat === "shopping") return "shopping";
+    return "general";
+  }, [subserviceForm.category, selectedFolderKey]);
+
+  const { notif, setNotif, sendIfEnabled, resetNotif } = useNotificationDraft(notifServiceType);
 
   // ==========================================
   // Queries & Mutations
@@ -609,6 +629,7 @@ const Services = () => {
     setEditingSubservice(null);
     setPhotoFiles([]);
     setExistingPhotos([]);
+    resetNotif();
 
     const cat = baseTemplate?.category || selectedFolderKey || "hotel/resorts";
     const sub = baseTemplate?.subService || "";
@@ -725,7 +746,7 @@ const Services = () => {
     setCustomFieldsList((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // 1-Click Quick Toggle between Live (published) and Draft
+  // 1-Click Quick Toggle between Live (published) and Draft with optional Notification Broadcast
   const handleToggleSubserviceStatus = async (item) => {
     const newStatus = item.status === "published" ? "draft" : "published";
     const actionLabel = newStatus === "published" ? "Publish to Live" : "Move to Drafts";
@@ -735,11 +756,41 @@ const Services = () => {
         id: item._id,
         formData: { status: newStatus },
       });
-      toast.success(
-        newStatus === "published"
-          ? `🚀 '${item.title}' is now LIVE on BuXplore!`
-          : `📥 '${item.title}' moved to Drafts.`
-      );
+
+      if (newStatus === "published") {
+        toast.success(`🚀 '${item.title}' is now LIVE on BuXplore!`);
+        // Linkage: Offer instant push notification broadcast
+        const shouldBroadcast = window.confirm(
+          `🚀 '${item.title}' is now LIVE!\n\nWould you like to send a broadcast push notification to all travelers about this service?`
+        );
+        if (shouldBroadcast) {
+          const cat = item.category;
+          const sType =
+            cat === "hotel/resorts" ? "hotel" :
+            cat === "restaurants/bars" ? "restaurant" :
+            cat === "vehicle" ? "vehicle" :
+            cat === "events" ? "surprise_event" :
+            cat === "emergency" ? "emergency" :
+            cat === "shopping" ? "shopping" :
+            cat === "guide/travel agency" ? "guide" : "general";
+
+          try {
+            await sendNotification({
+              title: `Now Live: ${item.title}`,
+              message: `A new ${item.subService || "service"} is now live on BUXplore: ${item.title}. Explore it now!`,
+              type: sType === "event" || sType === "surprise_event" ? "EVENT" : "SERVICE",
+              serviceType: sType,
+              serviceId: item._id,
+            });
+            toast.success("📢 Broadcast notification sent to all travelers!");
+          } catch {
+            toast.error("Subservice published, but notification failed to send.");
+          }
+        }
+      } else {
+        toast.success(`📥 '${item.title}' moved to Drafts.`);
+      }
+
       refetchSubservices();
     } catch (err) {
       toast.error(err?.response?.data?.message || `Failed to ${actionLabel}`);
@@ -806,19 +857,28 @@ const Services = () => {
         photos: finalPhotos,
       };
 
+      let savedRecordId = editingSubservice?._id;
+
       if (editingSubservice) {
-        await updateCustomServiceMutation.mutateAsync({
+        const res = await updateCustomServiceMutation.mutateAsync({
           id: editingSubservice._id,
           formData: payload,
         });
+        savedRecordId = res?.data?._id || editingSubservice._id;
         toast.success(`'${payload.title}' updated successfully!`);
       } else {
-        await createCustomServiceMutation.mutateAsync(payload);
+        const res = await createCustomServiceMutation.mutateAsync(payload);
+        savedRecordId = res?.data?._id;
         toast.success(
           payload.status === "published"
             ? `🚀 '${payload.title}' published Live!`
             : `💾 '${payload.title}' saved to Drafts.`
         );
+      }
+
+      // Linkage: Send broadcast notification if enabled and status is published
+      if (payload.status === "published") {
+        await sendIfEnabled({ serviceId: savedRecordId });
       }
 
       setShowSubserviceModal(false);
@@ -2194,6 +2254,18 @@ const Services = () => {
                   </p>
                 </div>
               </div>
+
+              {/* Push Notification Linkage Section */}
+              {subserviceForm.status === "published" && (
+                <div className="pt-3 border-t border-slate-100">
+                  <NotificationDraftSection
+                    entityName={subserviceForm.title}
+                    serviceType={notifServiceType}
+                    value={notif}
+                    onChange={setNotif}
+                  />
+                </div>
+              )}
 
               {/* Save / Cancel Action Bar */}
               <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
