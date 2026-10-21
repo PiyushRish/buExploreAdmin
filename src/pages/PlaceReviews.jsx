@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useCallback } from "react";
 import {
-  Star, Heart, Trash2, Search, MessageSquare,
+  Heart, Trash2, Search, MessageSquare,
   MapPin, ArrowUpDown, Clock, TrendingUp,
   RefreshCw, User, Loader2, ChevronRight, X, ArrowLeft,
   Plus, AlertCircle, Filter, CheckCircle2, Copy, Sparkles,
-  BarChart2, ShieldAlert
+  ShieldAlert
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPlaces } from "../api/places.api";
@@ -25,49 +25,10 @@ const PLACE_CATEGORIES = [
 
 /* ─── SORT OPTIONS ─────────────────────────────────────────────── */
 const SORT_OPTIONS = [
-  { key: "newest",         label: "Newest First",      icon: Clock },
-  { key: "oldest",         label: "Oldest First",      icon: ArrowUpDown },
-  { key: "most_liked",     label: "Most Liked",        icon: TrendingUp },
-  { key: "highest_rating", label: "Highest Rated (5★)", icon: Star },
-  { key: "lowest_rating",  label: "Lowest Rated (1★)",  icon: AlertCircle },
+  { key: "newest",     label: "Newest First", icon: Clock },
+  { key: "oldest",     label: "Oldest First", icon: ArrowUpDown },
+  { key: "most_liked", label: "Most Liked",   icon: TrendingUp },
 ];
-
-/* ─── STAR COMPONENT ───────────────────────────────────────────── */
-const StarRating = ({ rating = 5, size = 14, interactive = false, onRatingChange = null }) => {
-  const [hoverRating, setHoverRating] = useState(0);
-
-  return (
-    <div className="flex items-center gap-1">
-      {Array.from({ length: 5 }).map((_, i) => {
-        const starValue = i + 1;
-        const isFilled = interactive
-          ? starValue <= (hoverRating || rating)
-          : starValue <= rating;
-
-        return (
-          <button
-            key={i}
-            type="button"
-            disabled={!interactive}
-            onClick={() => onRatingChange && onRatingChange(starValue)}
-            onMouseEnter={() => interactive && setHoverRating(starValue)}
-            onMouseLeave={() => interactive && setHoverRating(0)}
-            className={`${interactive ? "cursor-pointer transition-transform hover:scale-125 focus:outline-none" : "cursor-default"}`}
-          >
-            <Star
-              size={size}
-              className={`transition-colors ${
-                isFilled
-                  ? "text-amber-400 fill-amber-400 drop-shadow-xs"
-                  : "text-slate-200 fill-slate-100"
-              }`}
-            />
-          </button>
-        );
-      })}
-    </div>
-  );
-};
 
 /* ─── REVIEW CARD COMPONENT ────────────────────────────────────── */
 const ReviewCard = ({ review, onLike, onDelete, isDeleting }) => {
@@ -126,15 +87,7 @@ const ReviewCard = ({ review, onLike, onDelete, isDeleting }) => {
           </div>
 
           <div className="flex flex-col items-end gap-1 flex-shrink-0">
-            <div className="flex items-center gap-1.5 bg-amber-50/80 border border-amber-200/80 px-2 py-0.5 rounded-lg">
-              <StarRating rating={review.rating || 5} size={12} />
-              <span className="font-black text-amber-700 text-xs tabular-nums">
-                {Number(review.rating || 5).toFixed(1)}
-              </span>
-            </div>
-            {authorEmail && (
-              <span className="text-[10px] text-slate-400 font-mono">{displayDate}</span>
-            )}
+            <span className="text-[10px] text-slate-400 font-mono">{displayDate}</span>
           </div>
         </div>
 
@@ -251,7 +204,6 @@ const PlaceListItem = ({ place, isSelected, onClick }) => {
 
 /* ─── ADD REVIEW MODAL ─────────────────────────────────────────── */
 const AddReviewModal = ({ isOpen, onClose, place, onSubmit, isSubmitting }) => {
-  const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
 
   if (!isOpen || !place) return null;
@@ -268,7 +220,7 @@ const AddReviewModal = ({ isOpen, onClose, place, onSubmit, isSubmitting }) => {
     if (isOverLimit) {
       return toast.error("Review comment cannot exceed 50 words as required by backend.");
     }
-    onSubmit({ rating, comment });
+    onSubmit({ comment });
   };
 
   return (
@@ -279,7 +231,7 @@ const AddReviewModal = ({ isOpen, onClose, place, onSubmit, isSubmitting }) => {
           <div>
             <h3 className="font-black text-lg flex items-center gap-2">
               <Sparkles size={18} className="text-amber-300" />
-              Add Review / Feedback
+              Add Community Comment
             </h3>
             <p className="text-xs text-indigo-100 mt-0.5">
               Posting to: <span className="font-bold underline">{place.name}</span>
@@ -295,23 +247,6 @@ const AddReviewModal = ({ isOpen, onClose, place, onSubmit, isSubmitting }) => {
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* Rating Selection */}
-          <div>
-            <label className="text-xs font-black text-slate-700 uppercase tracking-wider block mb-2">
-              Star Rating: <span className="text-amber-500 font-extrabold">{rating} of 5 Stars</span>
-            </label>
-            <div className="flex items-center gap-3 p-3 bg-amber-50/50 border border-amber-100 rounded-2xl">
-              <StarRating
-                rating={rating}
-                size={24}
-                interactive={true}
-                onRatingChange={(newVal) => setRating(newVal)}
-              />
-              <span className="text-xs font-bold text-amber-800 ml-auto">
-                {rating === 5 ? "Exceptional" : rating === 4 ? "Very Good" : rating === 3 ? "Average" : rating === 2 ? "Below Average" : "Needs Improvement"}
-              </span>
-            </div>
-          </div>
 
           {/* Comment Textarea */}
           <div>
@@ -452,7 +387,6 @@ const PlaceReviews = ({ initialPlace = null, onBackToPlace = null }) => {
   const [selectedPlace, setSelectedPlace]         = useState(initialPlace);
   const [reviewSearch, setReviewSearch]           = useState("");
   const [sort, setSort]                           = useState("newest");
-  const [starFilter, setStarFilter]               = useState("all"); // 'all', '5', '4', '3', '2', '1', 'critical'
   const [page, setPage]                           = useState(1);
   const [showAddModal, setShowAddModal]           = useState(false);
   const [reviewToDelete, setReviewToDelete]       = useState(null);
@@ -516,28 +450,16 @@ const PlaceReviews = ({ initialPlace = null, onBackToPlace = null }) => {
   /* Derived Review Statistics */
   const stats = useMemo(() => {
     if (!rawReviews.length) {
-      return {
-        avgRating: 0,
-        totalLikes: 0,
-        distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
-      };
+      return { totalLikes: 0 };
     }
 
-    let sum = 0;
     let likes = 0;
-    const dist = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-
     rawReviews.forEach((r) => {
-      const rNum = Math.min(5, Math.max(1, Math.round(Number(r.rating) || 5)));
-      dist[rNum] = (dist[rNum] || 0) + 1;
-      sum += Number(r.rating) || 5;
       likes += typeof r.likes === "number" ? r.likes : 0;
     });
 
     return {
-      avgRating: (sum / rawReviews.length).toFixed(1),
       totalLikes: likes,
-      distribution: dist,
     };
   }, [rawReviews]);
 
@@ -556,12 +478,6 @@ const PlaceReviews = ({ initialPlace = null, onBackToPlace = null }) => {
       });
     }
 
-    // Star filter
-    if (starFilter === "5") list = list.filter((r) => Math.round(r.rating) === 5);
-    else if (starFilter === "4") list = list.filter((r) => Math.round(r.rating) === 4);
-    else if (starFilter === "3") list = list.filter((r) => Math.round(r.rating) === 3);
-    else if (starFilter === "critical") list = list.filter((r) => Math.round(r.rating) <= 2);
-
     // Sorting
     switch (sort) {
       case "newest":
@@ -573,18 +489,12 @@ const PlaceReviews = ({ initialPlace = null, onBackToPlace = null }) => {
       case "most_liked":
         list.sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
         break;
-      case "highest_rating":
-        list.sort((a, b) => (b.rating ?? 5) - (a.rating ?? 5));
-        break;
-      case "lowest_rating":
-        list.sort((a, b) => (a.rating ?? 5) - (b.rating ?? 5));
-        break;
       default:
         break;
     }
 
     return list;
-  }, [rawReviews, reviewSearch, starFilter, sort]);
+  }, [rawReviews, reviewSearch, sort]);
 
   /* Mutation: Like Review */
   const likeMut = useMutation({
@@ -829,28 +739,15 @@ const PlaceReviews = ({ initialPlace = null, onBackToPlace = null }) => {
                 </div>
               </div>
 
-              {/* ── STATS / RATING BREAKDOWN BAR ── */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-slate-100">
-                {/* Average Rating */}
-                <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-black text-base flex-shrink-0">
-                    ★
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Average Rating</p>
-                    <p className="text-sm font-black text-slate-800">
-                      {stats.avgRating} <span className="text-[10px] text-slate-400 font-semibold">/ 5.0</span>
-                    </p>
-                  </div>
-                </div>
-
-                {/* Total Reviews */}
+              {/* ── STATS BAR ── */}
+              <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-100">
+                {/* Total Reviews / Comments */}
                 <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
                     <MessageSquare size={16} />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Reviews</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Community Comments</p>
                     <p className="text-sm font-black text-slate-800">{totalReviews}</p>
                   </div>
                 </div>
@@ -861,23 +758,8 @@ const PlaceReviews = ({ initialPlace = null, onBackToPlace = null }) => {
                     <Heart size={16} />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Review Likes</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Likes</p>
                     <p className="text-sm font-black text-slate-800">{stats.totalLikes}</p>
-                  </div>
-                </div>
-
-                {/* Quick Star Filter */}
-                <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
-                    <BarChart2 size={16} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Star Distribution</p>
-                    <div className="flex items-center gap-1 text-[11px] font-bold text-slate-700">
-                      <span className="text-amber-500 font-black">5★</span> {stats.distribution[5] || 0} ·{" "}
-                      <span className="text-amber-500 font-black">4★</span> {stats.distribution[4] || 0} ·{" "}
-                      <span className="text-red-500 font-black">≤2★</span> {(stats.distribution[1] || 0) + (stats.distribution[2] || 0)}
-                    </div>
                   </div>
                 </div>
               </div>
@@ -903,45 +785,20 @@ const PlaceReviews = ({ initialPlace = null, onBackToPlace = null }) => {
                   )}
                 </div>
 
-                {/* Star Filter & Sort Tabs */}
-                <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
-                  {/* Star Filters */}
-                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-                    {[
-                      { key: "all", label: "All" },
-                      { key: "5", label: "5★" },
-                      { key: "4", label: "4★" },
-                      { key: "3", label: "3★" },
-                      { key: "critical", label: "1-2★ Critical" },
-                    ].map((tab) => (
-                      <button
-                        key={tab.key}
-                        onClick={() => setStarFilter(tab.key)}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                          starFilter === tab.key
-                            ? "bg-white text-indigo-700 shadow-xs"
-                            : "text-slate-600 hover:text-slate-900"
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
+                {/* Sort Selection */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400 font-semibold">Sort by:</span>
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value)}
+                    className="bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 py-1.5 px-3 outline-none cursor-pointer hover:border-slate-300"
+                  >
+                    {SORT_OPTIONS.map((opt) => (
+                      <option key={opt.key} value={opt.key}>
+                        {opt.label}
+                      </option>
                     ))}
-                  </div>
-
-                  {/* Sort Selection */}
-                  <div className="relative">
-                    <select
-                      value={sort}
-                      onChange={(e) => setSort(e.target.value)}
-                      className="bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 py-1.5 px-3 outline-none cursor-pointer hover:border-slate-300"
-                    >
-                      {SORT_OPTIONS.map((opt) => (
-                        <option key={opt.key} value={opt.key}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  </select>
                 </div>
               </div>
             </div>
