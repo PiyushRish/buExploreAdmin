@@ -812,9 +812,6 @@ const SurpriseEventDetailsModal = ({
                   <span className="w-2 h-2 rounded-full bg-pink-500"></span>
                   3. Existing Photos ({activePhotos.length})
                 </h4>
-                  <span className="w-2 h-2 rounded-full bg-pink-500"></span>
-                  2. Existing Photos ({activePhotos.length})
-                </h4>
 
                 {activePhotos.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
