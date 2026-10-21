@@ -215,23 +215,6 @@ const DashBoard = () => {
 
           {/* User Metrics Counters */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Live Online Users Badge */}
-            <button
-              onClick={() => handleNav("Users")}
-              className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200/90 rounded-full shadow-xs text-xs transition-all duration-150 cursor-pointer"
-              title="Real-time online users (Click to view users)"
-            >
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-              </span>
-              <span className="font-black text-emerald-800 text-xs sm:text-sm tabular-nums">
-                {onlineUsers}
-              </span>
-              <span className="text-[11px] text-emerald-700 font-semibold hidden sm:inline">
-                Online
-              </span>
-            </button>
 
             {/* Total Users Count Badge */}
             <button
