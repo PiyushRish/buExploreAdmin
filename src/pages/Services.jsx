@@ -80,16 +80,6 @@ const SERVICE_CATEGORIES = [
     description: "Certified heritage guides, local tour operators, custom trip planners",
   },
   {
-    key: "events",
-    name: "Surprise Events",
-    singular: "Surprise Event",
-    icon: Sparkles,
-    gradient: "from-pink-500 to-rose-600",
-    badgeBg: "bg-pink-50 text-pink-700 border-pink-200",
-    accentColor: "pink",
-    description: "Standalone surprise service: rooftop popups, secret gigs, birthday reveals, flash mobs & custom experiences",
-  },
-  {
     key: "shopping",
     name: "Shopping & Stores",
     singular: "Store / Shop",
@@ -233,32 +223,6 @@ const PREBUILT_TEMPLATES_BY_CATEGORY = {
         { fieldKey: "packages_offered", label: "Package Types", fieldType: "multiselect", defaultValue: ["Weekend Bundelkhand Circuit", "Orchha Heritage Tour", "Wildlife & Sanctuary Expedition"] },
         { fieldKey: "custom_itinerary", label: "Custom Tailored Itineraries", fieldType: "boolean", defaultValue: true },
         { fieldKey: "group_discounts", label: "Special Group Discounts Available", fieldType: "boolean", defaultValue: true },
-      ],
-    },
-  ],
-  "events": [
-    {
-      templateName: "Surprise Pop-up & Celebration Experience",
-      subService: "surprise_event",
-      description: "Standalone surprise service: rooftop popups, candlelight dinners, birthday reveals, flash mobs",
-      fields: [
-        { fieldKey: "experience_type", label: "Type of Experience", fieldType: "text", defaultValue: "Candlelight Rooftop Dinner & Acoustic Serenade" },
-        { fieldKey: "custom_decor_included", label: "Custom Theme Decor Included", fieldType: "boolean", defaultValue: true },
-        { fieldKey: "cake_food_included", label: "Cake & Multi-Course Dinner Included", fieldType: "boolean", defaultValue: true },
-        { fieldKey: "duration_hours", label: "Experience Duration (Hours)", fieldType: "number", defaultValue: 3 },
-        { fieldKey: "advance_booking_days", label: "Advance Notice Required (Days)", fieldType: "number", defaultValue: 2 },
-        { fieldKey: "pricing_package", label: "Package Price Starting (₹)", fieldType: "number", defaultValue: 3500 },
-      ],
-    },
-    {
-      templateName: "Cultural Night & Secret Acoustic Gig",
-      subService: "secret_gig",
-      description: "Intimate secret concerts, poetry open-mics, heritage storytelling and festival popups",
-      fields: [
-        { fieldKey: "entry_fee", label: "Entry Fee (Free or ₹)", fieldType: "text", defaultValue: "Free with Registration" },
-        { fieldKey: "performer_lineup", label: "Featured Artists / Storytellers", fieldType: "text", defaultValue: "Local Indie Musicians & Heritage Storytellers" },
-        { fieldKey: "seating_capacity", label: "Intimate Seating Capacity", fieldType: "number", defaultValue: 60 },
-        { fieldKey: "timings", label: "Event Timings", fieldType: "text", defaultValue: "07:00 PM - 10:00 PM" },
       ],
     },
   ],
@@ -1017,7 +981,7 @@ const Services = () => {
                     <span>1. Category Folders</span>
                   </div>
                   <p className="text-[11px] text-slate-600 leading-relaxed">
-                    Click any service folder (Hotels, Cafes, Vehicles, Emergency, etc.). Surprise Events is kept standalone because it can host any experience.
+                    Click any service folder (Hotels, Restaurants, Vehicles, Emergency, etc.). Surprise Events is kept completely separate in the sidebar because it showcases occasional regional happenings rather than subservices.
                   </p>
                 </div>
 
@@ -1106,6 +1070,39 @@ const Services = () => {
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* Surprise Events Standalone Domain Spotlight */}
+          <div className="bg-gradient-to-r from-pink-50 via-purple-50 to-indigo-50 border border-pink-200/80 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 text-white flex items-center justify-center font-bold shadow-md shadow-pink-500/20 flex-shrink-0">
+                <Sparkles size={22} />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm sm:text-base font-black text-slate-900">
+                    Surprise Events (Occasional Regional Happenings)
+                  </h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-pink-100 text-pink-700 border border-pink-200">
+                    Vast Domain · Standalone Service
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+                  Surprise Events does not have subservices — it is an expansive service for occasional regional happenings (cultural nights, seasonal festivals, secret gigs, flash mobs, and exhibitions).
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("navigate-tab", { detail: "Surprise Events" }));
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-pink-500/20 transition cursor-pointer whitespace-nowrap self-start sm:self-auto"
+            >
+              <Sparkles size={14} />
+              <span>Manage Regional Happenings</span>
+              <ArrowRight size={14} />
+            </button>
           </div>
 
           {/* Search Across All Folders */}

@@ -79,9 +79,16 @@ const DashBoard = () => {
       // fallback to polling userStats
     }
 
-    return () => {
-      if (socket) socket.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const handleTabNav = (e) => {
+      if (e?.detail) {
+        handleNav(e.detail);
+      }
     };
+    window.addEventListener("navigate-tab", handleTabNav);
+    return () => window.removeEventListener("navigate-tab", handleTabNav);
   }, []);
 
   const totalUsers = userStats?.totalUsers ?? userStats?.userCount ?? 0;
