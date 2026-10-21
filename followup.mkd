@@ -238,3 +238,29 @@ Dynamic schemas accept arbitrary keys from admins, creating a potential vector f
    - If an array, render tag pills.
    - If a number or string, render a label-value row.
    - Call `POST /api/services/custom/:id/click` when a user taps "Call" or "Visit Website".
+
+---
+
+## 10. Cloudflare Workers Compatibility & Direct Client-to-R2 Presigned Upload Architecture
+
+### Why This Is Required for Cloudflare Workers
+When hosting the backend on Cloudflare Workers (or serverless environments), incoming requests are subject to strict constraints:
+- **Payload Limits**: Cloudflare Workers enforce maximum request body limits (~100MB on enterprise, 10-25MB on standard).
+- **CPU Time & Execution Time Limits**: Buffering multi-megabyte photo or video multipart uploads inside Worker memory causes OOM crashes and execution timeouts.
+- **Zero-Byte Server Offload**: By utilizing short-lived AWS S3/Cloudflare R2 Presigned `PUT` URLs, media files stream directly from the user's browser / mobile device into Cloudflare R2 storage without passing a single file byte through Node.js or Cloudflare Workers.
+
+### Three-Step Direct Upload Workflow
+1. **Presign Request (`POST /api/media/r2/presign`)**:
+   - Client sends `{ fileName, contentType, mediaType, category }`.
+   - Backend validates category against allowed prefixes (`MEDIA_CATEGORIES`), validates authentication/authorization, and generates a pre-authenticated presigned `PUT` URL valid for 15 minutes.
+2. **Direct Browser-to-R2 PUT**:
+   - Client performs raw HTTP `PUT` directly to the presigned R2 URL via `axios.put(uploadUrl, file, { headers: { "Content-Type": file.type } })`.
+   - Uses standalone Axios without default backend base URLs or Bearer tokens (which R2 would reject with 403 Forbidden).
+   - Tracks live upload progress via `onUploadProgress` wired to `UploadProgressBar`.
+3. **Completion & Normalization (`POST /api/media/r2/complete`)**:
+   - Client sends `{ key, mediaType, category }`.
+   - Backend confirms object existence via S3 `HeadObjectCommand`, validates key ownership and category bounds, and returns a verified asset descriptor `{ url, public_id, storageProvider: "r2", key, mediaType }`.
+4. **Final API Submission**:
+   - The creation or update endpoint receives a lean JSON payload containing `{ ...data, photos: [verifiedAssets] }`.
+   - Backend controllers pass this directly into `normalizeIncomingMediaAssets()`, avoiding all multipart parsing!
+

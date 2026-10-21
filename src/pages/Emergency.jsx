@@ -14,6 +14,7 @@ import {
   useDeleteEmergencyMutation,
 } from "../mutations/emergencyMutation.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const SUBCATEGORIES = [
   { id: "ALL", label: "All Services", icon: ShieldAlert, color: "indigo" },
@@ -68,7 +69,8 @@ const EmergencyPage = () => {
   const updateMutation = useUpdateEmergencyMutation();
   const deleteMutation = useDeleteEmergencyMutation();
 
-  const isSaving = createMutation.isPending || updateMutation.isPending;
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
+  const isSaving = createMutation.isPending || updateMutation.isPending || isUploadingR2;
 
   const handleOpenAdd = () => {
     setEditingService(null);
@@ -147,89 +149,78 @@ const EmergencyPage = () => {
     if (!form.title.trim()) return toast.error("Service Title is required");
     if (!form.emergencyNumber.trim()) return toast.error("Emergency Number is required");
 
-    const formData = new FormData();
-    formData.append("title", form.title);
-    formData.append("subCategory", form.subCategory);
-    formData.append("emergencyNumber", form.emergencyNumber);
-    formData.append("is24x7", form.is24x7);
-    formData.append("liveStatus", form.liveStatus);
-    formData.append("description", form.description);
-
-    if (form.tollFreeNumber) formData.append("tollFreeNumber", form.tollFreeNumber);
-
-    if (form.alternateNumbers) {
-      const arr = form.alternateNumbers.split(",").map((s) => s.trim()).filter(Boolean);
-      formData.append("alternateNumbers", JSON.stringify(arr));
-    }
-
-    if (form.facilities) {
-      const facArr = form.facilities.split(",").map((s) => s.trim()).filter(Boolean);
-      formData.append("facilities", JSON.stringify(facArr));
-    }
-
-    formData.append(
-      "location",
-      JSON.stringify({
-        address: form.address,
-        area: form.area,
-        city: form.city,
-        googleMapsUrl: form.googleMapsUrl,
-      })
-    );
-
-    // Subcategory details
-    if (form.subCategory === "ambulance") {
-      formData.append(
-        "ambulanceDetails",
-        JSON.stringify({
-          operatorType: form.operatorType || "Government / Private",
-          avgResponseTimeMinutes: Number(form.avgResponseTimeMinutes) || undefined,
-          hasOxygenSupport: form.hasOxygenSupport,
-          hasVentilator: form.hasVentilator,
-        })
-      );
-    } else if (form.subCategory === "hospital") {
-      formData.append(
-        "hospitalDetails",
-        JSON.stringify({
-          hasIcu: form.hasIcu,
-          hasEmergencyTraumaCenter: form.hasEmergencyTraumaCenter,
-          hasBloodBank: form.hasBloodBank,
-        })
-      );
-    } else if (form.subCategory === "police") {
-      formData.append(
-        "policeDetails",
-        JSON.stringify({
-          stationCode: form.stationCode,
-          jurisdictionArea: form.jurisdictionArea,
-        })
-      );
-    } else if (form.subCategory === "fireStation") {
-      formData.append(
-        "fireStationDetails",
-        JSON.stringify({
-          numFireTenders: Number(form.numFireTenders) || 0,
-        })
-      );
-    }
-
-    photoFiles.forEach((file) => {
-      formData.append("EmergencyPhotos", file);
-    });
-
     try {
+      let uploadedAssets = [];
+      if (photoFiles.length > 0) {
+        setIsUploadingR2(true);
+        uploadedAssets = await uploadMultipleFilesDirectToR2(photoFiles, "services/emergency", "image");
+      }
+
+      const payload = {
+        title: form.title.trim(),
+        subCategory: form.subCategory,
+        emergencyNumber: form.emergencyNumber.trim(),
+        is24x7: form.is24x7,
+        liveStatus: form.liveStatus,
+        description: form.description,
+        ...(form.tollFreeNumber ? { tollFreeNumber: form.tollFreeNumber } : {}),
+        alternateNumbers: form.alternateNumbers
+          ? form.alternateNumbers.split(",").map((s) => s.trim()).filter(Boolean)
+          : [],
+        facilities: form.facilities
+          ? form.facilities.split(",").map((s) => s.trim()).filter(Boolean)
+          : [],
+        location: {
+          address: form.address,
+          area: form.area,
+          city: form.city,
+          googleMapsUrl: form.googleMapsUrl,
+        },
+        ...(form.subCategory === "ambulance" ? {
+          ambulanceDetails: {
+            operatorType: form.operatorType || "Government / Private",
+            avgResponseTimeMinutes: Number(form.avgResponseTimeMinutes) || undefined,
+            hasOxygenSupport: form.hasOxygenSupport,
+            hasVentilator: form.hasVentilator,
+          }
+        } : {}),
+        ...(form.subCategory === "hospital" ? {
+          hospitalDetails: {
+            hasIcu: form.hasIcu,
+            hasEmergencyTraumaCenter: form.hasEmergencyTraumaCenter,
+            hasBloodBank: form.hasBloodBank,
+          }
+        } : {}),
+        ...(form.subCategory === "police" ? {
+          policeDetails: {
+            stationCode: form.stationCode,
+            jurisdictionArea: form.jurisdictionArea,
+          }
+        } : {}),
+        ...(form.subCategory === "fireStation" ? {
+          fireStationDetails: {
+            numFireTenders: Number(form.numFireTenders) || 0,
+          }
+        } : {}),
+        ...(editingService
+          ? (uploadedAssets.length > 0 ? { photos: [...(editingService.photos || []), ...uploadedAssets] } : {})
+          : { photos: uploadedAssets }
+        ),
+      };
+
       if (editingService) {
-        await updateMutation.mutateAsync({ id: editingService._id, formData });
+        await updateMutation.mutateAsync({ id: editingService._id, formData: payload });
         toast.success("Emergency service updated successfully!");
       } else {
-        await createMutation.mutateAsync(formData);
+        await createMutation.mutateAsync(payload);
         toast.success("Emergency service created successfully!");
       }
       setShowModal(false);
       setPhotoFiles([]);
+      setIsUploadingR2(false);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to save emergency service");
+      setIsUploadingR2(false);
+      toast.error(err?.response?.data?.message || err?.message || "Failed to save emergency service");
     }
   };
 

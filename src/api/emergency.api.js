@@ -15,21 +15,19 @@ export const getEmergencyServicesBySubCategory = async (subCategory) => {
   return res.data;
 };
 
-export const createEmergencyService = async (formData) => {
-  const res = await axiosClient.post("/services/createEmergency", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+export const createEmergencyService = async (data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.post("/services/createEmergency", data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 120000,
   });
   return res.data;
 };
 
-export const updateEmergencyService = async (id, formData) => {
-  const res = await axiosClient.put(`/services/emergency/${id}`, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+export const updateEmergencyService = async (id, data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.put(`/services/emergency/${id}`, data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 120000,
   });
   return res.data;

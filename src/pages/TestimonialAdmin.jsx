@@ -6,6 +6,7 @@ import axiosClient from "../api/axiosClient.js";
 import toast from "react-hot-toast";
 import { validateMediaType } from "../utils/validators.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const Testimonials = () => {
   const [showModal, setShowModal] = useState(false);
@@ -20,27 +21,37 @@ const Testimonials = () => {
 
   const [content, setContent] = useState("");
   const [photos, setPhotos] = useState([]);
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   const addMutation = useCreateTestimonialMutation();
   const deleteMutation = useDeleteTestimonialMutation();
 
-  const handleCreate = () => {
-    if (!content) return toast.error("Content is required");
-    const formData = new FormData();
-    formData.append("content", content);
-    photos.forEach(f => formData.append("photos", f));
-
-    addMutation.mutate(formData, {
-      onSuccess: () => {
-        toast.success("Testimonial saved!");
-        setShowModal(false);
-        setContent("");
-        setPhotos([]);
-      },
-      onError: (err) => {
-        toast.error(err?.response?.data?.message || "Failed to create");
+  const handleCreate = async () => {
+    if (!content.trim()) return toast.error("Content is required");
+    try {
+      let uploadedAssets = [];
+      if (photos.length > 0) {
+        setIsUploadingR2(true);
+        uploadedAssets = await uploadMultipleFilesDirectToR2(photos, "testimonials", "image");
       }
-    });
+
+      addMutation.mutate({ content, photos: uploadedAssets }, {
+        onSuccess: () => {
+          toast.success("Testimonial saved!");
+          setShowModal(false);
+          setContent("");
+          setPhotos([]);
+          setIsUploadingR2(false);
+        },
+        onError: (err) => {
+          setIsUploadingR2(false);
+          toast.error(err?.response?.data?.message || "Failed to create testimonial");
+        }
+      });
+    } catch (err) {
+      setIsUploadingR2(false);
+      toast.error(err?.response?.data?.message || err?.message || "Failed to upload images directly to Cloudflare R2");
+    }
   };
 
   const handleDelete = (id) => {
@@ -137,18 +148,23 @@ const Testimonials = () => {
               </label>
             </div>
 
-            {addMutation.isPending && (
+            {(addMutation.isPending || isUploadingR2) && (
               <div className="mt-3">
-                <UploadProgressBar isUploading={addMutation.isPending} />
+                <UploadProgressBar isUploading={addMutation.isPending || isUploadingR2} />
               </div>
             )}
 
             <button
               onClick={handleCreate}
-              disabled={addMutation.isPending}
+              disabled={addMutation.isPending || isUploadingR2}
               className="w-full bg-blue-600 hover:bg-blue-700 active:scale-98 text-white py-3 rounded-xl font-bold shadow-md mt-4 transition disabled:bg-blue-300 flex items-center justify-center gap-2 cursor-pointer"
             >
-              {addMutation.isPending ? (
+              {isUploadingR2 ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Uploading to Cloudflare R2...</span>
+                </>
+              ) : addMutation.isPending ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
                   <span>Publishing Testimonial...</span>

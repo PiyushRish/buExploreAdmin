@@ -19,6 +19,7 @@ import {
   useDeleteCustomServiceMutation,
 } from "../mutations/serviceTemplateMutation.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const CATEGORIES = [
   "restaurants/bars",
@@ -110,7 +111,8 @@ const ServiceTemplatesPage = () => {
   const updateListingMutation = useUpdateCustomServiceMutation();
   const deleteListingMutation = useDeleteCustomServiceMutation();
 
-  const isSavingListing = createListingMutation.isPending || updateListingMutation.isPending;
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
+  const isSavingListing = createListingMutation.isPending || updateListingMutation.isPending || isUploadingR2;
   const isSavingTemplate = createTemplateMutation.isPending || updateTemplateMutation.isPending;
 
   // ==========================================
@@ -289,56 +291,51 @@ const ServiceTemplatesPage = () => {
       }
     });
 
-    const formData = new FormData();
-    formData.append("title", listingForm.title);
-    formData.append("category", listingForm.category);
-    formData.append("subService", listingForm.subService);
-    formData.append("status", listingForm.status);
-    formData.append("description", listingForm.description);
-
-    if (listingForm.templateId) {
-      formData.append("templateId", listingForm.templateId);
-    }
-
-    formData.append(
-      "contact",
-      JSON.stringify({
-        phone: listingForm.phone,
-        email: listingForm.email,
-      })
-    );
-
-    formData.append(
-      "location",
-      JSON.stringify({
-        address: listingForm.address,
-        city: listingForm.city,
-      })
-    );
-
-    formData.append("customDetails", JSON.stringify(customDetails));
-
-    if (listingForm.tags) {
-      const tagsArr = listingForm.tags.split(",").map((s) => s.trim()).filter(Boolean);
-      formData.append("tags", JSON.stringify(tagsArr));
-    }
-
-    photoFiles.forEach((file) => {
-      formData.append("ServicePhotos", file);
-    });
-
     try {
+      let uploadedAssets = [];
+      if (photoFiles.length > 0) {
+        setIsUploadingR2(true);
+        uploadedAssets = await uploadMultipleFilesDirectToR2(photoFiles, "services/custom", "image");
+      }
+
+      const payload = {
+        title: listingForm.title.trim(),
+        category: listingForm.category,
+        subService: listingForm.subService,
+        status: listingForm.status,
+        description: listingForm.description,
+        ...(listingForm.templateId ? { templateId: listingForm.templateId } : {}),
+        contact: {
+          phone: listingForm.phone,
+          email: listingForm.email,
+        },
+        location: {
+          address: listingForm.address,
+          city: listingForm.city,
+        },
+        customDetails,
+        tags: listingForm.tags
+          ? listingForm.tags.split(",").map((s) => s.trim()).filter(Boolean)
+          : [],
+        ...(editingListing
+          ? (uploadedAssets.length > 0 ? { photos: [...(editingListing.photos || []), ...uploadedAssets] } : {})
+          : { photos: uploadedAssets }
+        ),
+      };
+
       if (editingListing) {
-        await updateListingMutation.mutateAsync({ id: editingListing._id, formData });
+        await updateListingMutation.mutateAsync({ id: editingListing._id, formData: payload });
         toast.success("Custom service updated successfully!");
       } else {
-        await createListingMutation.mutateAsync(formData);
+        await createListingMutation.mutateAsync(payload);
         toast.success("Custom service created & published successfully!");
       }
       setShowListingModal(false);
       setPhotoFiles([]);
+      setIsUploadingR2(false);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to save listing");
+      setIsUploadingR2(false);
+      toast.error(err?.response?.data?.message || err?.message || "Failed to save listing");
     }
   };
 

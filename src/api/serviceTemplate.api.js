@@ -48,21 +48,19 @@ export const getCustomServiceById = async (id) => {
   return res.data;
 };
 
-export const createCustomService = async (formData) => {
-  const res = await axiosClient.post("/services/custom", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+export const createCustomService = async (data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.post("/services/custom", data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 180000,
   });
   return res.data;
 };
 
-export const updateCustomService = async (id, formData) => {
-  const res = await axiosClient.put(`/services/custom/${id}`, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+export const updateCustomService = async (id, data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.put(`/services/custom/${id}`, data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 180000,
   });
   return res.data;
