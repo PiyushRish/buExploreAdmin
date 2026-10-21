@@ -75,3 +75,13 @@ export const trackCustomServiceClick = async (id) => {
   const res = await axiosClient.post(`/services/custom/${id}/click`);
   return res.data;
 };
+
+export const trackCustomServiceShare = async (id) => {
+  const res = await axiosClient.post(`/services/custom/${id}/share`);
+  return res.data;
+};
+
+export const trackCustomServiceLike = async (id) => {
+  const res = await axiosClient.post(`/services/custom/${id}/like`);
+  return res.data;
+};

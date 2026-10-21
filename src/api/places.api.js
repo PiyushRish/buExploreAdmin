@@ -72,8 +72,20 @@ export const restorePlace = async (placeId) => {
   return res.data;
 };
 
-// 10. Like Place
+// 10. Like Place (Queued & Sequential)
 export const likePlace = async (placeId) => {
   const res = await axiosClient.post(`/places/like/${placeId}`);
+  return res.data;
+};
+
+// 11. Track Place View / Impression (Queued & Buffered)
+export const trackPlaceView = async (placeId) => {
+  const res = await axiosClient.post(`/places/stats/view/${placeId}`);
+  return res.data;
+};
+
+// 12. Track Place Share (Queued & Buffered)
+export const trackPlaceShare = async (placeId) => {
+  const res = await axiosClient.post(`/places/stats/share/${placeId}`);
   return res.data;
 };
