@@ -296,9 +296,14 @@ const ServicesPage = () => {
       });
     });
 
-    let list = Array.from(map.values());
+    return Array.from(map.values());
+  }, [selectedCategoryKey, allTemplates]);
 
-    if (searchQuery.trim() && !selectedSubserviceSlug) {
+  // Filtered subservices based on search and status tabs
+  const filteredCategorySubservices = useMemo(() => {
+    let list = currentCategorySubservices;
+
+    if (searchQuery.trim() && level2Tab === "subservices") {
       const q = searchQuery.toLowerCase();
       list = list.filter(
         (item) =>
@@ -315,7 +320,7 @@ const ServicesPage = () => {
     }
 
     return list;
-  }, [selectedCategoryKey, allTemplates, searchQuery, subserviceStatusFilter, selectedSubserviceSlug]);
+  }, [currentCategorySubservices, searchQuery, level2Tab, subserviceStatusFilter]);
 
   // Uncreated preset suggestions for "+ Create Subservice" (Excludes any preset that is ALREADY created!)
   const availablePresets = useMemo(() => {
@@ -438,29 +443,38 @@ const ServicesPage = () => {
     );
   }, [editingObject, selectedSubserviceSlug, currentCategorySubservices, allTemplates, selectedCategoryKey]);
 
-  // Catalog Statistics
+  // Catalog Statistics (Accurate counts of strictly created subservices and objects)
   const catalogStats = useMemo(() => {
     const totalCategories = SERVICE_CATEGORIES.length;
-    const totalTemplates = allTemplates.length;
     const totalObjects = allCustomServices.length;
     const publishedObjects = allCustomServices.filter((o) => o.status === "published").length;
 
     const byCategory = {};
+    let totalSubservicesCount = 0;
+
     SERVICE_CATEGORIES.forEach((cat) => {
       const catTemplates = allTemplates.filter((t) => t.category === cat.key);
       const catObjects = allCustomServices.filter((o) => o.category === cat.key);
-      const presets = RELATABLE_SUBSERVICES_BY_CATEGORY[cat.key] || [];
-      const uniqueSlugs = new Set([
-        ...catTemplates.map((t) => t.subService?.toLowerCase()),
-        ...presets.map((p) => p.slug?.toLowerCase()),
-      ]);
+      const uniqueCreatedSlugs = new Set(
+        catTemplates
+          .map((t) => (t.subService || "").toLowerCase().trim())
+          .filter(Boolean)
+      );
       byCategory[cat.key] = {
-        subservicesCount: uniqueSlugs.size,
+        subservicesCount: uniqueCreatedSlugs.size,
         objectsCount: catObjects.length,
       };
+      totalSubservicesCount += uniqueCreatedSlugs.size;
     });
 
-    return { totalCategories, totalTemplates, totalObjects, publishedObjects, byCategory };
+    return {
+      totalCategories,
+      totalTemplates: allTemplates.length,
+      totalSubservices: totalSubservicesCount,
+      totalObjects,
+      publishedObjects,
+      byCategory,
+    };
   }, [allTemplates, allCustomServices]);
 
   /* ─── LEVEL 2: SUBSERVICE CLASS CREATION / EDITING ─── */
@@ -868,9 +882,9 @@ const ServicesPage = () => {
 
           <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-3.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 block mb-0.5">
-              Blueprint Schemas
+              Total Subservices
             </span>
-            <span className="text-2xl font-black text-indigo-950">{catalogStats.totalTemplates}</span>
+            <span className="text-2xl font-black text-indigo-950">{catalogStats.totalSubservices}</span>
           </div>
 
           <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-3.5">
@@ -1292,9 +1306,24 @@ const ServicesPage = () => {
                   </div>
                 )}
               </div>
+            ) : filteredCategorySubservices.length === 0 ? (
+              <div className="py-12 text-center bg-white rounded-3xl border border-dashed border-slate-200 p-6 space-y-2">
+                <p className="text-xs font-bold text-slate-500">
+                  No subservices match this filter ({subserviceStatusFilter === "live" ? "Live Only" : subserviceStatusFilter === "draft" ? "Drafts Only" : `"${searchQuery}"`})
+                </p>
+                <button
+                  onClick={() => {
+                    setSubserviceStatusFilter("all");
+                    setSearchQuery("");
+                  }}
+                  className="text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
+                >
+                  Reset filter to Show All ({currentCategorySubservices.length})
+                </button>
+              </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {currentCategorySubservices.map((subservice) => {
+                {filteredCategorySubservices.map((subservice) => {
                   const objectsCount = allCustomServices.filter(
                     (o) => o.category === selectedCategoryKey && o.subService === subservice.slug
                   ).length;
