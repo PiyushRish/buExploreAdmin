@@ -1,33 +1,21 @@
 import React, { useState, useMemo } from "react";
 import {
   Folder, FolderOpen, Layers, Plus, Trash2, Edit, Loader2, Sparkles, X, Check,
-  Eye, MousePointerClick, RefreshCw, Filter, CheckCircle2, AlertCircle,
-  ArrowRight, ChevronRight, ArrowLeft, Hotel, Utensils, Car, ShieldAlert,
-  Compass, ShoppingBag, Search, UploadCloud, Globe, Phone, Mail, MapPin,
-  SlidersHorizontal, CheckCircle, Clock, ExternalLink, Send, Info, HelpCircle,
-  ChevronDown, ChevronUp, Copy, BookmarkCheck
+  ChevronRight, ArrowLeft, Hotel, Utensils, Car, ShieldAlert,
+  Compass, ShoppingBag, Search, CheckCircle, RefreshCw, AlertCircle,
+  SlidersHorizontal, Info, Eye, BookmarkCheck, ArrowRight, ShieldCheck, FileText
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   useServiceTemplatesQuery,
-  useCustomServicesQuery,
 } from "../queries/serviceTemplateQueries.js";
 import {
   useCreateServiceTemplateMutation,
   useUpdateServiceTemplateMutation,
   useDeleteServiceTemplateMutation,
-  useSeedDefaultTemplatesMutation,
-  useCreateCustomServiceMutation,
-  useUpdateCustomServiceMutation,
-  useDeleteCustomServiceMutation,
 } from "../mutations/serviceTemplateMutation.js";
-import UploadProgressBar from "../components/UploadProgressBar.jsx";
-import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
-import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
-import { useNotificationDraft } from "../utils/useNotificationDraft.js";
-import { sendNotification } from "../api/notification.api.js";
 
-/* ─── 8 SERVICE CATEGORIES CONFIGURATION ─── */
+/* ─── 7 CORE SERVICE CATEGORIES ─── */
 const SERVICE_CATEGORIES = [
   {
     key: "hotel/resorts",
@@ -101,421 +89,412 @@ const SERVICE_CATEGORIES = [
   },
 ];
 
-/* ─── PREBUILT BLUEPRINTS FOR EVERY SERVICE CATEGORY ─── */
-const PREBUILT_TEMPLATES_BY_CATEGORY = {
+/* ─── CURATED RELATABLE SUBSERVICES & SLUGS PER SERVICE CATEGORY ─── */
+const RELATABLE_SUBSERVICES_BY_CATEGORY = {
   "hotel/resorts": [
-    {
-      templateName: "Luxury Resort & Heritage Palace",
-      subService: "resort",
-      description: "Blueprint for 3-5 star luxury resorts, heritage havelis & palaces",
-      fields: [
-        { fieldKey: "amenities", label: "Amenities", fieldType: "multiselect", defaultValue: ["Swimming Pool", "Spa & Wellness", "Free High-Speed WiFi", "Multi-Cuisine Restaurant"] },
-        { fieldKey: "room_types", label: "Available Room Categories", fieldType: "multiselect", defaultValue: ["Deluxe Heritage Room", "Royal Suite", "Executive Villa"] },
-        { fieldKey: "check_in_time", label: "Check-in Timings", fieldType: "text", defaultValue: "02:00 PM" },
-        { fieldKey: "check_out_time", label: "Check-out Timings", fieldType: "text", defaultValue: "11:00 AM" },
-        { fieldKey: "starting_price", label: "Starting Price Per Night (₹)", fieldType: "number", defaultValue: 4500 },
-        { fieldKey: "breakfast_included", label: "Complimentary Breakfast", fieldType: "boolean", defaultValue: true },
-      ],
-    },
-    {
-      templateName: "Boutique Hotel & Homestay",
-      subService: "homestay",
-      description: "Blueprint for cozy boutique stays, family homestays & guest houses",
-      fields: [
-        { fieldKey: "amenities", label: "Homestay Amenities", fieldType: "multiselect", defaultValue: ["Home-Cooked Food", "WiFi", "Hot Water", "Parking"] },
-        { fieldKey: "host_languages", label: "Languages Spoken by Host", fieldType: "text", defaultValue: "Hindi, English" },
-        { fieldKey: "pet_friendly", label: "Pet Friendly", fieldType: "boolean", defaultValue: false },
-        { fieldKey: "starting_price", label: "Starting Price Per Night (₹)", fieldType: "number", defaultValue: 1800 },
-      ],
-    },
+    { name: "Resorts & Retreats", slug: "resort", description: "Luxury resorts, wellness retreats and palace stays" },
+    { name: "Homestays & Guest Houses", slug: "homestay", description: "Local family homestays, bed & breakfasts and guest houses" },
+    { name: "Heritage Havelis & Palaces", slug: "heritage_palace", description: "Historic forts, royal havelis and heritage properties" },
+    { name: "Boutique & City Hotels", slug: "boutique_hotel", description: "Modern boutique hotels, business stays and lodges" },
+    { name: "Farmstays & Campsites", slug: "farmstay_camp", description: "Eco cottages, nature camps and rural farmstays" },
   ],
   "restaurants/bars": [
-    {
-      templateName: "Specialty Cafe & Roastery",
-      subService: "cafe",
-      description: "Blueprint for artisan cafes, coffee roasters, bakeries and workspaces",
-      fields: [
-        { fieldKey: "coffee_specialties", label: "Coffee Specialties", fieldType: "multiselect", defaultValue: ["Espresso", "Cold Brew", "Pour-Over", "Matcha Latte"] },
-        { fieldKey: "outdoor_seating", label: "Outdoor / Garden Seating", fieldType: "boolean", defaultValue: true },
-        { fieldKey: "wifi_available", label: "High-Speed WiFi for Working", fieldType: "boolean", defaultValue: true },
-        { fieldKey: "avg_cost_for_two", label: "Average Cost for Two (₹)", fieldType: "number", defaultValue: 450 },
-        { fieldKey: "opening_hours", label: "Operating Timings", fieldType: "text", defaultValue: "08:30 AM - 10:30 PM" },
-      ],
-    },
-    {
-      templateName: "Pub & Restro-Bar",
-      subService: "pub",
-      description: "Blueprint for craft lounges, restro-bars, and night clubs",
-      fields: [
-        { fieldKey: "happy_hours", label: "Happy Hours Deals & Timings", fieldType: "text", defaultValue: "04:00 PM - 08:00 PM" },
-        { fieldKey: "dj_music_nights", label: "Live DJ / Band Performances", fieldType: "boolean", defaultValue: true },
-        { fieldKey: "liquor_served", label: "Cocktails & Alcoholic Beverages", fieldType: "boolean", defaultValue: true },
-        { fieldKey: "rooftop_lounge", label: "Rooftop City View", fieldType: "boolean", defaultValue: false },
-        { fieldKey: "avg_cost_for_two", label: "Average Cost for Two (₹)", fieldType: "number", defaultValue: 1400 },
-      ],
-    },
+    { name: "Cafes & Roasteries", slug: "cafe", description: "Artisan cafes, specialty coffee roasters, and bakeries" },
+    { name: "Fine Dining & Bistros", slug: "fine_dining", description: "Multi-cuisine family restaurants, bistros and gourmet dining" },
+    { name: "Rooftop Lounges & Bars", slug: "rooftop_bar", description: "Scenic rooftop lounges, craft cocktail bars and pubs" },
+    { name: "Street Food Hubs", slug: "street_food", description: "Famous street food stalls, chaat corners and evening eateries" },
+    { name: "Family Dhabas", slug: "dhaba", description: "Traditional roadside and highway dhabas with authentic thalis" },
+    { name: "Bakeries & Sweet Shops", slug: "bakery_sweets", description: "Heritage sweet shops, patisseries and confectioneries" },
   ],
   "vehicle": [
-    {
-      templateName: "Self-Drive Car & Bike Rental",
-      subService: "vehicle_rental",
-      description: "Blueprint for self-drive motorbikes, scooties, sedans & SUVs",
-      fields: [
-        { fieldKey: "vehicle_types", label: "Available Fleet", fieldType: "multiselect", defaultValue: ["Activa / Scooty", "Royal Enfield", "Swift Dzire", "Thar 4x4"] },
-        { fieldKey: "security_deposit", label: "Refundable Security Deposit (₹)", fieldType: "number", defaultValue: 1000 },
-        { fieldKey: "helmets_included", label: "Helmets Included for Free", fieldType: "boolean", defaultValue: true },
-        { fieldKey: "daily_rate_starting", label: "Daily Rate Starting From (₹)", fieldType: "number", defaultValue: 400 },
-        { fieldKey: "docs_required", label: "Documents Required (DL, Aadhaar)", fieldType: "text", defaultValue: "Original Driving License + Aadhaar Card" },
-      ],
-    },
-    {
-      templateName: "City Cab & Airport Taxi Service",
-      subService: "taxi",
-      description: "Blueprint for 24/7 outstation cabs, railway station transfers, and local city taxis",
-      fields: [
-        { fieldKey: "cab_types", label: "Cab Categories", fieldType: "multiselect", defaultValue: ["Sedan (AC)", "SUV (Ertiga/Innova)", "Tempo Traveller"] },
-        { fieldKey: "rate_per_km", label: "Rate Per KM Starting (₹)", fieldType: "number", defaultValue: 12 },
-        { fieldKey: "is_24x7", label: "24/7 Availability", fieldType: "boolean", defaultValue: true },
-      ],
-    },
+    { name: "Self-Drive Cars", slug: "self_drive_car", description: "Self-drive hatchbacks, sedans and SUVs" },
+    { name: "Bikes & Scooters", slug: "bike_scooter", description: "Daily two-wheeler and scooty rentals" },
+    { name: "City Taxis & Cabs", slug: "taxi_cab", description: "Chauffeur-driven local cabs and outstation taxis" },
+    { name: "E-Rickshaws & Autos", slug: "auto_rickshaw", description: "Local electric rickshaws and tourist autos" },
+    { name: "Tempo Travelers & Buses", slug: "tempo_bus", description: "Large group tempo travelers and luxury tourist mini-buses" },
   ],
   "emergency": [
-    {
-      templateName: "24/7 Ambulance & Trauma Transport",
-      subService: "ambulance",
-      description: "Blueprint for cardiac ICU ambulances, oxygen ambulances, and trauma vehicles",
-      fields: [
-        { fieldKey: "ambulance_type", label: "Vehicle Type", fieldType: "text", defaultValue: "Advanced Life Support (ICU on Wheels)" },
-        { fieldKey: "oxygen_equipped", label: "Oxygen & Ventilator Equipped", fieldType: "boolean", defaultValue: true },
-        { fieldKey: "emergency_hotline", label: "Direct Emergency Hotline Number", fieldType: "text", defaultValue: "+91 9999999999" },
-        { fieldKey: "average_response_mins", label: "Average Response Time (mins)", fieldType: "number", defaultValue: 15 },
-      ],
-    },
-    {
-      templateName: "Hospital & Multi-Specialty Clinic",
-      subService: "hospital",
-      description: "Blueprint for emergency hospitals, multi-specialty trauma centers, and diagnostic clinics",
-      fields: [
-        { fieldKey: "emergency_ward_24x7", label: "24/7 Emergency Ward Available", fieldType: "boolean", defaultValue: true },
-        { fieldKey: "icu_beds_count", label: "ICU Beds Capacity", fieldType: "number", defaultValue: 20 },
-        { fieldKey: "specialties", label: "Key Specialties", fieldType: "multiselect", defaultValue: ["Cardiology", "Trauma & Ortho", "Pediatrics", "Gynecology"] },
-        { fieldKey: "consultation_fee", label: "OPD Consultation Fee (₹)", fieldType: "number", defaultValue: 400 },
-      ],
-    },
+    { name: "24/7 Ambulances", slug: "ambulance", description: "Emergency basic and ICU ambulance response units" },
+    { name: "Emergency Trauma Hospitals", slug: "emergency_hospital", description: "24/7 emergency casualty wards and multi-specialty hospitals" },
+    { name: "Police Stations & Helpdesks", slug: "police_station", description: "District police stations, tourist police posts & PCRs" },
+    { name: "Roadside Assistance", slug: "roadside_assistance", description: "24/7 towing, breakdown support and mechanical help" },
+    { name: "Blood Banks & Diagnostic Centers", slug: "blood_bank", description: "24-hour blood bank reserves and critical diagnostic labs" },
   ],
   "guide/travel agency": [
-    {
-      templateName: "Certified Heritage Tour Guide",
-      subService: "heritage_guide",
-      description: "Blueprint for Ministry of Tourism certified local guides and heritage walk leaders",
-      fields: [
-        { fieldKey: "languages", label: "Languages Fluently Spoken", fieldType: "multiselect", defaultValue: ["Hindi", "English", "French", "German"] },
-        { fieldKey: "circuit_expertise", label: "Circuit Expertise", fieldType: "multiselect", defaultValue: ["Jhansi Fort & Rani Mahal", "Orchha Temples", "Khajuraho Heritage", "Bundelkhand History"] },
-        { fieldKey: "hourly_rate", label: "Standard Guide Fee Per Hour (₹)", fieldType: "number", defaultValue: 500 },
-        { fieldKey: "govt_approved", label: "Govt. Tourism Approved Badge", fieldType: "boolean", defaultValue: true },
-      ],
-    },
-    {
-      templateName: "Travel Agency & Outstation Operator",
-      subService: "travel_agency",
-      description: "Blueprint for verified travel planners, custom itinerary designers, and bus/train booking operators",
-      fields: [
-        { fieldKey: "packages_offered", label: "Package Types", fieldType: "multiselect", defaultValue: ["Weekend Bundelkhand Circuit", "Orchha Heritage Tour", "Wildlife & Sanctuary Expedition"] },
-        { fieldKey: "custom_itinerary", label: "Custom Tailored Itineraries", fieldType: "boolean", defaultValue: true },
-        { fieldKey: "group_discounts", label: "Special Group Discounts Available", fieldType: "boolean", defaultValue: true },
-      ],
-    },
+    { name: "Certified Heritage Tour Guides", slug: "heritage_guide", description: "Government-certified regional historians and monument guides" },
+    { name: "Travel & Tour Agencies", slug: "tour_agency", description: "Custom tour planners, itinerary operators and ticket booking" },
+    { name: "Adventure & Safari Organizers", slug: "adventure_organizer", description: "Trekking expeditions, river rafting, and wildlife safaris" },
+    { name: "Pilgrimage & Spiritual Guides", slug: "pilgrimage_guide", description: "Temple trails, spiritual walks and cultural circuit guides" },
   ],
   "shopping": [
-    {
-      templateName: "Local Handicraft & Brassware Emporium",
-      subService: "handicraft",
-      description: "Blueprint for local Bundelkhand brass crafts, handloom textiles & souvenir shops",
-      fields: [
-        { fieldKey: "craft_types", label: "Specialty Crafts", fieldType: "multiselect", defaultValue: ["Brass Artifacts", "Handloom Chanderi Sarees", "Clay Pottery", "Local Spices"] },
-        { fieldKey: "digital_payment", label: "Credit Cards & UPI Accepted", fieldType: "boolean", defaultValue: true },
-        { fieldKey: "national_shipping", label: "Domestic Shipping / Courier Available", fieldType: "boolean", defaultValue: true },
-        { fieldKey: "operating_hours", label: "Opening Hours", fieldType: "text", defaultValue: "10:00 AM - 09:00 PM" },
-      ],
-    },
+    { name: "Handicrafts & Artisans", slug: "handicrafts", description: "Handmade local crafts, pottery, terracotta and wood art" },
+    { name: "Brassware & Metal Arts", slug: "brassware", description: "Famous regional brass crafts, metal idols and heritage utensils" },
+    { name: "Traditional Apparel & Textiles", slug: "textiles", description: "Chanderi sarees, handloom silks, and traditional ethnic wear" },
+    { name: "Local Sweets & Food Specialties", slug: "sweets_specialties", description: "Regional spices, peda, sweets and authentic edible souvenirs" },
   ],
   "others": [
-    {
-      templateName: "Luggage Storage & Cloakroom Service",
-      subService: "luggage_storage",
-      description: "Safe traveler cloakroom and luggage lockers near transit hubs",
-      fields: [
-        { fieldKey: "hourly_rate", label: "Rate Per Bag Per Day (₹)", fieldType: "number", defaultValue: 80 },
-        { fieldKey: "cctv_monitored", label: "24/7 CCTV & Security Monitored", fieldType: "boolean", defaultValue: true },
-        { fieldKey: "operating_hours", label: "Operating Hours", fieldType: "text", defaultValue: "06:00 AM - 11:30 PM" },
-      ],
-    },
-    {
-      templateName: "Travel & Drone Photography",
-      subService: "photography",
-      description: "Professional photo shoots, drone video coverage, and vacation reel production",
-      fields: [
-        { fieldKey: "deliverables", label: "Deliverables Included", fieldType: "multiselect", defaultValue: ["50 Edited High-Res Photos", "1 Cinematic 4K Reel", "Full Raw Drone Footage"] },
-        { fieldKey: "turnaround_hours", label: "Delivery Turnaround (Hours)", fieldType: "number", defaultValue: 24 },
-        { fieldKey: "package_rate", label: "Session Rate (₹)", fieldType: "number", defaultValue: 2500 },
-      ],
-    },
+    { name: "Luggage Storage & Cloakrooms", slug: "luggage_storage", description: "Safe travel luggage drop-off, lockers and transit cloakrooms" },
+    { name: "Photography & Drone Shoots", slug: "photo_video_shoot", description: "Heritage photographers, pre-wedding & drone videography" },
+    { name: "Equipment & Gear Rentals", slug: "equipment_rental", description: "Camping gear, audio guides, cameras and travel accessories" },
   ],
 };
 
-const FIELD_TYPES = [
-  { id: "text", label: "Single Line Text" },
-  { id: "number", label: "Number" },
-  { id: "boolean", label: "Yes / No (Toggle)" },
-  { id: "multiselect", label: "Multi-Select (Comma-separated Tags)" },
-  { id: "textarea", label: "Long Paragraph" },
-  { id: "time_range", label: "Operating Hours (e.g. 09:00 AM - 10:00 PM)" },
-];
+/* ─── RECOMMENDED STARTER BLUEPRINT SCHEMAS PER SUBSERVICE SLUG ─── */
+const RECOMMENDED_BLUEPRINT_FIELDS = {
+  resort: [
+    { fieldKey: "amenities", label: "Amenities", fieldType: "multiselect", defaultValue: ["Swimming Pool", "Spa & Wellness", "Free WiFi", "Multi-Cuisine Dining"] },
+    { fieldKey: "room_types", label: "Available Room Categories", fieldType: "multiselect", defaultValue: ["Deluxe Heritage Room", "Royal Suite", "Executive Villa"] },
+    { fieldKey: "check_in_time", label: "Check-in Timings", fieldType: "text", defaultValue: "02:00 PM" },
+    { fieldKey: "check_out_time", label: "Check-out Timings", fieldType: "text", defaultValue: "11:00 AM" },
+    { fieldKey: "starting_price", label: "Starting Price Per Night (₹)", fieldType: "number", defaultValue: 4500 },
+    { fieldKey: "complimentary_breakfast", label: "Complimentary Breakfast", fieldType: "boolean", defaultValue: true },
+  ],
+  homestay: [
+    { fieldKey: "homestay_amenities", label: "Homestay Amenities", fieldType: "multiselect", defaultValue: ["Home-Cooked Food", "WiFi", "Hot Water", "Parking"] },
+    { fieldKey: "host_languages", label: "Host Languages Spoken", fieldType: "text", defaultValue: "Hindi, English" },
+    { fieldKey: "pet_friendly", label: "Pet Friendly", fieldType: "boolean", defaultValue: false },
+    { fieldKey: "starting_price", label: "Starting Price (₹)", fieldType: "number", defaultValue: 1800 },
+  ],
+  cafe: [
+    { fieldKey: "coffee_specialties", label: "Coffee Specialties", fieldType: "multiselect", defaultValue: ["Espresso", "Cold Brew", "Pour-Over", "Matcha Latte"] },
+    { fieldKey: "outdoor_seating", label: "Outdoor / Garden Seating", fieldType: "boolean", defaultValue: true },
+    { fieldKey: "wifi_available", label: "High-Speed WiFi for Working", fieldType: "boolean", defaultValue: true },
+    { fieldKey: "average_cost_for_two", label: "Avg Cost for Two (₹)", fieldType: "number", defaultValue: 400 },
+  ],
+  fine_dining: [
+    { fieldKey: "cuisines", label: "Cuisine Types", fieldType: "multiselect", defaultValue: ["North Indian", "Bundelkhandi Special", "Mughlai", "Continental"] },
+    { fieldKey: "table_reservation_required", label: "Reservation Recommended", fieldType: "boolean", defaultValue: true },
+    { fieldKey: "alcohol_served", label: "Bar / Alcohol Served", fieldType: "boolean", defaultValue: false },
+    { fieldKey: "valet_parking", label: "Valet Parking Available", fieldType: "boolean", defaultValue: true },
+  ],
+  ambulance: [
+    { fieldKey: "ambulance_type", label: "Ambulance Category", fieldType: "select", options: ["Basic Life Support (BLS)", "Advanced ICU Ambulance", "Oxygen Ambulance"], defaultValue: "Basic Life Support (BLS)" },
+    { fieldKey: "oxygen_equipped", label: "Oxygen Cylinder Onboard", fieldType: "boolean", defaultValue: true },
+    { fieldKey: "doctor_paramedic_onboard", label: "Paramedic / Doctor Accompanied", fieldType: "boolean", defaultValue: true },
+    { fieldKey: "response_time_mins", label: "Avg Response Time (Mins)", fieldType: "number", defaultValue: 15 },
+  ],
+  self_drive_car: [
+    { fieldKey: "available_car_types", label: "Vehicle Fleet Types", fieldType: "multiselect", defaultValue: ["Hatchback (Swift/i20)", "Sedan (Dzire)", "SUV (Creta/Scorpio)"] },
+    { fieldKey: "fuel_included", label: "Fuel Included in Rent", fieldType: "boolean", defaultValue: false },
+    { fieldKey: "security_deposit", label: "Security Deposit (₹)", fieldType: "number", defaultValue: 3000 },
+    { fieldKey: "per_day_starting_price", label: "Per Day Starting Rate (₹)", fieldType: "number", defaultValue: 1500 },
+  ],
+  heritage_guide: [
+    { fieldKey: "certified_monuments", label: "Certified Monument Circuits", fieldType: "multiselect", defaultValue: ["Jhansi Fort & Museum", "Orchha Palaces & Temples", "Khajuraho Group of Temples"] },
+    { fieldKey: "languages", label: "Languages Fluently Spoken", fieldType: "text", defaultValue: "Hindi, English, French" },
+    { fieldKey: "hourly_rate", label: "Half-Day Tour Rate (₹)", fieldType: "number", defaultValue: 1200 },
+  ],
+};
 
-const Services = () => {
-  // Navigation State: null = Folder Hub View; categoryKey = Inside that Folder
-  const [selectedFolderKey, setSelectedFolderKey] = useState(null);
-  const [folderSubserviceTab, setFolderSubserviceTab] = useState("live"); // "live" (published) | "draft"
-  const [globalSearch, setGlobalSearch] = useState("");
-  const [subserviceSearch, setSubserviceSearch] = useState("");
-  const [showAdminGuide, setShowAdminGuide] = useState(true);
+const ServicesPage = () => {
+  // Folder Navigation State
+  const [selectedCategoryKey, setSelectedCategoryKey] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("all"); // "all" | "live" | "draft"
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // ==========================================
-  // Template Modal State (Base Template Name is EDITABLE!)
-  // ==========================================
-  const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState(null);
-  const [templateForm, setTemplateForm] = useState({
-    templateName: "",
-    category: "hotel/resorts",
-    subService: "",
+  // Subservice Category Modal State (Class creation/editing)
+  const [showSubserviceModal, setShowSubserviceModal] = useState(false);
+  const [editingSubservice, setEditingSubservice] = useState(null); // null = new, object = edit
+  const [subserviceForm, setSubserviceForm] = useState({
+    name: "",
+    slug: "",
     description: "",
-    icon: "layers",
+    isActive: true,
+  });
+
+  // Blueprint Template Modal State (For that subservice only)
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [activeTemplateSubservice, setActiveTemplateSubservice] = useState(null);
+  const [templateForm, setTemplateForm] = useState({
+    id: null,
+    templateName: "",
+    description: "",
     fields: [],
   });
 
-  // ==========================================
-  // Subservice Listing Modal State
-  // ==========================================
-  const [showSubserviceModal, setShowSubserviceModal] = useState(false);
-  const [editingSubservice, setEditingSubservice] = useState(null);
-  const [subserviceForm, setSubserviceForm] = useState({
-    templateId: "",
-    title: "",
-    category: "hotel/resorts",
-    subService: "",
-    status: "published",
-    description: "",
-    phone: "",
-    email: "",
-    address: "",
-    city: "Jhansi",
-    customDetails: {},
-    tags: "",
-  });
-  const [customFieldsList, setCustomFieldsList] = useState([]);
-  const [photoFiles, setPhotoFiles] = useState([]);
-  const [existingPhotos, setExistingPhotos] = useState([]);
-
-  // ==========================================
-  // Push Notification Linkage
-  // ==========================================
-  const notifServiceType = useMemo(() => {
-    const cat = subserviceForm.category || selectedFolderKey;
-    if (cat === "hotel/resorts") return "hotel";
-    if (cat === "restaurants/bars") return "restaurant";
-    if (cat === "vehicle") return "vehicle";
-    if (cat === "emergency") return "emergency";
-    if (cat === "guide/travel agency") return "guide";
-    if (cat === "events") return "surprise_event";
-    if (cat === "shopping") return "shopping";
-    return "general";
-  }, [subserviceForm.category, selectedFolderKey]);
-
-  const { notif, setNotif, sendIfEnabled, resetNotif } = useNotificationDraft(notifServiceType);
-
-  // ==========================================
-  // Queries & Mutations
-  // ==========================================
+  // Backend Queries & Mutations
   const {
-    data: templatesData,
-    isLoading: isTemplatesLoading,
+    data: templatesRes,
+    isLoading: loadingTemplates,
     refetch: refetchTemplates,
-  } = useServiceTemplatesQuery();
+  } = useServiceTemplatesQuery({ all: "true", includeInactive: "true" });
 
-  const {
-    data: subservicesData,
-    isLoading: isSubservicesLoading,
-    refetch: refetchSubservices,
-  } = useCustomServicesQuery();
+  const createTemplateMut = useCreateServiceTemplateMutation();
+  const updateTemplateMut = useUpdateServiceTemplateMutation();
+  const deleteTemplateMut = useDeleteServiceTemplateMutation();
 
-  const createTemplateMutation = useCreateServiceTemplateMutation();
-  const updateTemplateMutation = useUpdateServiceTemplateMutation();
-  const deleteTemplateMutation = useDeleteServiceTemplateMutation();
-  const seedTemplatesMutation   = useSeedDefaultTemplatesMutation();
+  const allTemplates = useMemo(() => {
+    return templatesRes?.data || templatesRes?.templates || (Array.isArray(templatesRes) ? templatesRes : []);
+  }, [templatesRes]);
 
-  const createCustomServiceMutation = useCreateCustomServiceMutation();
-  const updateCustomServiceMutation = useUpdateCustomServiceMutation();
-  const deleteCustomServiceMutation = useDeleteCustomServiceMutation();
+  // Selected Category Object
+  const selectedCategory = useMemo(() => {
+    return SERVICE_CATEGORIES.find((c) => c.key === selectedCategoryKey) || null;
+  }, [selectedCategoryKey]);
 
-  const [isUploadingR2, setIsUploadingR2] = useState(false);
-  const isSavingSubservice =
-    createCustomServiceMutation.isPending ||
-    updateCustomServiceMutation.isPending ||
-    isUploadingR2;
-  const isSavingTemplate =
-    createTemplateMutation.isPending ||
-    updateTemplateMutation.isPending;
+  // Overall Catalog Statistics
+  const catalogStats = useMemo(() => {
+    const totalCategories = SERVICE_CATEGORIES.length;
+    const totalTemplates = allTemplates.length;
+    const liveTemplates = allTemplates.filter((t) => t.isActive !== false).length;
+    const draftTemplates = allTemplates.filter((t) => t.isActive === false).length;
 
-  const allTemplates = templatesData?.data || [];
-  const allSubservices = subservicesData?.data || [];
-
-  // Active Folder Config
-  const activeFolder = useMemo(() => {
-    if (!selectedFolderKey) return null;
-    return SERVICE_CATEGORIES.find((c) => c.key === selectedFolderKey) || null;
-  }, [selectedFolderKey]);
-
-  // Statistics per Category
-  const categoryStats = useMemo(() => {
-    const map = {};
+    // Subservices count by category
+    const byCategory = {};
     SERVICE_CATEGORIES.forEach((cat) => {
-      const templates = allTemplates.filter((t) => t.category === cat.key);
-      const subservices = allSubservices.filter((s) => s.category === cat.key);
-      const live = subservices.filter((s) => s.status === "published");
-      const drafts = subservices.filter((s) => s.status === "draft");
-
-      map[cat.key] = {
-        templateCount: templates.length,
-        liveCount: live.length,
-        draftCount: drafts.length,
-        totalSubservices: subservices.length,
+      const templatesForCat = allTemplates.filter((t) => t.category === cat.key);
+      const presets = RELATABLE_SUBSERVICES_BY_CATEGORY[cat.key] || [];
+      // Total unique subservices known in this category
+      const uniqueSlugs = new Set([
+        ...templatesForCat.map((t) => t.subService?.toLowerCase()),
+        ...presets.map((p) => p.slug?.toLowerCase()),
+      ]);
+      byCategory[cat.key] = {
+        subservicesCount: uniqueSlugs.size,
+        liveCount: templatesForCat.filter((t) => t.isActive !== false).length,
+        draftCount: templatesForCat.filter((t) => t.isActive === false).length,
+        templateCount: templatesForCat.length,
       };
     });
-    return map;
-  }, [allTemplates, allSubservices]);
 
-  // Folder-Filtered Templates
-  const folderTemplates = useMemo(() => {
-    if (!selectedFolderKey) return [];
-    return allTemplates.filter((t) => t.category === selectedFolderKey);
-  }, [allTemplates, selectedFolderKey]);
+    const totalSubservicesAcross = Object.values(byCategory).reduce(
+      (sum, item) => sum + item.subservicesCount,
+      0
+    );
 
-  // Prebuilt starter templates for the active folder
-  const prebuiltStarterTemplates = useMemo(() => {
-    if (!selectedFolderKey) return [];
-    return PREBUILT_TEMPLATES_BY_CATEGORY[selectedFolderKey] || [];
-  }, [selectedFolderKey]);
+    return {
+      totalCategories,
+      totalTemplates,
+      liveTemplates,
+      draftTemplates,
+      totalSubservicesAcross,
+      byCategory,
+    };
+  }, [allTemplates]);
 
-  // Folder-Filtered Subservices (Live vs Draft)
-  const folderSubservices = useMemo(() => {
-    if (!selectedFolderKey) return { live: [], drafts: [] };
-    let items = allSubservices.filter((s) => s.category === selectedFolderKey);
+  // Subservices for the selected category folder
+  const currentCategorySubservices = useMemo(() => {
+    if (!selectedCategoryKey) return [];
 
-    if (subserviceSearch.trim()) {
-      const q = subserviceSearch.toLowerCase().trim();
-      items = items.filter(
-        (s) =>
-          s.title?.toLowerCase().includes(q) ||
-          s.subService?.toLowerCase().includes(q) ||
-          s.location?.address?.toLowerCase().includes(q) ||
-          s.contact?.phone?.includes(q)
+    const catTemplates = allTemplates.filter((t) => t.category === selectedCategoryKey);
+    const presets = RELATABLE_SUBSERVICES_BY_CATEGORY[selectedCategoryKey] || [];
+
+    const map = new Map();
+
+    // 1. Seed from curated relatable presets
+    presets.forEach((preset) => {
+      map.set(preset.slug.toLowerCase(), {
+        name: preset.name,
+        slug: preset.slug.toLowerCase(),
+        description: preset.description,
+        template: null,
+        isActive: true, // default live
+        isPreset: true,
+      });
+    });
+
+    // 2. Attach or override with templates from database
+    catTemplates.forEach((t) => {
+      const slug = (t.subService || "").toLowerCase();
+      if (!slug) return;
+
+      const existing = map.get(slug);
+      map.set(slug, {
+        name: existing ? existing.name : t.templateName.replace(/ Blueprint$/i, ""),
+        slug,
+        description: t.description || existing?.description || "",
+        template: t,
+        isActive: t.isActive !== false,
+        isPreset: !!existing,
+      });
+    });
+
+    let list = Array.from(map.values());
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (item) =>
+          item.name.toLowerCase().includes(q) ||
+          item.slug.toLowerCase().includes(q) ||
+          item.description.toLowerCase().includes(q)
       );
     }
 
-    return {
-      live: items.filter((s) => s.status === "published"),
-      drafts: items.filter((s) => s.status === "draft"),
-    };
-  }, [allSubservices, selectedFolderKey, subserviceSearch]);
+    // Status filter (Live vs Draft)
+    if (statusFilter === "live") {
+      list = list.filter((item) => item.isActive);
+    } else if (statusFilter === "draft") {
+      list = list.filter((item) => !item.isActive);
+    }
 
-  // ==========================================
-  // Handlers: Seed Built-in Defaults
-  // ==========================================
-  const handleSeedDefaults = async () => {
-    if (
-      !window.confirm(
-        "Seed production default subservice templates (Hotels, Cafes, Vehicles, Emergency)? This will safely add missing templates without deleting existing ones."
-      )
-    )
+    return list;
+  }, [selectedCategoryKey, allTemplates, searchQuery, statusFilter]);
+
+  /* ─── HANDLERS: SUBSERVICE CATEGORY (CLASS) ─── */
+  const handleOpenAddSubservice = () => {
+    setEditingSubservice(null);
+    setSubserviceForm({
+      name: "",
+      slug: "",
+      description: "",
+      isActive: true,
+    });
+    setShowSubserviceModal(true);
+  };
+
+  const handleOpenEditSubservice = (subservice) => {
+    setEditingSubservice(subservice);
+    setSubserviceForm({
+      name: subservice.name,
+      slug: subservice.slug,
+      description: subservice.description,
+      isActive: subservice.isActive,
+    });
+    setShowSubserviceModal(true);
+  };
+
+  const handleSelectPresetChip = (preset) => {
+    setSubserviceForm((prev) => ({
+      ...prev,
+      name: preset.name,
+      slug: preset.slug,
+      description: preset.description,
+    }));
+  };
+
+  const handleSaveSubservice = async (e) => {
+    e.preventDefault();
+    const cleanSlug = subserviceForm.slug.trim().toLowerCase().replace(/[\s.-]+/g, "_");
+    if (!cleanSlug) {
+      toast.error("Please provide a relatable slug");
       return;
+    }
 
     try {
-      const res = await seedTemplatesMutation.mutateAsync();
-      toast.success(res?.message || "Default templates seeded successfully!");
+      const existingTemplate = editingSubservice?.template;
+
+      if (existingTemplate?._id) {
+        // Update existing template
+        await updateTemplateMut.mutateAsync({
+          id: existingTemplate._id,
+          data: {
+            subService: cleanSlug,
+            description: subserviceForm.description,
+            isActive: subserviceForm.isActive,
+          },
+        });
+        toast.success(`Subservice class "${subserviceForm.name}" updated!`);
+      } else {
+        // Create initial blueprint template for this subservice class
+        const defaultFields = RECOMMENDED_BLUEPRINT_FIELDS[cleanSlug] || [
+          { fieldKey: "amenities", label: "Special Features / Amenities", fieldType: "tags", defaultValue: [] },
+          { fieldKey: "starting_price", label: "Starting Price (₹)", fieldType: "number", defaultValue: 1000 },
+        ];
+
+        await createTemplateMut.mutateAsync({
+          templateName: `${subserviceForm.name} Blueprint`,
+          category: selectedCategoryKey,
+          subService: cleanSlug,
+          description: subserviceForm.description,
+          fields: defaultFields,
+          isActive: subserviceForm.isActive,
+        });
+        toast.success(`Subservice class "${subserviceForm.name}" created with starter blueprint!`);
+      }
+
+      setShowSubserviceModal(false);
       refetchTemplates();
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to seed default templates");
+      toast.error(err?.response?.data?.message || "Failed to save subservice");
     }
   };
 
-  // 1-Click Save a Prebuilt Template directly to DB
-  const handleSavePrebuiltTemplate = async (prebuilt) => {
+  const handleToggleSubserviceStatus = async (subservice) => {
     try {
-      await createTemplateMutation.mutateAsync({
-        templateName: prebuilt.templateName,
-        category: selectedFolderKey,
-        subService: prebuilt.subService,
-        description: prebuilt.description,
-        icon: "layers",
-        fields: prebuilt.fields,
+      if (subservice.template?._id) {
+        await updateTemplateMut.mutateAsync({
+          id: subservice.template._id,
+          data: {
+            isActive: !subservice.isActive,
+          },
+        });
+        toast.success(
+          `Subservice "${subservice.name}" set to ${!subservice.isActive ? "🟢 Live" : "🟡 Draft"}!`
+        );
+      } else {
+        // Create template in draft or live
+        const defaultFields = RECOMMENDED_BLUEPRINT_FIELDS[subservice.slug] || [
+          { fieldKey: "amenities", label: "Amenities", fieldType: "tags", defaultValue: [] },
+        ];
+        await createTemplateMut.mutateAsync({
+          templateName: `${subservice.name} Blueprint`,
+          category: selectedCategoryKey,
+          subService: subservice.slug,
+          description: subservice.description,
+          fields: defaultFields,
+          isActive: !subservice.isActive,
+        });
+        toast.success(`Subservice "${subservice.name}" initialized and set to ${!subservice.isActive ? "🟢 Live" : "🟡 Draft"}!`);
+      }
+      refetchTemplates();
+    } catch (err) {
+      toast.error("Failed to toggle subservice status");
+    }
+  };
+
+  const handleDeleteSubservice = async (subservice) => {
+    if (!subservice.template?._id) {
+      toast.success("Preset reset to default.");
+      return;
+    }
+    if (!window.confirm(`Delete blueprint template for subservice "${subservice.name}"?`)) {
+      return;
+    }
+
+    try {
+      await deleteTemplateMut.mutateAsync(subservice.template._id);
+      toast.success(`Template for "${subservice.name}" deleted.`);
+      refetchTemplates();
+    } catch (err) {
+      toast.error("Failed to delete template");
+    }
+  };
+
+  /* ─── HANDLERS: BLUEPRINT TEMPLATE (FOR THAT SUBSERVICE ONLY) ─── */
+  const handleOpenConfigureTemplate = (subservice) => {
+    setActiveTemplateSubservice(subservice);
+    if (subservice.template) {
+      setTemplateForm({
+        id: subservice.template._id,
+        templateName: subservice.template.templateName || `${subservice.name} Blueprint`,
+        description: subservice.template.description || subservice.description || "",
+        fields: subservice.template.fields || [],
       });
-      toast.success(`Prebuilt template '${prebuilt.templateName}' saved into your folder!`);
-      refetchTemplates();
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to save template");
+    } else {
+      const defaultFields = RECOMMENDED_BLUEPRINT_FIELDS[subservice.slug] || [
+        { fieldKey: "amenities", label: "Special Features / Amenities", fieldType: "tags", defaultValue: [] },
+        { fieldKey: "starting_price", label: "Starting Price (₹)", fieldType: "number", defaultValue: 1000 },
+      ];
+      setTemplateForm({
+        id: null,
+        templateName: `${subservice.name} Blueprint`,
+        description: subservice.description || "",
+        fields: defaultFields,
+      });
     }
-  };
-
-  // ==========================================
-  // Handlers: Template Management (EDITABLE NAME!)
-  // ==========================================
-  const handleOpenCreateTemplate = (presetCategory = null, prefillData = null) => {
-    setEditingTemplate(null);
-    setTemplateForm({
-      templateName: prefillData?.templateName || "",
-      category: presetCategory || selectedFolderKey || "hotel/resorts",
-      subService: prefillData?.subService || "",
-      description: prefillData?.description || "",
-      icon: "layers",
-      fields: prefillData?.fields || [
-        { fieldKey: "amenities", label: "Special Amenities", fieldType: "multiselect", defaultValue: [] },
-        { fieldKey: "openingHours", label: "Operating Hours", fieldType: "text", defaultValue: "09:00 AM - 10:00 PM" },
-      ],
-    });
     setShowTemplateModal(true);
   };
 
-  const handleOpenEditTemplate = (tpl) => {
-    setEditingTemplate(tpl);
-    // Explicitly set templateName so base template name is fully editable!
-    setTemplateForm({
-      templateName: tpl.templateName || "",
-      category: tpl.category || "hotel/resorts",
-      subService: tpl.subService || "",
-      description: tpl.description || "",
-      icon: tpl.icon || "layers",
-      fields: Array.isArray(tpl.fields)
-        ? tpl.fields.map((f) => ({
-            fieldKey: f.fieldKey || "",
-            label: f.label || "",
-            fieldType: f.fieldType || "text",
-            defaultValue: f.defaultValue ?? "",
-            required: Boolean(f.required),
-          }))
-        : [],
-    });
-    setShowTemplateModal(true);
-  };
-
-  const handleAddFieldToTemplate = () => {
+  const handleAddTemplateField = () => {
     setTemplateForm((prev) => ({
       ...prev,
       fields: [
         ...prev.fields,
         {
-          fieldKey: `attr_${Date.now()}`,
-          label: "New Field Label",
+          fieldKey: `custom_field_${Date.now()}`,
+          label: "New Field",
           fieldType: "text",
           defaultValue: "",
           required: false,
@@ -524,48 +503,59 @@ const Services = () => {
     }));
   };
 
-  const handleRemoveFieldFromTemplate = (index) => {
+  const handleUpdateTemplateField = (index, key, val) => {
+    setTemplateForm((prev) => ({
+      ...prev,
+      fields: prev.fields.map((f, i) => (i === index ? { ...f, [key]: val } : f)),
+    }));
+  };
+
+  const handleRemoveTemplateField = (index) => {
     setTemplateForm((prev) => ({
       ...prev,
       fields: prev.fields.filter((_, i) => i !== index),
     }));
   };
 
+  const handleApplyRecommendedBlueprint = () => {
+    if (!activeTemplateSubservice) return;
+    const recommended = RECOMMENDED_BLUEPRINT_FIELDS[activeTemplateSubservice.slug];
+    if (recommended && recommended.length > 0) {
+      setTemplateForm((prev) => ({
+        ...prev,
+        fields: recommended,
+      }));
+      toast.success(`Loaded recommended blueprint schema for "${activeTemplateSubservice.name}"!`);
+    } else {
+      toast("No preset schema found; you can define custom fields freely.");
+    }
+  };
+
   const handleSaveTemplate = async (e) => {
     e.preventDefault();
     if (!templateForm.templateName.trim()) {
-      return toast.error("Template Name is required");
-    }
-    if (!templateForm.subService.trim()) {
-      return toast.error("SubService slug is required (e.g. cafe, luxury_resort)");
+      toast.error("Template name is required");
+      return;
     }
 
     try {
-      if (editingTemplate) {
-        // Updating template - templateName is preserved & editable!
-        await updateTemplateMutation.mutateAsync({
-          id: editingTemplate._id,
-          data: {
-            templateName: templateForm.templateName.trim(),
-            category: templateForm.category,
-            subService: templateForm.subService.trim().toLowerCase(),
-            description: templateForm.description,
-            icon: templateForm.icon,
-            fields: templateForm.fields,
-          },
-        });
-        toast.success(`Template '${templateForm.templateName}' updated successfully!`);
+      const payload = {
+        templateName: templateForm.templateName.trim(),
+        category: selectedCategoryKey,
+        subService: activeTemplateSubservice.slug,
+        description: templateForm.description,
+        fields: templateForm.fields,
+        isActive: activeTemplateSubservice.isActive,
+      };
+
+      if (templateForm.id) {
+        await updateTemplateMut.mutateAsync({ id: templateForm.id, data: payload });
+        toast.success(`Template "${templateForm.templateName}" updated successfully!`);
       } else {
-        await createTemplateMutation.mutateAsync({
-          templateName: templateForm.templateName.trim(),
-          category: templateForm.category,
-          subService: templateForm.subService.trim().toLowerCase(),
-          description: templateForm.description,
-          icon: templateForm.icon,
-          fields: templateForm.fields,
-        });
-        toast.success(`Template '${templateForm.templateName}' created successfully!`);
+        await createTemplateMut.mutateAsync(payload);
+        toast.success(`Template "${templateForm.templateName}" created successfully!`);
       }
+
       setShowTemplateModal(false);
       refetchTemplates();
     } catch (err) {
@@ -573,522 +563,159 @@ const Services = () => {
     }
   };
 
-  const handleDeleteTemplate = async (id, name) => {
-    if (!window.confirm(`Are you sure you want to delete the template '${name}'? Existing subservices using it will not be lost.`))
-      return;
-
-    try {
-      await deleteTemplateMutation.mutateAsync(id);
-      toast.success("Template deleted successfully");
-      refetchTemplates();
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to delete template");
-    }
-  };
-
-  // ==========================================
-  // Handlers: Subservice Management (Live vs Drafts)
-  // ==========================================
-  const handleOpenAddSubservice = (baseTemplate = null) => {
-    setEditingSubservice(null);
-    setPhotoFiles([]);
-    setExistingPhotos([]);
-    resetNotif();
-
-    const cat = baseTemplate?.category || selectedFolderKey || "hotel/resorts";
-    const sub = baseTemplate?.subService || "";
-
-    // Load custom attributes schema from selected template
-    const tFields = baseTemplate?.fields || [];
-    const initialFields = tFields.map((f) => ({
-      key: f.fieldKey,
-      label: f.label,
-      type: f.fieldType,
-      value: f.defaultValue !== undefined ? f.defaultValue : "",
-    }));
-
-    setCustomFieldsList(initialFields);
-    setSubserviceForm({
-      templateId: baseTemplate?._id || "",
-      title: "",
-      category: cat,
-      subService: sub,
-      status: folderSubserviceTab === "draft" ? "draft" : "published",
-      description: "",
-      phone: "",
-      email: "",
-      address: "",
-      city: "Jhansi",
-      customDetails: {},
-      tags: "",
-    });
-    setShowSubserviceModal(true);
-  };
-
-  const handleOpenEditSubservice = (item) => {
-    setEditingSubservice(item);
-    setPhotoFiles([]);
-    setExistingPhotos(item.photos || []);
-
-    // Reconstruct custom attributes list
-    const details = item.customDetails || {};
-    const fieldDefs = item.fieldDefinitions || [];
-    const fieldsMap = {};
-
-    fieldDefs.forEach((fd) => {
-      fieldsMap[fd.fieldKey] = {
-        key: fd.fieldKey,
-        label: fd.label,
-        type: fd.fieldType,
-        value: details[fd.fieldKey] !== undefined ? details[fd.fieldKey] : "",
-      };
-    });
-
-    // Also include any customDetails keys not in fieldDefinitions
-    Object.entries(details).forEach(([k, v]) => {
-      if (!fieldsMap[k]) {
-        fieldsMap[k] = {
-          key: k,
-          label: k.replace(/([A-Z])/g, " $1").replace(/_/g, " "),
-          type: Array.isArray(v) ? "multiselect" : typeof v === "boolean" ? "boolean" : "text",
-          value: v,
-        };
-      }
-    });
-
-    setCustomFieldsList(Object.values(fieldsMap));
-    setSubserviceForm({
-      templateId: item.template?._id || item.template || "",
-      title: item.title || "",
-      category: item.category || selectedFolderKey || "hotel/resorts",
-      subService: item.subService || "",
-      status: item.status || "published",
-      description: item.description || "",
-      phone: item.contact?.phone || "",
-      email: item.contact?.email || "",
-      address: item.location?.address || "",
-      city: item.location?.city || "Jhansi",
-      customDetails: details,
-      tags: Array.isArray(item.tags) ? item.tags.join(", ") : "",
-    });
-    setShowSubserviceModal(true);
-  };
-
-  const handleSelectTemplateForSubservice = (tplId) => {
-    const t = allTemplates.find((item) => item._id === tplId);
-    if (!t) return;
-
-    setSubserviceForm((prev) => ({
-      ...prev,
-      templateId: t._id,
-      category: t.category,
-      subService: t.subService,
-    }));
-
-    const fields = (t.fields || []).map((f) => ({
-      key: f.fieldKey,
-      label: f.label,
-      type: f.fieldType,
-      value: f.defaultValue !== undefined ? f.defaultValue : "",
-    }));
-    setCustomFieldsList(fields);
-  };
-
-  const handleAddDynamicAttribute = () => {
-    setCustomFieldsList((prev) => [
-      ...prev,
-      {
-        key: `attr_${Date.now()}`,
-        label: "Custom Attribute",
-        type: "text",
-        value: "",
-      },
-    ]);
-  };
-
-  const handleRemoveDynamicAttribute = (index) => {
-    setCustomFieldsList((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  // 1-Click Quick Toggle between Live (published) and Draft with optional Notification Broadcast
-  const handleToggleSubserviceStatus = async (item) => {
-    const newStatus = item.status === "published" ? "draft" : "published";
-    const actionLabel = newStatus === "published" ? "Publish to Live" : "Move to Drafts";
-
-    try {
-      await updateCustomServiceMutation.mutateAsync({
-        id: item._id,
-        formData: { status: newStatus },
-      });
-
-      if (newStatus === "published") {
-        toast.success(`🚀 '${item.title}' is now LIVE on BuXplore!`);
-        // Linkage: Offer instant push notification broadcast
-        const shouldBroadcast = window.confirm(
-          `🚀 '${item.title}' is now LIVE!\n\nWould you like to send a broadcast push notification to all travelers about this service?`
-        );
-        if (shouldBroadcast) {
-          const cat = item.category;
-          const sType =
-            cat === "hotel/resorts" ? "hotel" :
-            cat === "restaurants/bars" ? "restaurant" :
-            cat === "vehicle" ? "vehicle" :
-            cat === "events" ? "surprise_event" :
-            cat === "emergency" ? "emergency" :
-            cat === "shopping" ? "shopping" :
-            cat === "guide/travel agency" ? "guide" : "general";
-
-          try {
-            await sendNotification({
-              title: `Now Live: ${item.title}`,
-              message: `A new ${item.subService || "service"} is now live on BUXplore: ${item.title}. Explore it now!`,
-              type: sType === "event" || sType === "surprise_event" ? "EVENT" : "SERVICE",
-              serviceType: sType,
-              serviceId: item._id,
-            });
-            toast.success("📢 Broadcast notification sent to all travelers!");
-          } catch {
-            toast.error("Subservice published, but notification failed to send.");
-          }
-        }
-      } else {
-        toast.success(`📥 '${item.title}' moved to Drafts.`);
-      }
-
-      refetchSubservices();
-    } catch (err) {
-      toast.error(err?.response?.data?.message || `Failed to ${actionLabel}`);
-    }
-  };
-
-  const handleSaveSubservice = async (e) => {
-    e.preventDefault();
-    if (!subserviceForm.title.trim()) {
-      return toast.error("Business / Service Title is required");
-    }
-    if (!subserviceForm.subService.trim()) {
-      return toast.error("Subservice type (slug) is required");
-    }
-
-    // Package dynamic attributes
-    const cleanDetails = {};
-    customFieldsList.forEach((item) => {
-      if (item.key) {
-        let val = item.value;
-        if (item.type === "number") val = Number(val) || 0;
-        if (item.type === "boolean") val = val === true || val === "true";
-        if (item.type === "multiselect" && typeof val === "string") {
-          val = val.split(",").map((s) => s.trim()).filter(Boolean);
-        }
-        cleanDetails[item.key] = val;
-      }
-    });
-
-    try {
-      let uploadedAssets = [];
-      if (photoFiles.length > 0) {
-        setIsUploadingR2(true);
-        uploadedAssets = await uploadMultipleFilesDirectToR2(
-          photoFiles,
-          `services/${subserviceForm.category}`,
-          "image"
-        );
-      }
-
-      const finalPhotos = editingSubservice
-        ? [...existingPhotos, ...uploadedAssets]
-        : uploadedAssets;
-
-      const payload = {
-        title: subserviceForm.title.trim(),
-        category: subserviceForm.category,
-        subService: subserviceForm.subService.trim().toLowerCase(),
-        status: subserviceForm.status,
-        description: subserviceForm.description,
-        ...(subserviceForm.templateId ? { templateId: subserviceForm.templateId } : {}),
-        contact: {
-          phone: subserviceForm.phone,
-          email: subserviceForm.email,
-        },
-        location: {
-          address: subserviceForm.address,
-          city: subserviceForm.city,
-        },
-        customDetails: cleanDetails,
-        tags: subserviceForm.tags
-          ? subserviceForm.tags.split(",").map((s) => s.trim()).filter(Boolean)
-          : [],
-        photos: finalPhotos,
-      };
-
-      let savedRecordId = editingSubservice?._id;
-
-      if (editingSubservice) {
-        const res = await updateCustomServiceMutation.mutateAsync({
-          id: editingSubservice._id,
-          formData: payload,
-        });
-        savedRecordId = res?.data?._id || editingSubservice._id;
-        toast.success(`'${payload.title}' updated successfully!`);
-      } else {
-        const res = await createCustomServiceMutation.mutateAsync(payload);
-        savedRecordId = res?.data?._id;
-        toast.success(
-          payload.status === "published"
-            ? `🚀 '${payload.title}' published Live!`
-            : `💾 '${payload.title}' saved to Drafts.`
-        );
-      }
-
-      // Linkage: Send broadcast notification if enabled and status is published
-      if (payload.status === "published") {
-        await sendIfEnabled({ serviceId: savedRecordId });
-      }
-
-      setShowSubserviceModal(false);
-      setPhotoFiles([]);
-      setIsUploadingR2(false);
-      refetchSubservices();
-    } catch (err) {
-      setIsUploadingR2(false);
-      toast.error(err?.response?.data?.message || err?.message || "Failed to save subservice");
-    }
-  };
-
-  const handleDeleteSubservice = async (id, title) => {
-    if (!window.confirm(`Delete subservice '${title}' permanently?`)) return;
-
-    try {
-      await deleteCustomServiceMutation.mutateAsync(id);
-      toast.success("Subservice deleted successfully");
-      refetchSubservices();
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to delete subservice");
-    }
-  };
-
-  const handleRemoveExistingPhoto = (index) => {
-    setExistingPhotos((prev) => prev.filter((_, i) => i !== index));
-  };
-
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* ──────────────────────────────────────────────────────────── */}
-      {/* TOP HEADER & ACTION BAR */}
-      {/* ──────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 sm:p-7 rounded-3xl text-white shadow-xl">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-indigo-300 text-xs font-bold uppercase tracking-wider">
-            <Layers size={14} />
-            <span>BuXplore Services & Subservices Hub</span>
+    <div className="space-y-6 pb-12 animate-in fade-in duration-150">
+      {/* ════════════════════════════════════════════════════════════
+          1. EXECUTIVE CATALOG OVERVIEW & STATISTICS HUB
+          ════════════════════════════════════════════════════════════ */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black">
+                <Layers size={22} />
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                  Services & Subservices Catalog
+                </h1>
+                <p className="text-xs text-slate-500 font-medium">
+                  Class architecture: Service Folders ➔ Subservice Categories (Classes) ➔ Blueprint Templates
+                </p>
+              </div>
+            </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-2.5">
-            {activeFolder ? (
-              <>
-                <button
-                  onClick={() => setSelectedFolderKey(null)}
-                  className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-                  title="Back to All Folders"
-                >
-                  <ArrowLeft size={18} />
-                </button>
-                <span>{activeFolder.name}</span>
-              </>
-            ) : (
-              "All Services & Category Folders"
-            )}
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-2xl">
-            {activeFolder
-              ? activeFolder.description
-              : "Organized by service folders. Create customizable subservice templates on the top bar and manage live or draft listings."}
-          </p>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              onClick={() => refetchTemplates()}
+              disabled={loadingTemplates}
+              className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+              title="Refresh Catalog Data"
+            >
+              <RefreshCw size={16} className={loadingTemplates ? "animate-spin text-indigo-600" : ""} />
+            </button>
+          </div>
         </div>
 
-        {/* Global Controls */}
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <button
-            onClick={() => setShowAdminGuide((prev) => !prev)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white backdrop-blur border border-white/10 transition cursor-pointer"
-          >
-            <HelpCircle size={13} className="text-indigo-300" />
-            <span>{showAdminGuide ? "Hide Guide" : "Admin Guide"}</span>
-          </button>
+        {/* 4 Key Stat Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="bg-slate-50/80 border border-slate-200/70 rounded-2xl p-4">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+              Service Domains
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-black text-slate-900">
+                {catalogStats.totalCategories}
+              </span>
+              <span className="text-xs font-semibold text-slate-500">Core Folders</span>
+            </div>
+          </div>
 
-          <button
-            onClick={handleSeedDefaults}
-            disabled={seedTemplatesMutation.isPending}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white backdrop-blur border border-white/10 transition cursor-pointer"
-            title="Seed built-in starter templates for cafe, hotel, vehicle, emergency"
-          >
-            {seedTemplatesMutation.isPending ? (
-              <Loader2 size={13} className="animate-spin" />
-            ) : (
-              <Sparkles size={13} className="text-amber-300" />
-            )}
-            <span>Seed Starter Templates</span>
-          </button>
+          <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-500 block mb-1">
+              Subservice Classes
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-black text-indigo-950">
+                {catalogStats.totalSubservicesAcross}
+              </span>
+              <span className="text-xs font-semibold text-indigo-600">Total Defined</span>
+            </div>
+          </div>
 
-          <button
-            onClick={() => handleOpenCreateTemplate(selectedFolderKey)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-500 hover:bg-indigo-600 text-white shadow-md shadow-indigo-500/30 transition cursor-pointer"
-          >
-            <Plus size={14} />
-            <span>Create Template</span>
-          </button>
+          <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-4">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 block mb-1">
+              Live Subservices
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-black text-emerald-950">
+                {catalogStats.liveTemplates}
+              </span>
+              <span className="text-xs font-semibold text-emerald-600">Active & Published</span>
+            </div>
+          </div>
 
-          <button
-            onClick={() => handleOpenAddSubservice()}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black bg-white hover:bg-slate-100 text-slate-900 shadow-md transition cursor-pointer"
-          >
-            <Plus size={14} />
-            <span>Add Subservice</span>
-          </button>
+          <div className="bg-amber-50/60 border border-amber-100 rounded-2xl p-4">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 block mb-1">
+              Draft / Private
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-black text-amber-950">
+                {catalogStats.draftTemplates}
+              </span>
+              <span className="text-xs font-semibold text-amber-600">Draft Schemas</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Category Pill Quick Selectors */}
+        <div className="pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <button
+              onClick={() => setSelectedCategoryKey(null)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                selectedCategoryKey === null
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <Folder size={13} />
+              <span>All 7 Folders</span>
+            </button>
+
+            {SERVICE_CATEGORIES.map((cat) => {
+              const Icon = cat.icon;
+              const isSelected = selectedCategoryKey === cat.key;
+              const count = catalogStats.byCategory[cat.key]?.subservicesCount || 0;
+              return (
+                <button
+                  key={cat.key}
+                  onClick={() => setSelectedCategoryKey(cat.key)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                    isSelected
+                      ? "bg-indigo-600 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  <Icon size={13} />
+                  <span>{cat.name}</span>
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                      isSelected ? "bg-white/20 text-white" : "bg-white text-slate-700"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* ──────────────────────────────────────────────────────────── */}
-      {/* ADMIN QUICK GUIDE (HOW TO USE ALL OF THIS) */}
-      {/* ──────────────────────────────────────────────────────────── */}
-      {showAdminGuide && (
-        <div className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 rounded-3xl border border-indigo-100/80 p-5 sm:p-6 shadow-xs relative">
-          <button
-            onClick={() => setShowAdminGuide(false)}
-            className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
-            title="Dismiss Guide"
-          >
-            <X size={16} />
-          </button>
-
-          <div className="flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold flex-shrink-0 shadow-md shadow-indigo-500/20">
-              <Info size={20} />
-            </div>
-            <div className="space-y-2 flex-1">
-              <div>
-                <h3 className="text-sm font-black text-slate-900">
-                  Admin Quick Guide: How to Use Services & Subservices
-                </h3>
-                <p className="text-xs text-slate-500">
-                  A simple reference designed for non-tech admins to manage custom services without touching code.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2">
-                <div className="bg-white/80 p-3 rounded-2xl border border-indigo-100/70 shadow-xs space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-black text-indigo-900">
-                    <Folder size={14} className="text-indigo-600" />
-                    <span>1. Category Folders</span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 leading-relaxed">
-                    Click any service folder (Hotels, Restaurants, Vehicles, Emergency, etc.). Surprise Events is kept completely separate in the sidebar because it showcases occasional regional happenings rather than subservices.
-                  </p>
-                </div>
-
-                <div className="bg-white/80 p-3 rounded-2xl border border-indigo-100/70 shadow-xs space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-black text-indigo-900">
-                    <Edit size={14} className="text-indigo-600" />
-                    <span>2. Editable Templates</span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 leading-relaxed">
-                    The top bar in each folder shows templates. You can rename base template names freely and add/remove schema fields (timings, amenities, tags).
-                  </p>
-                </div>
-
-                <div className="bg-white/80 p-3 rounded-2xl border border-indigo-100/70 shadow-xs space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-black text-indigo-900">
-                    <CheckCircle size={14} className="text-emerald-600" />
-                    <span>3. Live vs Drafts</span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 leading-relaxed">
-                    Subservices are divided into 🟢 Live and 🟡 Drafts. You can prepare listings in draft mode and publish them to live with 1 click anytime!
-                  </p>
-                </div>
-
-                <div className="bg-white/80 p-3 rounded-2xl border border-indigo-100/70 shadow-xs space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-black text-indigo-900">
-                    <Sparkles size={14} className="text-amber-500" />
-                    <span>4. Prebuilt Starter Sets</span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 leading-relaxed">
-                    Every service category comes with ready-to-use prebuilt blueprints so you never have to guess what fields are needed.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ──────────────────────────────────────────────────────────── */}
-      {/* ROOT VIEW: 8 CATEGORY FOLDERS GRID */}
-      {/* ──────────────────────────────────────────────────────────── */}
-      {!selectedFolderKey ? (
+      {/* ════════════════════════════════════════════════════════════
+          VIEW A: ALL 7 FOLDERS DIRECTORY
+          ════════════════════════════════════════════════════════════ */}
+      {selectedCategoryKey === null ? (
         <div className="space-y-6">
-          {/* Summary Metric Ribbon */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                <Folder size={20} />
-              </div>
-              <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Service Folders</p>
-                <p className="text-lg font-black text-slate-900">{SERVICE_CATEGORIES.length}</p>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-                <Layers size={20} />
-              </div>
-              <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Configured Templates</p>
-                <p className="text-lg font-black text-slate-900">{allTemplates.length}</p>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                <CheckCircle size={20} />
-              </div>
-              <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Live Subservices</p>
-                <p className="text-lg font-black text-emerald-600">
-                  {allSubservices.filter((s) => s.status === "published").length}
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                <Clock size={20} />
-              </div>
-              <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Drafts (Unpublished)</p>
-                <p className="text-lg font-black text-amber-600">
-                  {allSubservices.filter((s) => s.status === "draft").length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Surprise Events Standalone Domain Spotlight */}
-          <div className="bg-gradient-to-r from-pink-50 via-purple-50 to-indigo-50 border border-pink-200/80 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          {/* Regional Happenings / Surprise Events Spotlight */}
+          <div className="bg-gradient-to-r from-purple-50 via-pink-50 to-indigo-50 border border-purple-200/80 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 text-white flex items-center justify-center font-bold shadow-md shadow-pink-500/20 flex-shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 text-white flex items-center justify-center font-bold shadow-md shadow-purple-500/20 shrink-0">
                 <Sparkles size={22} />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-sm sm:text-base font-black text-slate-900">
-                    Regional Surprise Events (Occasional Regional Happenings)
+                    Regional Surprise Events (Occasional Happenings)
                   </h3>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-pink-100 text-pink-700 border border-pink-200">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200">
                     Vast Regional Domain · Standalone Service
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-                  Surprise Events does not have subservices — it is an expansive service covering a vast domain of occasional regional happenings (festivals, cultural celebrations, pop-ups, laser shows, exhibitions & sporadic gatherings). Flexible key-value variables adapt to any event format.
+                  Surprise Events does not have subservices — it is an expansive service for occasional regional happenings across Bundelkhand (festivals, pop-ups, cultural nights, secret gigs). Managed independently in the sidebar with flexible key-value variables.
                 </p>
               </div>
             </div>
@@ -1097,101 +724,58 @@ const Services = () => {
               onClick={() => {
                 window.dispatchEvent(new CustomEvent("navigate-tab", { detail: "Surprise Events" }));
               }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-pink-500/20 transition cursor-pointer whitespace-nowrap self-start sm:self-auto"
+              className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-500/20 transition cursor-pointer whitespace-nowrap self-start sm:self-auto"
             >
               <Sparkles size={14} />
-              <span>Manage Regional Happenings</span>
+              <span>Open Surprise Events</span>
               <ArrowRight size={14} />
             </button>
           </div>
 
-          {/* Search Across All Folders */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-            <div className="relative flex-1 max-w-md">
-              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                value={globalSearch}
-                onChange={(e) => setGlobalSearch(e.target.value)}
-                placeholder="Search subservices or templates across all folders..."
-                className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-indigo-400 outline-none transition"
-              />
-              {globalSearch && (
-                <button
-                  onClick={() => setGlobalSearch("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X size={13} />
-                </button>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 text-xs text-slate-500 font-semibold">
-              <span>Click any folder below to manage templates & listings</span>
-            </div>
-          </div>
-
-          {/* 8 Folder Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          {/* 7 Core Service Folders Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {SERVICE_CATEGORIES.map((cat) => {
               const Icon = cat.icon;
-              const stats = categoryStats[cat.key] || {
-                templateCount: 0,
-                liveCount: 0,
-                draftCount: 0,
-                totalSubservices: 0,
-              };
-
+              const stats = catalogStats.byCategory[cat.key] || { subservicesCount: 0, liveCount: 0, draftCount: 0 };
               return (
                 <div
                   key={cat.key}
-                  onClick={() => {
-                    setSelectedFolderKey(cat.key);
-                    setFolderSubserviceTab("live");
-                  }}
-                  className="group bg-white rounded-3xl border border-slate-200/80 shadow-xs hover:shadow-xl hover:border-indigo-300 transition-all duration-200 p-5 flex flex-col justify-between cursor-pointer relative overflow-hidden"
+                  onClick={() => setSelectedCategoryKey(cat.key)}
+                  className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xs hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer flex flex-col justify-between group"
                 >
-                  {/* Top folder tab styling */}
-                  <div className={`h-1.5 w-20 rounded-full bg-gradient-to-r ${cat.gradient} mb-4`} />
-
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-800 group-hover:scale-105 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div
+                        className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${cat.gradient} text-white flex items-center justify-center font-bold shadow-md shadow-indigo-500/10 group-hover:scale-105 transition`}
+                      >
                         <Icon size={24} />
                       </div>
-                      <span className="p-1.5 rounded-xl bg-slate-50 text-slate-400 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition">
-                        <FolderOpen size={16} />
+                      <span className="px-3 py-1 rounded-full text-xs font-black bg-slate-100 text-slate-700 border border-slate-200">
+                        {stats.subservicesCount} Subservices
                       </span>
                     </div>
 
                     <div>
-                      <h3 className="font-black text-slate-900 text-base group-hover:text-indigo-600 transition">
+                      <h3 className="font-black text-slate-900 text-lg group-hover:text-indigo-600 transition">
                         {cat.name}
                       </h3>
-                      <p className="text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
                         {cat.description}
                       </p>
                     </div>
-
-                    {/* Folder Metrics Pills */}
-                    <div className="pt-2 border-t border-slate-100 flex items-center gap-2 flex-wrap">
-                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700">
-                        {stats.templateCount} Templates
-                      </span>
-                      <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                        {stats.liveCount} Live
-                      </span>
-                      {stats.draftCount > 0 && (
-                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
-                          {stats.draftCount} Drafts
-                        </span>
-                      )}
-                    </div>
                   </div>
 
-                  {/* Open Folder Footer */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-600 group-hover:text-indigo-600 transition">
-                    <span>Explore Folder</span>
-                    <ChevronRight size={15} className="group-hover:translate-x-1 transition" />
+                  <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[11px] font-bold">
+                      <span className="text-emerald-600">● {stats.liveCount} Live</span>
+                      <span className="text-slate-300">|</span>
+                      <span className="text-amber-600">● {stats.draftCount} Draft</span>
+                    </div>
+
+                    <div className="flex items-center gap-1 text-xs font-bold text-indigo-600 group-hover:translate-x-1 transition">
+                      <span>Open Folder</span>
+                      <ChevronRight size={14} />
+                    </div>
                   </div>
                 </div>
               );
@@ -1199,724 +783,375 @@ const Services = () => {
           </div>
         </div>
       ) : (
-        /* ──────────────────────────────────────────────────────────── */
-        /* INSIDE FOLDER VIEW: CATEGORY TEMPLATES & SUBSERVICES */
-        /* ──────────────────────────────────────────────────────────── */
-        <div className="space-y-8">
-          {/* Breadcrumb Navigation Bar */}
-          <div className="flex items-center justify-between bg-white px-5 py-3 rounded-2xl border border-slate-200/80 shadow-xs">
-            <div className="flex items-center gap-2 text-xs font-bold">
-              <button
-                onClick={() => setSelectedFolderKey(null)}
-                className="flex items-center gap-1.5 text-slate-500 hover:text-indigo-600 transition cursor-pointer"
-              >
-                <Folder size={14} />
-                <span>All Services</span>
-              </button>
-              <ChevronRight size={13} className="text-slate-300" />
-              <span className="text-indigo-600 flex items-center gap-1.5">
-                {React.createElement(activeFolder.icon, { size: 14 })}
-                {activeFolder.name}
-              </span>
+        /* ════════════════════════════════════════════════════════════
+            VIEW B: INSIDE A SELECTED FOLDER (SUBSERVICE CLASSES & TEMPLATES)
+            ════════════════════════════════════════════════════════════ */
+        <div className="space-y-6">
+          {/* Breadcrumb Navigation Header */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setSelectedCategoryKey(null)}
+                  className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                  title="Back to all folders"
+                >
+                  <ArrowLeft size={16} />
+                </button>
+
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
+                    <span>Services</span>
+                    <ChevronRight size={12} />
+                    <span className="text-indigo-600">{selectedCategory.name}</span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-0.5">
+                    {selectedCategory.name} Subservices
+                  </h2>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleOpenAddSubservice}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 transition cursor-pointer"
+                >
+                  <Plus size={16} />
+                  <span>Add Subservice Category</span>
+                </button>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  refetchTemplates();
-                  refetchSubservices();
-                }}
-                className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg transition cursor-pointer"
-                title="Refresh Folder"
-              >
-                <RefreshCw size={14} />
-              </button>
-              <button
-                onClick={() => setSelectedFolderKey(null)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
-              >
-                <ArrowLeft size={13} />
-                <span>Switch Folder</span>
-              </button>
+            {/* Explanation Note for Non-Tech Users */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 flex items-start gap-2.5 text-xs text-slate-600">
+              <Info size={16} className="text-indigo-600 shrink-0 mt-0.5" />
+              <p className="leading-relaxed">
+                <strong className="text-slate-800">Class Definition:</strong> Each card below is a <strong>Subservice Category (Class)</strong> under {selectedCategory.name}. Businesses/Listings created in the app inherit the blueprint template of their subservice. Subservice categories do not have owners or contact numbers.
+              </p>
+            </div>
+
+            {/* Filter Tabs & Search Bar */}
+            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+                <button
+                  onClick={() => setStatusFilter("all")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    statusFilter === "all" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  All ({currentCategorySubservices.length})
+                </button>
+                <button
+                  onClick={() => setStatusFilter("live")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    statusFilter === "live" ? "bg-emerald-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  🟢 Live Only
+                </button>
+                <button
+                  onClick={() => setStatusFilter("draft")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    statusFilter === "draft" ? "bg-amber-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  🟡 Drafts Only
+                </button>
+              </div>
+
+              <div className="relative flex-1 max-w-xs">
+                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search subservice or slug..."
+                  className="w-full pl-9 pr-3.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 outline-hidden transition"
+                />
+              </div>
             </div>
           </div>
 
-          {/* ══════════════════════════════════════════════════════════ */}
-          {/* TOP BAR: TEMPLATE CREATION & CONFIGURATION */}
-          {/* ══════════════════════════════════════════════════════════ */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" />
-                  <h2 className="text-base font-black text-slate-900">
-                    Templates for {activeFolder.name}
-                  </h2>
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
-                    {folderTemplates.length} configured
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Blueprints defining schema fields (amenities, opening hours, etc.). You can rename templates anytime!
-                </p>
+          {/* Subservices Grid */}
+          {currentCategorySubservices.length === 0 ? (
+            <div className="py-20 text-center bg-white rounded-3xl border border-dashed border-slate-200 p-6 space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                <Layers size={22} />
               </div>
-
-              <button
-                onClick={() => handleOpenCreateTemplate(activeFolder.key)}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition cursor-pointer self-start sm:self-auto"
-              >
-                <Plus size={14} />
-                <span>Create New Template</span>
-              </button>
+              <h4 className="text-sm font-bold text-slate-700">No subservices found</h4>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                Click "Add Subservice Category" to create a new category class for {selectedCategory.name}.
+              </p>
             </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {currentCategorySubservices.map((subservice) => {
+                const hasTemplate = !!subservice.template;
+                const fieldCount = subservice.template?.fields?.length || 0;
+                const templateName = subservice.template?.templateName || `${subservice.name} Blueprint`;
 
-            {/* Configured Custom Templates */}
-            {folderTemplates.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-xs font-black text-slate-700 uppercase tracking-wider">
-                  <BookmarkCheck size={14} className="text-indigo-600" />
-                  <span>Your Active Templates in this Folder ({folderTemplates.length})</span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {folderTemplates.map((tpl) => (
-                    <div
-                      key={tpl._id}
-                      className="bg-slate-50/80 hover:bg-white rounded-2xl border border-slate-200/90 p-4 transition-all hover:shadow-md flex flex-col justify-between"
-                    >
-                      <div className="space-y-2.5">
-                        <div className="flex items-start justify-between">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-800 border border-indigo-200">
-                            {tpl.subService}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            {/* EDIT TEMPLATE BUTTON (BASE TEMPLATE NAME IS EDITABLE!) */}
-                            <button
-                              onClick={() => handleOpenEditTemplate(tpl)}
-                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition cursor-pointer"
-                              title="Edit Template & Rename"
-                            >
-                              <Edit size={14} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteTemplate(tpl._id, tpl.templateName)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                              title="Delete Template"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </div>
-
+                return (
+                  <div
+                    key={subservice.slug}
+                    className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs hover:shadow-md transition flex flex-col justify-between space-y-4"
+                  >
+                    <div className="space-y-3">
+                      {/* Card Header: Name + Relatable Slug + Status Badge */}
+                      <div className="flex items-start justify-between gap-2">
                         <div>
-                          {/* Base Template Name */}
-                          <h4 className="font-black text-slate-900 text-sm">{tpl.templateName}</h4>
-                          <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
-                            {tpl.description || "Reusable subservice blueprint"}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h3 className="font-black text-slate-900 text-base leading-snug">
+                              {subservice.name}
+                            </h3>
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                              slug: {subservice.slug}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                            {subservice.description || "Subservice class category"}
                           </p>
                         </div>
 
-                        {/* Fields Preview */}
-                        <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                          <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            <span>Configured Fields ({tpl.fields?.length || 0})</span>
-                          </div>
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {(tpl.fields || []).slice(0, 4).map((f) => (
-                              <span
-                                key={f.fieldKey}
-                                className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-50 text-slate-700 border border-slate-200"
-                              >
-                                {f.label}
-                              </span>
-                            ))}
-                            {(tpl.fields?.length || 0) > 4 && (
-                              <span className="text-[10px] font-bold text-slate-400">
-                                +{tpl.fields.length - 4} more
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-3 mt-3 border-t border-slate-200/60 flex items-center justify-between">
-                        <button
-                          onClick={() => handleOpenAddSubservice(tpl)}
-                          className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition cursor-pointer"
-                        >
-                          <Plus size={13} />
-                          <span>Use This Template</span>
-                        </button>
-                        <button
-                          onClick={() => handleOpenEditTemplate(tpl)}
-                          className="text-[11px] font-bold text-slate-500 hover:text-slate-800 underline decoration-slate-300 cursor-pointer"
-                        >
-                          Rename / Fields
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ── PREBUILT BLUEPRINTS SECTION (READY FOR EVERY SERVICE CATEGORY) ── */}
-            <div className="pt-2 border-t border-slate-100 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-black text-slate-800 uppercase tracking-wider">
-                  <Sparkles size={14} className="text-amber-500" />
-                  <span>Ready-to-Use Prebuilt Templates for {activeFolder.name}</span>
-                </div>
-                <span className="text-[11px] text-slate-400 font-semibold hidden sm:inline">
-                  Click 'Save to My Templates' or 'Use Blueprint' to instantly create subservices
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {prebuiltStarterTemplates.map((prebuilt, pbIdx) => (
-                  <div
-                    key={pbIdx}
-                    className="p-4 bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/30 rounded-2xl border border-indigo-100/90 shadow-2xs flex flex-col justify-between"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
-                            ⚡
+                        {subservice.isActive ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                            🟢 Live
                           </span>
-                          <span className="font-black text-slate-900 text-xs sm:text-sm">
-                            {prebuilt.templateName}
-                          </span>
-                        </div>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-100 text-slate-600">
-                          {prebuilt.subService}
-                        </span>
-                      </div>
-
-                      <p className="text-[11px] text-slate-500 leading-relaxed">
-                        {prebuilt.description}
-                      </p>
-
-                      <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                        {prebuilt.fields.slice(0, 4).map((f) => (
-                          <span
-                            key={f.fieldKey}
-                            className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-white text-indigo-900 border border-indigo-100"
-                          >
-                            {f.label}
-                          </span>
-                        ))}
-                        {prebuilt.fields.length > 4 && (
-                          <span className="text-[10px] font-bold text-slate-400">
-                            +{prebuilt.fields.length - 4} more
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-100 text-amber-700 border border-amber-200 whitespace-nowrap">
+                            🟡 Draft
                           </span>
                         )}
                       </div>
-                    </div>
 
-                    <div className="pt-3 mt-3 border-t border-indigo-100/60 flex items-center justify-between gap-2">
-                      <button
-                        onClick={() => handleOpenAddSubservice(prebuilt)}
-                        className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition cursor-pointer"
-                      >
-                        <Plus size={13} />
-                        <span>Use Blueprint</span>
-                      </button>
+                      {/* Blueprint Template Card Section */}
+                      <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                            <FileText size={12} className="text-indigo-600" />
+                            Blueprint Schema
+                          </span>
+                          {hasTemplate ? (
+                            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                              {fieldCount} Schema Field{fieldCount !== 1 ? "s" : ""}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                              Starter Blueprint Ready
+                            </span>
+                          )}
+                        </div>
 
-                      <div className="flex items-center gap-2">
+                        <div>
+                          <p className="text-xs font-black text-slate-800 truncate">
+                            Template: {templateName}
+                          </p>
+                          <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                            {hasTemplate
+                              ? `Defines custom attributes for ${subservice.name} businesses`
+                              : "Click configure to review and customize fields schema"}
+                          </p>
+                        </div>
+
                         <button
-                          onClick={() => handleOpenCreateTemplate(activeFolder.key, prebuilt)}
-                          className="text-[11px] font-bold text-slate-500 hover:text-slate-800 transition cursor-pointer"
-                          title="Customize fields before saving"
+                          type="button"
+                          onClick={() => handleOpenConfigureTemplate(subservice)}
+                          className="w-full mt-1 py-2 px-3 bg-indigo-50 hover:bg-indigo-100 active:scale-98 text-indigo-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
                         >
-                          Customize & Rename
-                        </button>
-                        <button
-                          onClick={() => handleSavePrebuiltTemplate(prebuilt)}
-                          className="px-2.5 py-1 bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition cursor-pointer shadow-2xs"
-                        >
-                          Save to My Templates
+                          <SlidersHorizontal size={13} />
+                          <span>{hasTemplate ? "Edit Blueprint Template" : "Configure Blueprint Template"}</span>
                         </button>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
 
-          {/* ══════════════════════════════════════════════════════════ */}
-          {/* MAIN SECTION: LIVE & DRAFT SUBSERVICES */}
-          {/* ══════════════════════════════════════════════════════════ */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 space-y-5">
-            {/* Subservices Section Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-              <div>
-                <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
-                  <span>Subservices in {activeFolder.name}</span>
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Manage active listings for users or draft listings being prepared.
-                </p>
-              </div>
-
-              {/* Add Subservice Action */}
-              <button
-                onClick={() => handleOpenAddSubservice()}
-                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 transition cursor-pointer self-start sm:self-auto"
-              >
-                <Plus size={14} />
-                <span>Add New Subservice</span>
-              </button>
-            </div>
-
-            {/* Filter Bar: Live vs Draft Tabs + Search */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              {/* Tabs: Live vs Draft */}
-              <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl w-fit">
-                <button
-                  onClick={() => setFolderSubserviceTab("live")}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                    folderSubserviceTab === "live"
-                      ? "bg-white text-emerald-700 shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span>Live Subservices</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 font-black">
-                    {folderSubservices.live.length}
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => setFolderSubserviceTab("draft")}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                    folderSubserviceTab === "draft"
-                      ? "bg-white text-amber-700 shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span>Drafts (Unpublished)</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-50 text-amber-700 font-black">
-                    {folderSubservices.drafts.length}
-                  </span>
-                </button>
-              </div>
-
-              {/* Search Within this folder */}
-              <div className="relative w-full sm:w-64">
-                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={subserviceSearch}
-                  onChange={(e) => setSubserviceSearch(e.target.value)}
-                  placeholder={`Search ${activeFolder.singular.toLowerCase()}...`}
-                  className="w-full pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-indigo-400 outline-none transition"
-                />
-                {subserviceSearch && (
-                  <button
-                    onClick={() => setSubserviceSearch("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Subservices Grid */}
-            {isSubservicesLoading ? (
-              <div className="py-20 flex justify-center text-slate-400">
-                <Loader2 size={32} className="animate-spin text-indigo-500" />
-              </div>
-            ) : (
-              (() => {
-                const list =
-                  folderSubserviceTab === "live"
-                    ? folderSubservices.live
-                    : folderSubservices.drafts;
-
-                if (list.length === 0) {
-                  return (
-                    <div className="py-16 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200 p-8">
-                      <Sparkles size={36} className="mx-auto mb-2 text-slate-300" />
-                      <h3 className="text-sm font-bold text-slate-700">
-                        {folderSubserviceTab === "live"
-                          ? `No live ${activeFolder.name.toLowerCase()} found`
-                          : `No drafts in ${activeFolder.name.toLowerCase()}`}
-                      </h3>
-                      <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-4">
-                        {folderSubserviceTab === "live"
-                          ? "Add a new subservice or publish one from your drafts section."
-                          : "Drafts will appear here when you save a subservice with Draft status."}
-                      </p>
+                    {/* Bottom Actions: Toggle Status, Edit, Delete */}
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                       <button
-                        onClick={() => handleOpenAddSubservice()}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-xs cursor-pointer"
+                        type="button"
+                        onClick={() => handleToggleSubserviceStatus(subservice)}
+                        className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                          subservice.isActive
+                            ? "bg-amber-50 hover:bg-amber-100 text-amber-700"
+                            : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
+                        }`}
                       >
-                        Add {activeFolder.singular}
+                        <CheckCircle size={13} />
+                        <span>{subservice.isActive ? "Move to Draft" : "Publish to Live"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditSubservice(subservice)}
+                        className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                        title="Edit subservice class details"
+                      >
+                        <Edit size={14} />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSubservice(subservice)}
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
+                        title="Delete template"
+                      >
+                        <Trash2 size={14} />
                       </button>
                     </div>
-                  );
-                }
-
-                return (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {list.map((item) => {
-                      const photoUrl =
-                        item.photos?.[0]?.url || item.photos?.[0] || "";
-                      const customEntries = Object.entries(item.customDetails || {});
-
-                      return (
-                        <div
-                          key={item._id}
-                          className="bg-white rounded-3xl border border-slate-200/90 shadow-xs hover:shadow-lg transition-all overflow-hidden flex flex-col justify-between"
-                        >
-                          <div>
-                            {/* Card Media Header */}
-                            <div className="h-44 bg-slate-900 relative overflow-hidden group">
-                              {photoUrl ? (
-                                <img
-                                  src={photoUrl}
-                                  alt={item.title}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 bg-slate-800">
-                                  {React.createElement(activeFolder.icon, {
-                                    size: 36,
-                                    className: "mb-1 text-slate-600",
-                                  })}
-                                  <span className="text-[10px] font-mono uppercase text-slate-400">
-                                    {item.subService}
-                                  </span>
-                                </div>
-                              )}
-
-                              {/* Badges Overlay */}
-                              <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-black/60 backdrop-blur text-white border border-white/20">
-                                  {item.subService}
-                                </span>
-                                <span
-                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                    item.status === "published"
-                                      ? "bg-emerald-500 text-white"
-                                      : "bg-amber-500 text-white"
-                                  }`}
-                                >
-                                  {item.status === "published" ? "Live" : "Draft"}
-                                </span>
-                              </div>
-
-                              {/* Views & Clicks overlay */}
-                              <div className="absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-black/50 backdrop-blur text-white text-[10px] font-mono flex items-center gap-2">
-                                <span className="flex items-center gap-1">
-                                  <Eye size={11} /> {item.views || 0}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <MousePointerClick size={11} /> {item.clicks || 0}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Card Content */}
-                            <div className="p-4 space-y-3">
-                              <div>
-                                <h3 className="font-black text-slate-900 text-base leading-snug line-clamp-1">
-                                  {item.title}
-                                </h3>
-                                <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
-                                  <MapPin size={12} className="text-slate-400 flex-shrink-0" />
-                                  <span className="truncate">
-                                    {item.location?.address || item.location?.city || "Jhansi"}
-                                  </span>
-                                </div>
-                                {item.contact?.phone && (
-                                  <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
-                                    <Phone size={12} className="text-slate-400 flex-shrink-0" />
-                                    <span>{item.contact.phone}</span>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Custom Attributes Preview */}
-                              {customEntries.length > 0 && (
-                                <div className="p-2.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
-                                  <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
-                                    Configured Attributes ({customEntries.length})
-                                  </span>
-                                  <div className="space-y-1 pt-0.5">
-                                    {customEntries.slice(0, 3).map(([k, v]) => (
-                                      <div key={k} className="flex justify-between text-[11px]">
-                                        <span className="text-slate-500 capitalize">
-                                          {k.replace(/([A-Z])/g, " $1")}:
-                                        </span>
-                                        <span className="font-bold text-slate-800 truncate max-w-[140px]">
-                                          {Array.isArray(v) ? v.join(", ") : String(v)}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Card Action Footer */}
-                          <div className="p-4 pt-0 border-t border-slate-100 flex items-center justify-between gap-2 mt-2">
-                            {/* 1-Click Status Toggle */}
-                            <button
-                              onClick={() => handleToggleSubserviceStatus(item)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                                item.status === "published"
-                                  ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200"
-                                  : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
-                              }`}
-                              title={
-                                item.status === "published"
-                                  ? "Move to Drafts (hide from live site)"
-                                  : "Publish to Live Site"
-                              }
-                            >
-                              {item.status === "published" ? (
-                                <>
-                                  <Clock size={12} />
-                                  <span>Move to Draft</span>
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle size={12} />
-                                  <span>Publish Live</span>
-                                </>
-                              )}
-                            </button>
-
-                            <div className="flex items-center gap-1">
-                              {/* Edit Subservice */}
-                              <button
-                                onClick={() => handleOpenEditSubservice(item)}
-                                className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition cursor-pointer"
-                                title="Edit Subservice Details"
-                              >
-                                <Edit size={15} />
-                              </button>
-
-                              {/* Delete Subservice */}
-                              <button
-                                onClick={() => handleDeleteSubservice(item._id, item.title)}
-                                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
-                                title="Delete Subservice"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
                   </div>
                 );
-              })()
-            )}
-          </div>
+              })}
+            </div>
+          )}
         </div>
       )}
 
-      {/* ──────────────────────────────────────────────────────────── */}
-      {/* MODAL 1: TEMPLATE CREATION / EDIT (BASE NAME IS EDITABLE!) */}
-      {/* ──────────────────────────────────────────────────────────── */}
-      {showTemplateModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl border border-slate-100">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      {/* ════════════════════════════════════════════════════════════
+          MODAL 1: CREATE / EDIT SUBSERVICE CATEGORY (CLASS DEFINITION ONLY)
+          (Zero contact info, zero email/phone, zero address, zero notifications)
+          ════════════════════════════════════════════════════════════ */}
+      {showSubserviceModal && selectedCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
               <div>
-                <h2 className="text-base font-black text-slate-900">
-                  {editingTemplate ? "Edit Subservice Template" : "Create New Subservice Template"}
-                </h2>
-                <p className="text-xs text-slate-500">
-                  {editingTemplate
-                    ? "Modify template name, subservice slug, or add/remove dynamic fields."
-                    : "Define a reusable blueprint for a specific subservice type."}
+                <h3 className="text-base font-black text-slate-900">
+                  {editingSubservice ? "Edit Subservice Category" : "Add Subservice Category"}
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Define a subservice class for <strong>{selectedCategory.name}</strong>
                 </p>
               </div>
               <button
-                onClick={() => setShowTemplateModal(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
+                onClick={() => setShowSubserviceModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSaveTemplate} className="p-6 overflow-y-auto space-y-4 flex-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* BASE TEMPLATE NAME (FULLY EDITABLE!) */}
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Template Name * <span className="text-slate-400 font-normal">(Editable)</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Specialty Cafe & Roastery, Luxury Heritage Resort"
-                    value={templateForm.templateName}
-                    onChange={(e) =>
-                      setTemplateForm({ ...templateForm, templateName: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white focus:border-indigo-500 outline-none transition"
-                  />
-                </div>
-
-                {/* Subservice Slug */}
+            <form onSubmit={handleSaveSubservice} className="p-6 space-y-4">
+              {/* Relatable Presets Picker (Click to auto-fill) */}
+              {!editingSubservice && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    SubService Slug * <span className="text-slate-400 font-normal">(e.g. cafe, pub, resort)</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. cafe, pub, resort, ambulance"
-                    value={templateForm.subService}
-                    onChange={(e) =>
-                      setTemplateForm({ ...templateForm, subService: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold focus:bg-white focus:border-indigo-500 outline-none transition"
-                  />
-                </div>
-
-                {/* Service Category */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Folder Category</label>
-                  <select
-                    value={templateForm.category}
-                    onChange={(e) =>
-                      setTemplateForm({ ...templateForm, category: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-indigo-500 outline-none transition cursor-pointer"
-                  >
-                    {SERVICE_CATEGORIES.map((c) => (
-                      <option key={c.key} value={c.key}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Description */}
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Template Description</label>
-                  <input
-                    type="text"
-                    placeholder="Brief note about what kind of subservices use this blueprint..."
-                    value={templateForm.description}
-                    onChange={(e) =>
-                      setTemplateForm({ ...templateForm, description: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-indigo-500 outline-none transition"
-                  />
-                </div>
-              </div>
-
-              {/* Dynamic Schema Fields Builder */}
-              <div className="pt-3 border-t border-slate-100">
-                <div className="flex items-center justify-between mb-2.5">
-                  <div>
-                    <span className="text-xs font-black uppercase text-slate-700 tracking-wider">
-                      Schema Custom Fields ({templateForm.fields.length})
-                    </span>
-                    <p className="text-[11px] text-slate-400">
-                      Fields that will appear when adding a subservice using this template
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddFieldToTemplate}
-                    className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold hover:bg-indigo-100 transition flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus size={13} />
-                    <span>Add Field</span>
-                  </button>
-                </div>
-
-                <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
-                  {templateForm.fields.map((f, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-2.5"
-                    >
-                      <input
-                        type="text"
-                        placeholder="fieldKey"
-                        value={f.fieldKey}
-                        onChange={(e) => {
-                          const updated = [...templateForm.fields];
-                          updated[idx].fieldKey = e.target.value;
-                          setTemplateForm({ ...templateForm, fields: updated });
-                        }}
-                        className="w-28 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold"
-                        title="Key name in JSON"
-                      />
-
-                      <input
-                        type="text"
-                        placeholder="Display Label (e.g. WiFi, Pool)"
-                        value={f.label}
-                        onChange={(e) => {
-                          const updated = [...templateForm.fields];
-                          updated[idx].label = e.target.value;
-                          setTemplateForm({ ...templateForm, fields: updated });
-                        }}
-                        className="flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold"
-                      />
-
-                      <select
-                        value={f.fieldType}
-                        onChange={(e) => {
-                          const updated = [...templateForm.fields];
-                          updated[idx].fieldType = e.target.value;
-                          setTemplateForm({ ...templateForm, fields: updated });
-                        }}
-                        className="px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
-                      >
-                        {FIELD_TYPES.map((ft) => (
-                          <option key={ft.id} value={ft.id}>
-                            {ft.label}
-                          </option>
-                        ))}
-                      </select>
-
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                    Relatable Presets for {selectedCategory.name} (Click to Fill):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(RELATABLE_SUBSERVICES_BY_CATEGORY[selectedCategoryKey] || []).map((preset) => (
                       <button
+                        key={preset.slug}
                         type="button"
-                        onClick={() => handleRemoveFieldFromTemplate(idx)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 transition cursor-pointer"
-                        title="Remove Field"
+                        onClick={() => handleSelectPresetChip(preset)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition border cursor-pointer ${
+                          subserviceForm.slug === preset.slug
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                            : "bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 border-indigo-200"
+                        }`}
                       >
-                        <Trash2 size={14} />
+                        + {preset.name}
                       </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
+              )}
+
+              {/* Subservice Title */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Subservice Category Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={subserviceForm.name}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSubserviceForm((prev) => ({
+                      ...prev,
+                      name: val,
+                      slug: prev.slug || val.toLowerCase().replace(/[\s.-]+/g, "_"),
+                    }));
+                  }}
+                  placeholder="e.g. Heritage Havelis & Palaces"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-hidden transition"
+                />
               </div>
 
-              {/* Action Buttons */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              {/* Relatable Slug */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Relatable Slug (Identifier) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={subserviceForm.slug}
+                  onChange={(e) =>
+                    setSubserviceForm({
+                      ...subserviceForm,
+                      slug: e.target.value.toLowerCase().replace(/[\s.-]+/g, "_"),
+                    })
+                  }
+                  placeholder="e.g. heritage_palace"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm font-mono font-bold text-indigo-700 border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 outline-hidden transition"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Must be relatable to {selectedCategory.name} (lowercase, underscores).
+                </p>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Subservice Description
+                </label>
+                <textarea
+                  rows={2}
+                  value={subserviceForm.description}
+                  onChange={(e) => setSubserviceForm({ ...subserviceForm, description: e.target.value })}
+                  placeholder="Brief explanation of what belongs to this category class..."
+                  className="w-full px-3.5 py-2 rounded-xl text-xs border border-slate-200 bg-white focus:border-indigo-500 outline-hidden transition resize-none"
+                />
+              </div>
+
+              {/* Status Switch */}
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">Publication Status</span>
+                  <span className="text-[11px] text-slate-400">
+                    {subserviceForm.isActive ? "🟢 Live & Visible to App" : "🟡 Draft (Hidden from App)"}
+                  </span>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setShowTemplateModal(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                  onClick={() => setSubserviceForm((prev) => ({ ...prev, isActive: !prev.isActive }))}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    subserviceForm.isActive ? "bg-emerald-600 text-white" : "bg-amber-600 text-white"
+                  }`}
+                >
+                  {subserviceForm.isActive ? "Live" : "Draft"}
+                </button>
+              </div>
+
+              {/* Form Buttons */}
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSubserviceModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSavingTemplate}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 transition cursor-pointer flex items-center gap-1.5"
+                  disabled={createTemplateMut.isPending || updateTemplateMut.isPending}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 transition cursor-pointer flex items-center gap-1.5"
                 >
-                  {isSavingTemplate && <Loader2 size={14} className="animate-spin" />}
-                  <span>{editingTemplate ? "Update Template" : "Save Template"}</span>
+                  {createTemplateMut.isPending || updateTemplateMut.isPending ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Check size={14} />
+                  )}
+                  <span>Save Subservice Category</span>
                 </button>
               </div>
             </form>
@@ -1924,368 +1159,217 @@ const Services = () => {
         </div>
       )}
 
-      {/* ──────────────────────────────────────────────────────────── */}
-      {/* MODAL 2: ADD / EDIT SUBSERVICE LISTING */}
-      {/* ──────────────────────────────────────────────────────────── */}
-      {showSubserviceModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl border border-slate-100">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <div>
-                <h2 className="text-base font-black text-slate-900">
-                  {editingSubservice ? "Edit Subservice Listing" : "Add New Subservice Listing"}
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Configure business details, select status (Live or Draft), and fill custom attributes.
-                </p>
+      {/* ════════════════════════════════════════════════════════════
+          MODAL 2: CONFIGURE BLUEPRINT TEMPLATE (FOR THAT SUBSERVICE ONLY)
+          (Shows template name clearly as Template on top, NOT business name)
+          ════════════════════════════════════════════════════════════ */}
+      {showTemplateModal && activeTemplateSubservice && selectedCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+            {/* Header: Displays Template Name Clearly as Template */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 border border-indigo-200">
+                    Template Blueprint
+                  </span>
+                  <span className="text-xs font-bold text-slate-400">
+                    Subservice: <strong>{activeTemplateSubservice.name}</strong> ({activeTemplateSubservice.slug})
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900">
+                  Template: {templateForm.templateName || "Untitled Blueprint"}
+                </h3>
               </div>
+
               <button
-                onClick={() => setShowSubserviceModal(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
+                onClick={() => setShowTemplateModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSaveSubservice} className="p-6 overflow-y-auto space-y-4 flex-1">
-              {/* Template Picker */}
-              <div className="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Scrollable Form Body */}
+            <form onSubmit={handleSaveTemplate} className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* Template Name & Description */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
                 <div>
-                  <p className="text-xs font-black text-indigo-950">Subservice Template Blueprint</p>
-                  <p className="text-[11px] text-indigo-700">
-                    Applying a template pre-configures category, subservice slug & dynamic attributes
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Template Blueprint Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={templateForm.templateName}
+                    onChange={(e) => setTemplateForm({ ...templateForm, templateName: e.target.value })}
+                    placeholder="e.g. Luxury Resort & Palace Blueprint"
+                    className="w-full px-3.5 py-2 rounded-xl text-sm font-semibold border border-slate-200 bg-white focus:border-indigo-500 outline-hidden transition"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Shown to admins as the blueprint schema for <strong>{activeTemplateSubservice.name}</strong>.
                   </p>
                 </div>
-                <select
-                  value={subserviceForm.templateId}
-                  onChange={(e) => handleSelectTemplateForSubservice(e.target.value)}
-                  className="px-3 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-indigo-900 outline-none cursor-pointer"
-                >
-                  <option value="">-- Choose Base Template (Optional) --</option>
-                  {allTemplates.map((t) => (
-                    <option key={t._id} value={t._id}>
-                      {t.templateName} ({t.subService})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Core Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Business / Place Title *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Roastery Coffee House, Jhansi Central Hospital"
-                    value={subserviceForm.title}
-                    onChange={(e) =>
-                      setSubserviceForm({ ...subserviceForm, title: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white focus:border-indigo-500 outline-none transition"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Category</label>
-                  <select
-                    value={subserviceForm.category}
-                    onChange={(e) =>
-                      setSubserviceForm({ ...subserviceForm, category: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:border-indigo-500 outline-none transition cursor-pointer"
-                  >
-                    {SERVICE_CATEGORIES.map((c) => (
-                      <option key={c.key} value={c.key}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    SubService Slug * <span className="text-slate-400 font-normal">(e.g. cafe, resort)</span>
+                    Blueprint Description
                   </label>
                   <input
                     type="text"
-                    required
-                    placeholder="e.g. cafe, pub, resort, rental"
-                    value={subserviceForm.subService}
-                    onChange={(e) =>
-                      setSubserviceForm({ ...subserviceForm, subService: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold focus:bg-white focus:border-indigo-500 outline-none transition"
-                  />
-                </div>
-
-                {/* Status: Live vs Draft */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Publication Status</label>
-                  <select
-                    value={subserviceForm.status}
-                    onChange={(e) =>
-                      setSubserviceForm({ ...subserviceForm, status: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white focus:border-indigo-500 outline-none transition cursor-pointer"
-                  >
-                    <option value="published">🟢 Published (Live on Site)</option>
-                    <option value="draft">🟡 Draft (Hidden / In-progress)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Contact Phone</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. +91 9876543210"
-                    value={subserviceForm.phone}
-                    onChange={(e) =>
-                      setSubserviceForm({ ...subserviceForm, phone: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-indigo-500 outline-none transition"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Contact Email</label>
-                  <input
-                    type="email"
-                    placeholder="e.g. contact@business.com"
-                    value={subserviceForm.email}
-                    onChange={(e) =>
-                      setSubserviceForm({ ...subserviceForm, email: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-indigo-500 outline-none transition"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">City</label>
-                  <input
-                    type="text"
-                    placeholder="Jhansi"
-                    value={subserviceForm.city}
-                    onChange={(e) =>
-                      setSubserviceForm({ ...subserviceForm, city: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-indigo-500 outline-none transition"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Full Address</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Near Fort Gate, Sadar Bazar, Jhansi"
-                    value={subserviceForm.address}
-                    onChange={(e) =>
-                      setSubserviceForm({ ...subserviceForm, address: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-indigo-500 outline-none transition"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Description</label>
-                  <textarea
-                    rows={2}
-                    placeholder="Short description highlighting what makes this service special..."
-                    value={subserviceForm.description}
-                    onChange={(e) =>
-                      setSubserviceForm({ ...subserviceForm, description: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-indigo-500 outline-none transition"
+                    value={templateForm.description}
+                    onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
+                    placeholder="e.g. Schema definition for 3-5 star luxury resort listings"
+                    className="w-full px-3.5 py-2 rounded-xl text-xs border border-slate-200 bg-white focus:border-indigo-500 outline-hidden transition"
                   />
                 </div>
               </div>
 
-              {/* Dynamic Custom Fields Section */}
-              <div className="pt-3 border-t border-slate-100">
-                <div className="flex items-center justify-between mb-2">
+              {/* Schema Fields Builder */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-xs font-black uppercase text-slate-700 tracking-wider">
-                      Custom Attributes & Schema Data ({customFieldsList.length})
-                    </span>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <SlidersHorizontal size={13} className="text-indigo-600" />
+                      Blueprint Fields ({templateForm.fields.length})
+                    </h4>
                     <p className="text-[11px] text-slate-400">
-                      Configured from template schema or added on-the-fly
+                      Attributes that businesses under this subservice class will possess.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleAddDynamicAttribute}
-                    className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus size={12} />
-                    <span>Add Custom Field</span>
-                  </button>
+
+                  <div className="flex items-center gap-1.5">
+                    {RECOMMENDED_BLUEPRINT_FIELDS[activeTemplateSubservice.slug] && (
+                      <button
+                        type="button"
+                        onClick={handleApplyRecommendedBlueprint}
+                        className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition cursor-pointer"
+                        title="Load recommended starter fields for this subservice"
+                      >
+                        Reset to Preset Fields
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleAddTemplateField}
+                      className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus size={13} />
+                      <span>Add Field</span>
+                    </button>
+                  </div>
                 </div>
 
-                {customFieldsList.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic py-2">
-                    No custom fields configured yet. Select a template above or click 'Add Custom Field'.
-                  </p>
+                {/* Fields List */}
+                {templateForm.fields.length === 0 ? (
+                  <div className="py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400">
+                    No fields defined yet. Click "Add Field" or "Reset to Preset Fields".
+                  </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-56 overflow-y-auto pr-1">
-                    {customFieldsList.map((item, idx) => (
+                  <div className="space-y-2.5">
+                    {templateForm.fields.map((field, idx) => (
                       <div
                         key={idx}
-                        className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5"
+                        className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-2"
                       >
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-slate-700 capitalize">
-                            {item.label}
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveDynamicAttribute(idx)}
-                            className="text-slate-400 hover:text-rose-600 transition cursor-pointer"
-                            title="Remove attribute"
-                          >
-                            <X size={13} />
-                          </button>
-                        </div>
-
-                        {item.type === "boolean" ? (
-                          <label className="flex items-center gap-2 cursor-pointer pt-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">
+                              Field Label
+                            </label>
                             <input
-                              type="checkbox"
-                              checked={Boolean(item.value)}
+                              type="text"
+                              required
+                              value={field.label}
                               onChange={(e) => {
-                                const updated = [...customFieldsList];
-                                updated[idx].value = e.target.checked;
-                                setCustomFieldsList(updated);
+                                const val = e.target.value;
+                                handleUpdateTemplateField(idx, "label", val);
+                                if (!field.fieldKey || field.fieldKey.startsWith("custom_field_")) {
+                                  handleUpdateTemplateField(idx, "fieldKey", val.toLowerCase().replace(/[\s.-]+/g, "_"));
+                                }
                               }}
-                              className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                              placeholder="e.g. Amenities"
+                              className="w-full px-2.5 py-1.5 text-xs font-bold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white outline-hidden"
                             />
-                            <span className="text-xs font-semibold text-slate-700">
-                              {item.value ? "Yes (Enabled)" : "No (Disabled)"}
-                            </span>
-                          </label>
-                        ) : item.type === "textarea" ? (
-                          <textarea
-                            rows={2}
-                            value={item.value || ""}
-                            onChange={(e) => {
-                              const updated = [...customFieldsList];
-                              updated[idx].value = e.target.value;
-                              setCustomFieldsList(updated);
-                            }}
-                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
-                          />
-                        ) : (
-                          <input
-                            type={item.type === "number" ? "number" : "text"}
-                            placeholder={
-                              item.type === "multiselect"
-                                ? "Comma-separated (e.g. WiFi, AC, Parking)"
-                                : `Enter ${item.label}...`
-                            }
-                            value={item.value || ""}
-                            onChange={(e) => {
-                              const updated = [...customFieldsList];
-                              updated[idx].value = e.target.value;
-                              setCustomFieldsList(updated);
-                            }}
-                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
-                          />
-                        )}
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">
+                              Field Key (Slug)
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={field.fieldKey}
+                              onChange={(e) =>
+                                handleUpdateTemplateField(
+                                  idx,
+                                  "fieldKey",
+                                  e.target.value.toLowerCase().replace(/[\s.-]+/g, "_")
+                                )
+                              }
+                              placeholder="e.g. amenities"
+                              className="w-full px-2.5 py-1.5 text-xs font-mono font-bold text-indigo-700 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white outline-hidden"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <div className="flex-1">
+                              <label className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">
+                                Type
+                              </label>
+                              <select
+                                value={field.fieldType}
+                                onChange={(e) => handleUpdateTemplateField(idx, "fieldType", e.target.value)}
+                                className="w-full px-2.5 py-1.5 text-xs font-bold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white outline-hidden"
+                              >
+                                <option value="text">Text</option>
+                                <option value="number">Number</option>
+                                <option value="boolean">Yes / No (Boolean)</option>
+                                <option value="multiselect">Multi-Select List</option>
+                                <option value="select">Dropdown Select</option>
+                                <option value="tags">Tags</option>
+                                <option value="textarea">Long Text</option>
+                              </select>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTemplateField(idx)}
+                              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition self-end cursor-pointer"
+                              title="Delete field"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Photos & Media Upload Section */}
-              <div className="pt-3 border-t border-slate-100">
-                <label className="block text-xs font-black uppercase text-slate-700 tracking-wider mb-1.5">
-                  Photos & Media Upload (Direct to Cloudflare R2)
-                </label>
-
-                {/* Existing Photos Thumbnails */}
-                {existingPhotos.length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap mb-3">
-                    {existingPhotos.map((p, pIdx) => {
-                      const url = typeof p === "string" ? p : p?.url || "";
-                      return (
-                        <div
-                          key={pIdx}
-                          className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 group"
-                        >
-                          <img src={url} alt="Photo" className="w-full h-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveExistingPhoto(pIdx)}
-                            className="absolute top-1 right-1 p-0.5 rounded-full bg-black/60 text-white hover:bg-rose-600 transition cursor-pointer"
-                            title="Remove photo"
-                          >
-                            <X size={11} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* File Drop Area */}
-                <div className="p-4 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/70 text-center hover:bg-indigo-50/20 hover:border-indigo-300 transition cursor-pointer relative">
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={(e) => setPhotoFiles(Array.from(e.target.files || []))}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                  <UploadCloud size={24} className="mx-auto text-slate-400 mb-1" />
-                  <p className="text-xs font-bold text-slate-700">
-                    {photoFiles.length > 0
-                      ? `${photoFiles.length} new photos selected for R2 upload`
-                      : "Drag & drop photos or click to browse"}
-                  </p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    Images will upload directly to R2 with lightning speed
-                  </p>
-                </div>
-              </div>
-
-              {/* Push Notification Linkage Section */}
-              {subserviceForm.status === "published" && (
-                <div className="pt-3 border-t border-slate-100">
-                  <NotificationDraftSection
-                    entityName={subserviceForm.title}
-                    serviceType={notifServiceType}
-                    value={notif}
-                    onChange={setNotif}
-                  />
-                </div>
-              )}
-
-              {/* Save / Cancel Action Bar */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              {/* Form Buttons */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setShowSubserviceModal(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                  onClick={() => setShowTemplateModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSavingSubservice}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 transition cursor-pointer flex items-center gap-1.5"
+                  disabled={createTemplateMut.isPending || updateTemplateMut.isPending}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 transition cursor-pointer flex items-center gap-1.5"
                 >
-                  {isSavingSubservice && <Loader2 size={14} className="animate-spin" />}
-                  <span>
-                    {editingSubservice
-                      ? "Update Subservice"
-                      : subserviceForm.status === "published"
-                      ? "Publish Live"
-                      : "Save to Drafts"}
-                  </span>
+                  {createTemplateMut.isPending || updateTemplateMut.isPending ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Check size={14} />
+                  )}
+                  <span>Save Blueprint Template</span>
                 </button>
               </div>
             </form>
@@ -2296,4 +1380,4 @@ const Services = () => {
   );
 };
 
-export default Services;
+export default ServicesPage;
