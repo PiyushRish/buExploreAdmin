@@ -5,7 +5,7 @@ import {
   Compass, ShoppingBag, Search, CheckCircle, RefreshCw, AlertCircle,
   SlidersHorizontal, Info, Eye, BookmarkCheck, ArrowRight, ShieldCheck,
   FileText, MapPin, Phone, Mail, Globe, ExternalLink, RotateCcw, AlertTriangle,
-  UploadCloud, Tag
+  UploadCloud, Tag, Lock, Unlock
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -462,6 +462,38 @@ const ServicesPage = () => {
     }
   };
 
+  // 1-Click Subservice Offline (Private) <-> Live Toggle
+  const handleToggleSubserviceStatus = async (subservice, e) => {
+    e?.stopPropagation();
+    const newActive = !subservice.isActive;
+    const statusText = newActive ? "Live (Public on Mobile App)" : "Private / Offline (Hidden from Users)";
+    try {
+      if (subservice.template?._id) {
+        await updateTemplateMut.mutateAsync({
+          id: subservice.template._id,
+          data: { isActive: newActive },
+        });
+      } else {
+        const defaultFields = RECOMMENDED_BLUEPRINT_FIELDS[subservice.slug] || [
+          { fieldKey: "amenities", label: "Special Features / Amenities", fieldType: "tags", defaultValue: [] },
+          { fieldKey: "starting_price", label: "Starting Price (₹)", fieldType: "number", defaultValue: 1000 },
+        ];
+        await createTemplateMut.mutateAsync({
+          templateName: `${subservice.name} Blueprint`,
+          category: selectedCategoryKey,
+          subService: subservice.slug,
+          description: subservice.description,
+          fields: defaultFields,
+          isActive: newActive,
+        });
+      }
+      toast.success(`Subservice "${subservice.name}" is now ${statusText}!`);
+      refetchTemplates();
+    } catch (err) {
+      toast.error("Failed to update subservice status");
+    }
+  };
+
   /* ─── LEVEL 3: TEMPLATE BLUEPRINT CONFIGURATION (FOR THIS SUBSERVICE ONLY) ─── */
   const handleOpenConfigureTemplate = () => {
     if (!currentSubservice) return;
@@ -564,6 +596,8 @@ const ServicesPage = () => {
   };
 
   const handleOpenEditObject = (obj) => {
+    // Dismiss details modal so the edit modal opens cleanly in front and is never trapped behind
+    setSelectedObjectForDetails(null);
     setEditingObject(obj);
     setObjectForm({
       title: obj.title || "",
@@ -583,6 +617,26 @@ const ServicesPage = () => {
       status: obj.status || "published",
     });
     setShowObjectModal(true);
+  };
+
+  // 1-Click Take Offline (Set to Private) <-> Go Live (Publish) Toggle
+  const handleToggleObjectStatus = async (obj, e) => {
+    e?.stopPropagation();
+    const newStatus = obj.status === "published" ? "draft" : "published";
+    const statusText = newStatus === "published" ? "Live / Published" : "Private / Offline (Hidden from Users)";
+    try {
+      await updateCustomServiceMut.mutateAsync({
+        id: obj._id,
+        data: { status: newStatus },
+      });
+      toast.success(`"${obj.title}" is now ${statusText}!`);
+      if (selectedObjectForDetails?._id === obj._id) {
+        setSelectedObjectForDetails((prev) => (prev ? { ...prev, status: newStatus } : null));
+      }
+      refetchCustomServices();
+    } catch (err) {
+      toast.error("Failed to update status");
+    }
   };
 
   const handleSaveObject = async (e) => {
@@ -957,15 +1011,29 @@ const ServicesPage = () => {
                         </p>
                       </div>
 
-                      {subservice.isActive ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-700">
-                          🟢 Live
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-700">
-                          🟡 Draft
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {subservice.isActive ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-700">
+                            🟢 Live
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-700">
+                            🔒 Private
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleSubserviceStatus(subservice, e)}
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition cursor-pointer ${
+                            subservice.isActive
+                              ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200"
+                              : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
+                          }`}
+                          title={subservice.isActive ? "Take offline / set to private (hide from mobile app users)" : "Publish live to mobile app"}
+                        >
+                          {subservice.isActive ? "🔒 Set Private" : "🟢 Set Live"}
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -978,7 +1046,7 @@ const ServicesPage = () => {
                       <button
                         type="button"
                         onClick={(e) => handleOpenEditSubservice(subservice, e)}
-                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition"
+                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer"
                         title="Edit Subservice Category"
                       >
                         <Edit size={14} />
@@ -1030,9 +1098,52 @@ const ServicesPage = () => {
                     <ChevronRight size={12} />
                     <span className="text-indigo-600">{currentSubservice?.name}</span>
                   </div>
-                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-0.5">
-                    {currentSubservice?.name}
-                  </h2>
+                  <div className="flex items-center gap-2.5 mt-0.5 flex-wrap">
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                      {currentSubservice?.name}
+                    </h2>
+                    {currentSubservice?.isActive ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-700 flex items-center gap-1 border border-emerald-200">
+                        🟢 Live
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-700 flex items-center gap-1 border border-amber-200">
+                        🔒 Private / Offline
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleSubserviceStatus(currentSubservice, e)}
+                      className={`px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                        currentSubservice?.isActive
+                          ? "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
+                          : "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200"
+                      }`}
+                      title={currentSubservice?.isActive ? "Take subservice offline (hide from mobile app users)" : "Publish subservice live to mobile app"}
+                    >
+                      {currentSubservice?.isActive ? (
+                        <>
+                          <Lock size={12} />
+                          <span>Take Subservice Offline (Private)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Unlock size={12} />
+                          <span>Publish Subservice Live</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => handleOpenEditSubservice(currentSubservice, e)}
+                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                      title="Edit Subservice Details"
+                    >
+                      <Edit size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1182,10 +1293,24 @@ const ServicesPage = () => {
                             <AlertTriangle size={10} /> Trash
                           </span>
                         ) : (
-                          <span className="px-2.5 py-1 bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-extrabold rounded-full uppercase">
-                            Draft
+                          <span className="px-2.5 py-1 bg-amber-900/80 backdrop-blur-xs text-white text-[10px] font-extrabold rounded-full uppercase flex items-center gap-1">
+                            <Lock size={10} /> Private
                           </span>
                         )}
+                      </div>
+
+                      <div className="absolute top-3 right-3 flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditObject(obj);
+                          }}
+                          className="p-1.5 bg-white/90 hover:bg-white text-slate-700 rounded-xl shadow-xs transition backdrop-blur-xs cursor-pointer"
+                          title="Edit Object"
+                        >
+                          <Edit size={13} />
+                        </button>
                       </div>
                     </div>
 
@@ -1231,18 +1356,53 @@ const ServicesPage = () => {
                     </div>
                   </div>
 
-                  <div className="p-4 pt-0">
+                  <div className="p-4 pt-0 flex items-center gap-2">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedObjectForDetails(obj);
                       }}
-                      className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
+                      className="flex-1 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Eye size={13} />
-                      <span>View Object Details</span>
+                      <span>Details</span>
                     </button>
+
+                    {obj.status === "published" ? (
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleObjectStatus(obj, e)}
+                        className="py-2 px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0"
+                        title="Take offline / set to private (hide from mobile app users while fixing issues)"
+                      >
+                        <Lock size={12} />
+                        <span>Take Offline</span>
+                      </button>
+                    ) : obj.status === "draft" ? (
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleObjectStatus(obj, e)}
+                        className="py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-xs shrink-0"
+                        title="Publish live to mobile app users"
+                      >
+                        <Unlock size={12} />
+                        <span>Go Live</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRestoreObject(obj);
+                        }}
+                        className="py-2 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0"
+                        title="Restore to live"
+                      >
+                        <RotateCcw size={12} />
+                        <span>Restore</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1256,7 +1416,7 @@ const ServicesPage = () => {
           (Zero contact info, zero email/phone, zero address, zero notifications)
           ════════════════════════════════════════════════════════════ */}
       {showSubserviceModal && selectedCategory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
               <div>
@@ -1402,7 +1562,7 @@ const ServicesPage = () => {
           (Shows template name clearly as Template on top, NOT business name)
           ════════════════════════════════════════════════════════════ */}
       {showTemplateModal && currentSubservice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
               <div className="space-y-0.5">
@@ -1602,7 +1762,7 @@ const ServicesPage = () => {
           MODAL C: CREATE / EDIT OBJECT (LISTING INSTANCE FROM TEMPLATE)
           ════════════════════════════════════════════════════════════ */}
       {showObjectModal && currentSubservice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
               <div>
@@ -1625,37 +1785,93 @@ const ServicesPage = () => {
               {isSubmittingObject && <UploadProgressBar isUploading={isSubmittingObject} className="mb-4" />}
 
               {/* 1. Basic Info */}
-              <div className="bg-slate-50/70 border border-slate-200 rounded-2xl p-4 space-y-3">
+              <div className="bg-slate-50/70 border border-slate-200 rounded-2xl p-4 space-y-4">
                 <h4 className="text-xs font-black uppercase tracking-wider text-slate-600">
                   1. Business / Listing Identity
                 </h4>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Business Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={objectForm.title}
-                      onChange={(e) => setObjectForm({ ...objectForm, title: e.target.value })}
-                      placeholder="e.g. Betwa Retreat Orchha"
-                      className="w-full px-3.5 py-2 rounded-xl text-sm font-semibold border border-slate-200 bg-white focus:border-indigo-500 outline-hidden"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Business Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={objectForm.title}
+                    onChange={(e) => setObjectForm({ ...objectForm, title: e.target.value })}
+                    placeholder="e.g. Betwa Retreat Orchha"
+                    className="w-full px-3.5 py-2 rounded-xl text-sm font-semibold border border-slate-200 bg-white focus:border-indigo-500 outline-hidden"
+                  />
+                </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Publication Status</label>
-                    <select
-                      value={objectForm.status}
-                      onChange={(e) => setObjectForm({ ...objectForm, status: e.target.value })}
-                      className="w-full px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white focus:border-indigo-500 outline-hidden"
+                {/* Professional 3-Way Publication Status Selector */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Publication Status (Control App Visibility)
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div
+                      onClick={() => setObjectForm((prev) => ({ ...prev, status: "published" }))}
+                      className={`p-3 rounded-2xl border cursor-pointer transition flex flex-col justify-between ${
+                        objectForm.status === "published"
+                          ? "bg-emerald-50 border-emerald-400 ring-2 ring-emerald-200"
+                          : "bg-white border-slate-200 hover:bg-slate-50"
+                      }`}
                     >
-                      <option value="published">🟢 Published / Live</option>
-                      <option value="draft">🟡 Draft</option>
-                      <option value="archived">🗑️ Trash / Archived</option>
-                    </select>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                          <CheckCircle size={13} className="text-emerald-600" /> Live (Public)
+                        </span>
+                        {objectForm.status === "published" && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                        Visible to all mobile app users
+                      </p>
+                    </div>
+
+                    <div
+                      onClick={() => setObjectForm((prev) => ({ ...prev, status: "draft" }))}
+                      className={`p-3 rounded-2xl border cursor-pointer transition flex flex-col justify-between ${
+                        objectForm.status === "draft"
+                          ? "bg-amber-50 border-amber-400 ring-2 ring-amber-200"
+                          : "bg-white border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-amber-800 flex items-center gap-1.5">
+                          <Lock size={13} className="text-amber-600" /> Private (Offline)
+                        </span>
+                        {objectForm.status === "draft" && (
+                          <span className="w-2 h-2 rounded-full bg-amber-600"></span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                        Hidden from users while fixing issues or editing
+                      </p>
+                    </div>
+
+                    <div
+                      onClick={() => setObjectForm((prev) => ({ ...prev, status: "archived" }))}
+                      className={`p-3 rounded-2xl border cursor-pointer transition flex flex-col justify-between ${
+                        objectForm.status === "archived"
+                          ? "bg-rose-50 border-rose-400 ring-2 ring-rose-200"
+                          : "bg-white border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-rose-800 flex items-center gap-1.5">
+                          <AlertTriangle size={13} className="text-rose-600" /> Trash / Archived
+                        </span>
+                        {objectForm.status === "archived" && (
+                          <span className="w-2 h-2 rounded-full bg-rose-600"></span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                        Soft-deleted and archived
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -1896,23 +2112,46 @@ const ServicesPage = () => {
           <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 border border-indigo-200">
                     {selectedObjectForDetails.subService}
                   </span>
                   {selectedObjectForDetails.status === "published" ? (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-700">
-                      🟢 Live
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-700 flex items-center gap-1 border border-emerald-200">
+                      🟢 Live (Public)
                     </span>
                   ) : selectedObjectForDetails.status === "archived" ? (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-700">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-700 flex items-center gap-1 border border-rose-200">
                       🗑️ Trash
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-700">
-                      🟡 Draft
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-700 flex items-center gap-1 border border-amber-200">
+                      🔒 Private / Offline
                     </span>
+                  )}
+
+                  {selectedObjectForDetails.status === "published" && (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleObjectStatus(selectedObjectForDetails)}
+                      className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition cursor-pointer flex items-center gap-1"
+                      title="Take offline / set to private (hide from mobile app users while fixing issues)"
+                    >
+                      <Lock size={10} />
+                      <span>Take Offline (Private)</span>
+                    </button>
+                  )}
+                  {selectedObjectForDetails.status === "draft" && (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleObjectStatus(selectedObjectForDetails)}
+                      className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                      title="Publish live to mobile app users"
+                    >
+                      <Unlock size={10} />
+                      <span>Publish Live</span>
+                    </button>
                   )}
                 </div>
                 <h3 className="text-lg font-black text-slate-900">
@@ -2001,17 +2240,42 @@ const ServicesPage = () => {
             </div>
 
             {/* Bottom Actions: Edit, Soft Delete / Restore, Hard Delete */}
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  handleOpenEditObject(selectedObjectForDetails);
-                }}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-              >
-                <Edit size={14} />
-                <span>Edit Object</span>
-              </button>
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleOpenEditObject(selectedObjectForDetails);
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Edit size={14} />
+                  <span>Edit Object</span>
+                </button>
+
+                {/* 🔒 Take Offline (Set to Private) <-> 🟢 Publish Live Toggle */}
+                {selectedObjectForDetails.status === "published" ? (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleObjectStatus(selectedObjectForDetails)}
+                    className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                    title="Removes from live mobile app so you can fix issues and make changes safely"
+                  >
+                    <Lock size={13} />
+                    <span>Take Offline (Set to Private)</span>
+                  </button>
+                ) : selectedObjectForDetails.status === "draft" ? (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleObjectStatus(selectedObjectForDetails)}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    title="Publish live to mobile app users"
+                  >
+                    <Unlock size={13} />
+                    <span>Publish Live</span>
+                  </button>
+                ) : null}
+              </div>
 
               <div className="flex items-center gap-2">
                 {selectedObjectForDetails.status === "archived" ? (
@@ -2027,10 +2291,10 @@ const ServicesPage = () => {
                   <button
                     type="button"
                     onClick={() => handleSoftDeleteObject(selectedObjectForDetails)}
-                    className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                   >
                     <Trash2 size={14} />
-                    <span>Move to Trash (Soft Delete)</span>
+                    <span>Move to Trash</span>
                   </button>
                 )}
 
