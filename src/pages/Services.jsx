@@ -5,7 +5,7 @@ import {
   Compass, ShoppingBag, Search, CheckCircle, RefreshCw, AlertCircle,
   SlidersHorizontal, Info, Eye, BookmarkCheck, ArrowRight, ShieldCheck,
   FileText, MapPin, Phone, Mail, Globe, ExternalLink, RotateCcw, AlertTriangle,
-  UploadCloud, Tag, Lock, Unlock
+  UploadCloud, Tag, Lock, Unlock, Share2, MousePointer, Heart
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -226,6 +226,10 @@ const ServicesPage = () => {
     customDetails: {},
     photos: [],
     existingPhotos: [],
+    views: 0,
+    shares: 0,
+    clicks: 0,
+    likes: 0,
     status: "published",
   });
 
@@ -448,6 +452,9 @@ const ServicesPage = () => {
     const totalCategories = SERVICE_CATEGORIES.length;
     const totalObjects = allCustomServices.length;
     const publishedObjects = allCustomServices.filter((o) => o.status === "published").length;
+    const totalViews = allCustomServices.reduce((sum, o) => sum + (Number(o.views) || 0), 0);
+    const totalShares = allCustomServices.reduce((sum, o) => sum + (Number(o.shares) || 0), 0);
+    const totalClicks = allCustomServices.reduce((sum, o) => sum + (Number(o.clicks) || 0), 0);
 
     const byCategory = {};
     let totalSubservicesCount = 0;
@@ -463,6 +470,9 @@ const ServicesPage = () => {
       byCategory[cat.key] = {
         subservicesCount: uniqueCreatedSlugs.size,
         objectsCount: catObjects.length,
+        viewsCount: catObjects.reduce((acc, o) => acc + (Number(o.views) || 0), 0),
+        sharesCount: catObjects.reduce((acc, o) => acc + (Number(o.shares) || 0), 0),
+        clicksCount: catObjects.reduce((acc, o) => acc + (Number(o.clicks) || 0), 0),
       };
       totalSubservicesCount += uniqueCreatedSlugs.size;
     });
@@ -473,6 +483,9 @@ const ServicesPage = () => {
       totalSubservices: totalSubservicesCount,
       totalObjects,
       publishedObjects,
+      totalViews,
+      totalShares,
+      totalClicks,
       byCategory,
     };
   }, [allTemplates, allCustomServices]);
@@ -676,6 +689,11 @@ const ServicesPage = () => {
       location: { address: "", city: "Jhansi", googleMapsUrl: "" },
       customDetails: initialCustomDetails,
       photos: [],
+      existingPhotos: [],
+      views: 0,
+      shares: 0,
+      clicks: 0,
+      likes: 0,
       status: "published",
     });
     setShowObjectModal(true);
@@ -701,6 +719,10 @@ const ServicesPage = () => {
       customDetails: obj.customDetails || {},
       photos: [],
       existingPhotos: obj.photos || [],
+      views: Number(obj.views) || 0,
+      shares: Number(obj.shares) || 0,
+      clicks: Number(obj.clicks) || 0,
+      likes: Number(obj.likes) || 0,
       status: obj.status || "published",
     });
     setShowObjectModal(true);
@@ -762,6 +784,10 @@ const ServicesPage = () => {
         customDetails: objectForm.customDetails,
         status: objectForm.status,
         photos: finalPhotos,
+        views: Number(objectForm.views) || 0,
+        shares: Number(objectForm.shares) || 0,
+        clicks: Number(objectForm.clicks) || 0,
+        likes: Number(objectForm.likes) || 0,
       };
 
       if (editingObject?._id) {
@@ -871,8 +897,8 @@ const ServicesPage = () => {
           </div>
         </div>
 
-        {/* 4 Stat Counters */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* 5 Executive Stat Counters */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
               Service Domains
@@ -894,11 +920,20 @@ const ServicesPage = () => {
             <span className="text-2xl font-black text-emerald-950">{catalogStats.publishedObjects}</span>
           </div>
 
-          <div className="bg-purple-50/60 border border-purple-100 rounded-2xl p-3.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 block mb-0.5">
-              Total Instances
+          <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-3.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 block mb-0.5">
+              Total Views
             </span>
-            <span className="text-2xl font-black text-purple-950">{catalogStats.totalObjects}</span>
+            <span className="text-2xl font-black text-blue-950">{catalogStats.totalViews.toLocaleString()}</span>
+          </div>
+
+          <div className="bg-purple-50/60 border border-purple-100 rounded-2xl p-3.5 col-span-2 sm:col-span-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 block mb-0.5">
+              Shares & Clicks
+            </span>
+            <span className="text-2xl font-black text-purple-950">
+              {(catalogStats.totalShares + catalogStats.totalClicks).toLocaleString()}
+            </span>
           </div>
         </div>
       </div>
@@ -979,11 +1014,25 @@ const ServicesPage = () => {
                     </div>
                   </div>
 
-                  <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold">
-                    <span className="text-slate-500">{stats.objectsCount} Live Objects</span>
-                    <div className="flex items-center gap-1 text-indigo-600 group-hover:translate-x-1 transition">
-                      <span>Open Folder</span>
-                      <ChevronRight size={14} />
+                  <div className="pt-3 mt-3 border-t border-slate-100 flex flex-col gap-2">
+                    <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500">
+                      <span className="flex items-center gap-1 text-blue-600">
+                        <Eye size={12} /> {stats.viewsCount.toLocaleString()} views
+                      </span>
+                      <span className="flex items-center gap-1 text-emerald-600">
+                        <Share2 size={12} /> {stats.sharesCount} shares
+                      </span>
+                      <span className="flex items-center gap-1 text-purple-600">
+                        <MousePointer size={12} /> {stats.clicksCount} clicks
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs font-bold pt-1">
+                      <span className="text-slate-600 font-extrabold">{stats.objectsCount} Live Object{stats.objectsCount !== 1 ? "s" : ""}</span>
+                      <div className="flex items-center gap-1 text-indigo-600 group-hover:translate-x-1 transition">
+                        <span>Open Folder</span>
+                        <ChevronRight size={14} />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1158,13 +1207,53 @@ const ServicesPage = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center justify-between text-xs text-slate-500 font-bold px-1">
-                  <span>
-                    Showing {filteredCategoryLiveObjects.length} Live Listing Object{filteredCategoryLiveObjects.length !== 1 ? "s" : ""} across {selectedCategory.name}
-                  </span>
-                  <span className="text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 font-bold">
-                    🟢 Public & Active on Mobile App
-                  </span>
+                {/* ─── LEVEL 2 LIVE ENGAGEMENT STATS STRIP ─── */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                      <CheckCircle size={15} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block">Live Listings</span>
+                      <span className="text-sm font-black text-slate-900">{filteredCategoryLiveObjects.length}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                      <Eye size={15} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block">Total Views</span>
+                      <span className="text-sm font-black text-blue-900">
+                        {categoryLiveObjects.reduce((acc, o) => acc + (Number(o.views) || 0), 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                      <Share2 size={15} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block">Total Shares</span>
+                      <span className="text-sm font-black text-emerald-900">
+                        {categoryLiveObjects.reduce((acc, o) => acc + (Number(o.shares) || 0), 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                      <MousePointer size={15} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block">Inquiries / Clicks</span>
+                      <span className="text-sm font-black text-purple-900">
+                        {categoryLiveObjects.reduce((acc, o) => acc + (Number(o.clicks) || 0), 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -1225,6 +1314,19 @@ const ServicesPage = () => {
                                 {obj.description}
                               </p>
                             )}
+
+                            {/* Engagement Stats Strip */}
+                            <div className="flex items-center gap-3 py-1.5 px-3 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 my-1">
+                              <span className="flex items-center gap-1 text-blue-600" title="Views">
+                                <Eye size={12} /> {Number(obj.views || 0).toLocaleString()} views
+                              </span>
+                              <span className="flex items-center gap-1 text-emerald-600" title="Shares">
+                                <Share2 size={12} /> {Number(obj.shares || 0).toLocaleString()} shares
+                              </span>
+                              <span className="flex items-center gap-1 text-purple-600" title="Clicks">
+                                <MousePointer size={12} /> {Number(obj.clicks || 0).toLocaleString()} clicks
+                              </span>
+                            </div>
 
                             <div className="space-y-1 pt-1 text-xs text-slate-600">
                               {(obj.location?.city || obj.location?.address) && (
@@ -2459,6 +2561,52 @@ const ServicesPage = () => {
                 </label>
               </div>
 
+              {/* 5. Engagement & Performance Statistics */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <Eye size={13} className="text-blue-600" />
+                  <span>5. Engagement & Performance Statistics</span>
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Views</label>
+                    <input
+                      type="number"
+                      value={objectForm.views || 0}
+                      onChange={(e) => setObjectForm({ ...objectForm, views: Number(e.target.value) })}
+                      className="w-full px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Shares</label>
+                    <input
+                      type="number"
+                      value={objectForm.shares || 0}
+                      onChange={(e) => setObjectForm({ ...objectForm, shares: Number(e.target.value) })}
+                      className="w-full px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Inquiries / Clicks</label>
+                    <input
+                      type="number"
+                      value={objectForm.clicks || 0}
+                      onChange={(e) => setObjectForm({ ...objectForm, clicks: Number(e.target.value) })}
+                      className="w-full px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Likes</label>
+                    <input
+                      type="number"
+                      value={objectForm.likes || 0}
+                      onChange={(e) => setObjectForm({ ...objectForm, likes: Number(e.target.value) })}
+                      className="w-full px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Form Buttons */}
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
                 <button
@@ -2553,6 +2701,49 @@ const ServicesPage = () => {
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* ─── REAL-TIME ANALYTICS & PERFORMANCE GRID ─── */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-4 bg-slate-50/80 rounded-2xl border border-slate-200 shadow-2xs">
+                <div className="p-3 bg-white rounded-xl border border-slate-100 flex items-center gap-2.5 shadow-xs">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <Eye size={16} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Total Views</span>
+                    <span className="text-sm font-black text-slate-900">{Number(selectedObjectForDetails.views || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white rounded-xl border border-slate-100 flex items-center gap-2.5 shadow-xs">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <Share2 size={16} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Total Shares</span>
+                    <span className="text-sm font-black text-emerald-900">{Number(selectedObjectForDetails.shares || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white rounded-xl border border-slate-100 flex items-center gap-2.5 shadow-xs">
+                  <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                    <MousePointer size={16} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Inquiries / Clicks</span>
+                    <span className="text-sm font-black text-purple-900">{Number(selectedObjectForDetails.clicks || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white rounded-xl border border-slate-100 flex items-center gap-2.5 shadow-xs">
+                  <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                    <Heart size={16} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Total Likes</span>
+                    <span className="text-sm font-black text-rose-900">{Number(selectedObjectForDetails.likes || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
               {/* Photos Gallery */}
               {selectedObjectForDetails.photos && selectedObjectForDetails.photos.length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">

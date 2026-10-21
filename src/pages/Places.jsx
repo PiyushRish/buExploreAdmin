@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useMemo } from "react";
 import {
   Heart,
   MapPin,
@@ -9,6 +9,8 @@ import {
   Tag,
   Star,
   Loader2,
+  Eye,
+  Share2,
 } from "lucide-react";
 import { GenericListHeader } from "../components/layout/GenericListHeader.jsx";
 import { PlaceContext } from "../contextApi/places.jsx";
@@ -70,9 +72,19 @@ const PlaceCard = ({ place, onNavigateToReviews }) => {
           )}
         </div>
 
-        <div className="absolute bottom-3 right-3 z-20 bg-black/70 backdrop-blur-md text-white text-xs px-2.5 py-1 rounded-lg font-bold flex items-center gap-1">
-          <Heart size={12} className="text-red-500 fill-red-500" />
-          {place?.likes || 0}
+        <div className="absolute bottom-3 right-3 z-20 bg-black/75 backdrop-blur-md text-white text-[11px] px-2.5 py-1 rounded-xl font-bold flex items-center gap-2.5 border border-white/10 shadow-sm">
+          <span className="flex items-center gap-1" title="Views">
+            <Eye size={12} className="text-blue-400" />
+            <span>{Number(place?.views || 0).toLocaleString()}</span>
+          </span>
+          <span className="flex items-center gap-1" title="Likes">
+            <Heart size={12} className="text-rose-400 fill-rose-400" />
+            <span>{Number(place?.likes || 0).toLocaleString()}</span>
+          </span>
+          <span className="flex items-center gap-1" title="Shares">
+            <Share2 size={12} className="text-emerald-400" />
+            <span>{Number(place?.shares || 0).toLocaleString()}</span>
+          </span>
         </div>
       </div>
 
@@ -86,6 +98,22 @@ const PlaceCard = ({ place, onNavigateToReviews }) => {
           <span className="line-clamp-1">
             {place?.location?.address || place?.city || "Jhansi"}
           </span>
+        </div>
+
+        {/* Engagement Stats Strip */}
+        <div className="grid grid-cols-3 gap-1.5 py-2 px-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 mb-2.5">
+          <div className="flex items-center gap-1">
+            <Eye size={13} className="text-blue-500 shrink-0" />
+            <span>{Number(place?.views || 0).toLocaleString()} views</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Heart size={13} className="text-rose-500 shrink-0" />
+            <span>{Number(place?.likes || 0).toLocaleString()} likes</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Share2 size={13} className="text-emerald-500 shrink-0" />
+            <span>{Number(place?.shares || 0).toLocaleString()} shares</span>
+          </div>
         </div>
 
         <p className="text-gray-600 text-xs line-clamp-2 flex-grow leading-relaxed">
@@ -131,6 +159,16 @@ const Places = ({ onNavigateToReviews }) => {
   const { notif, setNotif, sendIfEnabled, resetNotif } = useNotificationDraft("place");
 
   const allPlaces = data?.places || [];
+
+  // Real-time Overview Statistics across all Destinations
+  const placeStats = useMemo(() => {
+    const totalCount = allPlaces.length;
+    const totalViews = allPlaces.reduce((sum, p) => sum + (Number(p.views) || 0), 0);
+    const totalLikes = allPlaces.reduce((sum, p) => sum + (Number(p.likes) || 0), 0);
+    const totalShares = allPlaces.reduce((sum, p) => sum + (Number(p.shares) || 0), 0);
+    const totalReviews = allPlaces.reduce((sum, p) => sum + (Array.isArray(p.reviews) ? p.reviews.length : 0), 0);
+    return { totalCount, totalViews, totalLikes, totalShares, totalReviews };
+  }, [allPlaces]);
 
   // Filter client-side by Category and Search Keyword
   const places = allPlaces.filter((place) => {
@@ -291,6 +329,69 @@ const Places = ({ onNavigateToReviews }) => {
           onCategoryChange={setSelectedCategory}
           totalItemsCount={allPlaces.length}
         />
+
+        {/* ─── DESTINATIONS REAL-TIME EXECUTIVE STATS HUB ─── */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">
+                Destinations
+              </span>
+              <span className="text-2xl font-black text-slate-900">{placeStats.totalCount}</span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+              <MapPin size={18} />
+            </div>
+          </div>
+
+          <div className="bg-white border border-blue-100 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-blue-500 block mb-1">
+                Total Views
+              </span>
+              <span className="text-2xl font-black text-blue-900">{placeStats.totalViews.toLocaleString()}</span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Eye size={18} />
+            </div>
+          </div>
+
+          <div className="bg-white border border-rose-100 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-rose-500 block mb-1">
+                Total Likes
+              </span>
+              <span className="text-2xl font-black text-rose-900">{placeStats.totalLikes.toLocaleString()}</span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+              <Heart size={18} />
+            </div>
+          </div>
+
+          <div className="bg-white border border-emerald-100 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block mb-1">
+                Total Shares
+              </span>
+              <span className="text-2xl font-black text-emerald-900">{placeStats.totalShares.toLocaleString()}</span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Share2 size={18} />
+            </div>
+          </div>
+
+          <div className="bg-white border border-amber-100 rounded-2xl p-4 shadow-xs col-span-2 sm:col-span-1 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block mb-1">
+                Total Reviews
+              </span>
+              <span className="text-2xl font-black text-amber-900">{placeStats.totalReviews.toLocaleString()}</span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Star size={18} />
+            </div>
+          </div>
+        </div>
 
         {/* DESTINATIONS GRID */}
         {places.length === 0 ? (
