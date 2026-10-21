@@ -28,6 +28,7 @@ import NotificationDraftSection from "../components/NotificationDraftSection.jsx
 import { useNotificationDraft } from "../utils/useNotificationDraft.js";
 import SurpriseEventDetailsModal from "../components/SurpriseEventDetailsModal.jsx";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const SurpriseEventsPage = () => {
   const [events, setEvents] = useState([]);
@@ -72,34 +73,41 @@ const SurpriseEventsPage = () => {
     e.preventDefault();
     setIsPublishing(true);
     try {
-      const data = new FormData();
-      data.append("title", formData.title);
-      data.append("description", formData.description);
-      data.append("city", formData.city);
-      data.append("location", formData.location);
-      data.append("eventType", formData.eventType);
-      data.append("eventDate", formData.eventDate);
+      let uploadedPhotoAssets = [];
+      let uploadedVideoAssets = [];
 
-      // Dynamic Metadata JSON
-      const metadata = {
-        entryFee: formData.entryFee,
-        organizer: formData.organizer,
+      if (formData.photos && formData.photos.length > 0) {
+        uploadedPhotoAssets = await uploadMultipleFilesDirectToR2(
+          formData.photos,
+          "events/surprise/photos",
+          "image"
+        );
+      }
+
+      if (formData.videos && formData.videos.length > 0) {
+        uploadedVideoAssets = await uploadMultipleFilesDirectToR2(
+          formData.videos,
+          "events/surprise/videos",
+          "video"
+        );
+      }
+
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        city: formData.city,
+        location: formData.location,
+        eventType: formData.eventType,
+        eventDate: formData.eventDate,
+        dynamicMetadata: {
+          entryFee: formData.entryFee,
+          organizer: formData.organizer,
+        },
+        photos: uploadedPhotoAssets,
+        videos: uploadedVideoAssets,
       };
-      data.append("dynamicMetadata", JSON.stringify(metadata));
 
-      if (formData.photos) {
-        for (let i = 0; i < formData.photos.length; i++) {
-          data.append("photos", formData.photos[i]);
-        }
-      }
-
-      if (formData.videos) {
-        for (let i = 0; i < formData.videos.length; i++) {
-          data.append("videos", formData.videos[i]);
-        }
-      }
-
-      const res = await addSurpriseEvent(data);
+      const res = await addSurpriseEvent(payload);
       await sendIfEnabled({ serviceId: res?.event?._id || res?.data?._id || res?._id });
       toast.success("Surprise Event published successfully!");
       setShowAddModal(false);
@@ -368,6 +376,7 @@ const SurpriseEventsPage = () => {
             {/* Scrollable Form Body */}
             <form onSubmit={handleCreate} className="flex-1 flex flex-col overflow-hidden">
               <div className="p-6 sm:p-8 space-y-6 overflow-y-auto flex-1">
+                {isPublishing && <UploadProgressBar isUploading={isPublishing} className="mb-4" />}
                 {/* SECTION 1: Event Essentials */}
                 <div className="bg-slate-50/60 border border-slate-200/80 rounded-2xl p-5 space-y-4">
                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">

@@ -26,7 +26,7 @@ export const useAddPlaceMutation = () => {
 export const useUpdatePlaceMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, formData }) => updatePlace({ id, formData }),
+    mutationFn: ({ id, formData, data }) => updatePlace({ id, formData, data }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["places"] });
       queryClient.invalidateQueries({ queryKey: ["reels"] });

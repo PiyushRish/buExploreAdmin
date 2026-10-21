@@ -11,6 +11,7 @@ import { validators, runValidators, validateMediaType } from "../utils/validator
 import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
 import { useNotificationDraft } from "../utils/useNotificationDraft.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const HotelCard = ({ hotel }) => {
   const { setClickedPlaceHandler } = useContext(PlaceContext);
@@ -54,6 +55,7 @@ const Hotels = () => {
   });
   
   const [photoFiles, setPhotoFiles] = useState([]);
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   const RULES = {
     title: [validators.required],
@@ -114,29 +116,29 @@ const Hotels = () => {
       return;
     }
 
-    const payload = {
-      title: form.title,
-      location: form.location,
-      subCategory: form.subCategory,
-      priceRange: form.priceRange,
-      rating: Number(form.rating),
-      distanceFromCenter: Number(form.distanceFromCenter),
-      description: form.description,
-      contact: JSON.stringify({
-        phone: form.phone,
-        email: form.email,
-        website: form.website
-      }),
-      amenities: JSON.stringify(form.amenities.split(',').map(i=>i.trim()).filter(Boolean)),
-      roomTypes: JSON.stringify(form.roomTypes.split(',').map(i=>i.trim()).filter(Boolean))
-    };
-
-    const formData = new FormData();
-    Object.keys(payload).forEach((k) => formData.append(k, payload[k]));
-    photoFiles.forEach(file => formData.append("HotelPhotos", file));
-
     try {
-      const result = await addHotelMutation.mutateAsync(formData);
+      setIsUploadingR2(true);
+      const uploadedPhotos = await uploadMultipleFilesDirectToR2(photoFiles, "services/hotels", "image");
+
+      const payload = {
+        title: form.title,
+        location: form.location,
+        subCategory: form.subCategory,
+        priceRange: form.priceRange,
+        rating: Number(form.rating) || 4.5,
+        distanceFromCenter: Number(form.distanceFromCenter) || 0,
+        description: form.description,
+        contact: {
+          phone: form.phone,
+          email: form.email,
+          website: form.website
+        },
+        amenities: form.amenities ? form.amenities.split(',').map(i=>i.trim()).filter(Boolean) : [],
+        roomTypes: form.roomTypes ? form.roomTypes.split(',').map(i=>i.trim()).filter(Boolean) : [],
+        photos: uploadedPhotos,
+      };
+
+      const result = await addHotelMutation.mutateAsync(payload);
       await sendIfEnabled({ serviceId: result?.hotel?._id || result?._id });
       toast.success("Property added successfully!");
       setShowModal(false);
@@ -145,8 +147,10 @@ const Hotels = () => {
       setTouched({});
       setFieldErrors({});
       resetNotif();
+      setIsUploadingR2(false);
     } catch(err) {
-      toast.error(err?.response?.data?.message || "Failed to add property");
+      setIsUploadingR2(false);
+      toast.error(err?.response?.data?.message || err?.message || "Failed to add property");
     }
   };
 
@@ -345,9 +349,9 @@ const Hotels = () => {
                 onChange={setNotif}
               />
 
-              {addHotelMutation.isPending && (
+              {(addHotelMutation.isPending || isUploadingR2) && (
                 <div className="pt-2">
-                  <UploadProgressBar isUploading={addHotelMutation.isPending} />
+                  <UploadProgressBar isUploading={addHotelMutation.isPending || isUploadingR2} />
                 </div>
               )}
             </div>
@@ -357,20 +361,25 @@ const Hotels = () => {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                disabled={addHotelMutation.isPending}
+                disabled={addHotelMutation.isPending || isUploadingR2}
                 className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={addHotelMutation.isPending}
+                disabled={addHotelMutation.isPending || isUploadingR2}
                 className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition disabled:bg-blue-300 flex items-center gap-2 cursor-pointer"
               >
-                {addHotelMutation.isPending ? (
+                {isUploadingR2 ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    <span>Uploading Property Assets...</span>
+                    <span>Uploading directly to Cloudflare R2...</span>
+                  </>
+                ) : addHotelMutation.isPending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Saving Property...</span>
                   </>
                 ) : (
                   <span>Create Property</span>

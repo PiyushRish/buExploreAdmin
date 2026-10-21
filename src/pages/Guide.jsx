@@ -11,6 +11,7 @@ import FormField from "../components/FormField.jsx";
 import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
 import { useNotificationDraft } from "../utils/useNotificationDraft.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const getImageUrl = (photo) => {
   if (!photo) return "https://picsum.photos/400/400";
@@ -128,35 +129,41 @@ const Guide = () => {
   });
   const [agencyPhotos, setAgencyPhotos] = useState([]);
   const [isAddingAgency, setIsAddingAgency] = useState(false);
+  const [isUploadingAgencyR2, setIsUploadingAgencyR2] = useState(false);
+  const [isUploadingGuideR2, setIsUploadingGuideR2] = useState(false);
 
   const handleCreateAgency = async (e) => {
     e.preventDefault();
     setIsAddingAgency(true);
     try {
-      const data = new FormData();
-      data.append("name", agencyForm.name);
-      data.append("address", agencyForm.address);
-      data.append("city", agencyForm.city);
-      data.append("description", agencyForm.description);
-      
-      const contact = { phone: agencyForm.phone, email: agencyForm.email, website: agencyForm.website };
-      data.append("contact", JSON.stringify(contact));
-
-      const openingHours = { open: agencyForm.openTime, close: agencyForm.closeTime, daysOpen: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] };
-      data.append("openingHours", JSON.stringify(openingHours));
-
-      if (agencyPhotos) {
-        for (let i = 0; i < agencyPhotos.length; i++) {
-          data.append("AgencyPhotos", agencyPhotos[i]);
-        }
+      let uploadedAgencyPhotos = [];
+      if (agencyPhotos && agencyPhotos.length > 0) {
+        setIsUploadingAgencyR2(true);
+        uploadedAgencyPhotos = await uploadMultipleFilesDirectToR2(agencyPhotos, "services/agencies", "image");
       }
 
-      await addAgency(data);
+      const contact = { phone: agencyForm.phone, email: agencyForm.email, website: agencyForm.website };
+      const openingHours = { open: agencyForm.openTime, close: agencyForm.closeTime, daysOpen: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] };
+
+      const payload = {
+        name: agencyForm.name,
+        address: agencyForm.address,
+        city: agencyForm.city,
+        description: agencyForm.description,
+        contact,
+        openingHours,
+        photos: uploadedAgencyPhotos,
+      };
+
+      await addAgency(payload);
       toast.success("Travel Agency created successfully!");
       setShowAgencyModal(false);
+      setAgencyPhotos([]);
       queryClient.invalidateQueries(["agencies"]);
+      setIsUploadingAgencyR2(false);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to create agency");
+      setIsUploadingAgencyR2(false);
+      toast.error(err.response?.data?.message || err.message || "Failed to create agency");
     } finally {
       setIsAddingAgency(false);
     }
@@ -168,36 +175,38 @@ const Guide = () => {
       return;
     }
 
-    const payload = {
-      title: guideForm.title,
-      name: guideForm.name,
-      subCategory: guideForm.subCategory,
-      agencyId: guideForm.agencyId,
-      experienceYears: Number(guideForm.experienceYears || 0),
-      fee: Number(guideForm.fee || 0),
-      contact: JSON.stringify({
-        phone: guideForm.phone,
-        email: guideForm.email,
-        website: guideForm.website,
-      }),
-      languages: JSON.stringify(guideForm.languages.split(",").map((s) => s.trim()).filter(Boolean)),
-      speciality: JSON.stringify(guideForm.speciality.split(",").map((s) => s.trim()).filter(Boolean)),
-    };
-
-    const formData = new FormData();
-    Object.keys(payload).forEach((k) => formData.append(k, payload[k]));
-    guidePhotos.forEach((file) => formData.append("GuidePhotos", file));
-
     try {
-      const result = await addGuideMutation(formData);
+      setIsUploadingGuideR2(true);
+      const uploadedGuidePhotos = await uploadMultipleFilesDirectToR2(guidePhotos, "services/guides", "image");
+
+      const payload = {
+        title: guideForm.title,
+        name: guideForm.name,
+        subCategory: guideForm.subCategory,
+        ...(guideForm.agencyId ? { agencyId: guideForm.agencyId } : {}),
+        experienceYears: Number(guideForm.experienceYears || 0),
+        fee: Number(guideForm.fee || 0),
+        contact: {
+          phone: guideForm.phone,
+          email: guideForm.email,
+          website: guideForm.website,
+        },
+        languages: guideForm.languages ? guideForm.languages.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        speciality: guideForm.speciality ? guideForm.speciality.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        photos: uploadedGuidePhotos,
+      };
+
+      const result = await addGuideMutation(payload);
       await sendIfEnabled({ serviceId: result?.guide?._id || result?._id });
       toast.success("Guide profile created!");
       setShowGuideModal(false);
       setGuidePhotos([]);
       resetNotif();
       queryClient.invalidateQueries(["guides"]);
+      setIsUploadingGuideR2(false);
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to add guide");
+      setIsUploadingGuideR2(false);
+      toast.error(err?.response?.data?.message || err?.message || "Failed to add guide");
     }
   };
 
@@ -441,29 +450,32 @@ const Guide = () => {
               </div>
 
               {/* Sticky Footer */}
-              <div className="sticky bottom-0 z-20 flex justify-between items-center px-6 py-4 bg-white/95 backdrop-blur border-t border-slate-100 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowAgencyModal(false)}
-                  disabled={isAddingAgency}
-                  className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isAddingAgency}
-                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold rounded-xl text-sm shadow-md transition disabled:bg-indigo-300 flex items-center gap-2 cursor-pointer"
-                >
-                  {isAddingAgency ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Uploading Agency Assets...</span>
-                    </>
-                  ) : (
-                    <span>Create Agency</span>
-                  )}
-                </button>
+              <div className="sticky bottom-0 z-20 flex flex-col gap-2 px-6 py-4 bg-white/95 backdrop-blur border-t border-slate-100 shrink-0">
+                <UploadProgressBar isUploading={isAddingAgency || isUploadingAgencyR2} />
+                <div className="flex justify-between items-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowAgencyModal(false)}
+                    disabled={isAddingAgency || isUploadingAgencyR2}
+                    className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isAddingAgency || isUploadingAgencyR2}
+                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-bold rounded-xl text-sm shadow-md transition disabled:bg-indigo-300 flex items-center gap-2 cursor-pointer"
+                  >
+                    {isAddingAgency || isUploadingAgencyR2 ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Uploading Agency Assets...</span>
+                      </>
+                    ) : (
+                      <span>Create Agency</span>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -669,19 +681,19 @@ const Guide = () => {
 
             {/* Sticky Footer */}
             <div className="sticky bottom-0 z-20 flex flex-col gap-2 px-6 py-4 bg-white/95 backdrop-blur border-t border-slate-100 shrink-0">
-              <UploadProgressBar isUploading={isAddingGuide} />
+              <UploadProgressBar isUploading={isAddingGuide || isUploadingGuideR2} />
               <div className="flex justify-between items-center">
                 <button
                   type="button"
                   onClick={() => setShowGuideModal(false)}
-                  disabled={isAddingGuide}
+                  disabled={isAddingGuide || isUploadingGuideR2}
                   className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleCreateGuide}
-                  disabled={isAddingGuide}
+                  disabled={isAddingGuide || isUploadingGuideR2}
                   className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition disabled:bg-purple-300 flex items-center gap-2"
                 >
                   {isAddingGuide ? (

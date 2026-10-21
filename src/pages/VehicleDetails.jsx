@@ -5,6 +5,7 @@ import { useDeleteVehicleMutation, useUpdateVehicleMutation } from "../mutations
 import toast from "react-hot-toast";
 import { validateMediaType } from "../utils/validators.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const VehicleDetails = () => {
   const { clickedPlace: vehicle, setClickedPlaceHandler } = useContext(PlaceContext);
@@ -12,6 +13,7 @@ const VehicleDetails = () => {
   const [data, setData] = useState({});
   const [isEditing, setIsEditing] = useState(false);
   const [newPhotoFiles, setNewPhotoFiles] = useState([]);
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   useEffect(() => {
     if (vehicle) {
@@ -34,41 +36,41 @@ const VehicleDetails = () => {
   };
 
   const handleSave = async () => {
-    const payload = {
-      title: data.title,
-      subCategory: data.subCategory,
-      vehicleType: data.vehicleType,
-      seats: Number(data.seats || 0),
-      price: Number(data.price || 0),
-      transmissionType: data.transmissionType,
-      fuelType: data.fuelType,
-      description: data.description,
-    };
-
-    const formData = new FormData();
-    Object.keys(payload).forEach((k) => formData.append(k, payload[k]));
-    
-    if (data.contactPhone || data.contactEmail) {
-      formData.append("contact", JSON.stringify({
-        phone: data.contactPhone,
-        email: data.contactEmail,
-        website: data.contactWebsite
-      }));
-    }
-    
-    if (newPhotoFiles.length > 0) {
-        newPhotoFiles.forEach(f => formData.append("VehiclePhotos", f));
-    }
-    formData.append("existingPhotos", JSON.stringify(vehicle.photos || []));
-
     try {
+      let newlyUploadedR2 = [];
+      if (newPhotoFiles.length > 0) {
+        setIsUploadingR2(true);
+        newlyUploadedR2 = await uploadMultipleFilesDirectToR2(newPhotoFiles, "services/vehicles", "image");
+      }
+
+      const payload = {
+        title: data.title,
+        subCategory: data.subCategory,
+        vehicleType: data.vehicleType,
+        seats: Number(data.seats || 0),
+        price: Number(data.price || 0),
+        transmissionType: data.transmissionType,
+        fuelType: data.fuelType,
+        description: data.description,
+        ...(data.contactPhone || data.contactEmail ? {
+          contact: {
+            phone: data.contactPhone,
+            email: data.contactEmail,
+            website: data.contactWebsite
+          }
+        } : {}),
+        photos: [...(vehicle.photos || []), ...newlyUploadedR2],
+      };
+
       const targetId = vehicle.service?._id || vehicle._id;
-      await updateMutation.mutateAsync({ id: targetId, formData });
+      await updateMutation.mutateAsync({ id: targetId, formData: payload });
       toast.success("Vehicle updated successfully!");
       setIsEditing(false);
       setNewPhotoFiles([]);
+      setIsUploadingR2(false);
     } catch(err) {
-      toast.error(err?.response?.data?.message || "Failed to update");
+      setIsUploadingR2(false);
+      toast.error(err?.response?.data?.message || err?.message || "Failed to update");
     }
   };
 
@@ -97,12 +99,16 @@ const VehicleDetails = () => {
             <div className="flex gap-3">
               <button
                 onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
-                disabled={updateMutation.isPending}
+                disabled={updateMutation.isPending || isUploadingR2}
                 className={`flex items-center px-4 py-2 rounded-lg font-bold transition ${
                   isEditing ? "bg-red-600 hover:bg-red-700 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 } disabled:opacity-50`}
               >
-                {updateMutation.isPending ? (
+                {isUploadingR2 ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin mr-2" /> Uploading to R2...
+                  </>
+                ) : updateMutation.isPending ? (
                   <>
                     <Loader2 size={16} className="animate-spin mr-2" /> Saving...
                   </>
@@ -119,14 +125,14 @@ const VehicleDetails = () => {
 
               <button
                 onClick={handleDelete}
-                disabled={deleteMutation.isPending || updateMutation.isPending}
+                disabled={deleteMutation.isPending || updateMutation.isPending || isUploadingR2}
                 className="px-4 py-2 bg-red-50 text-red-600 rounded-lg flex items-center font-bold hover:bg-red-100 focus:outline-none disabled:opacity-50"
               >
                 <Trash2 size={16} className="mr-2" /> Delete 
               </button>
             </div>
           </div>
-          <UploadProgressBar isUploading={updateMutation.isPending} className="mt-2" />
+          <UploadProgressBar isUploading={updateMutation.isPending || isUploadingR2} className="mt-2" />
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 space-y-6">

@@ -5,6 +5,7 @@ import { useDeleteHotelMutation, useUpdateHotelMutation } from "../mutations/hot
 import toast from "react-hot-toast";
 import { validateMediaType } from "../utils/validators.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const HotelDetails = () => {
   const { clickedPlace: hotel, setClickedPlaceHandler } = useContext(PlaceContext);
@@ -12,6 +13,7 @@ const HotelDetails = () => {
   const [data, setData] = useState({});
   const [isEditing, setIsEditing] = useState(false);
   const [newPhotoFiles, setNewPhotoFiles] = useState([]);
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   useEffect(() => {
     if (hotel) {
@@ -36,52 +38,46 @@ const HotelDetails = () => {
   };
 
   const handleSave = async () => {
-    const payload = {
-      title: data.title,
-      location: data.location,
-      subCategory: data.subCategory,
-      priceRange: data.priceRange,
-      rating: Number(data.rating || 0),
-      distanceFromCenter: Number(data.distanceFromCenter || 0),
-      description: data.description,
-    };
-
-    const formData = new FormData();
-    formData.append("data", JSON.stringify(payload));
-    
-    // We send these as explicit strings so parsedHotelData handles them
-    if (data.contactPhone || data.contactEmail) {
-      formData.append("contact", JSON.stringify({
-        phone: data.contactPhone,
-        email: data.contactEmail,
-        website: data.contactWebsite
-      }));
-    }
-    
-    if (data.parsedAmenities) {
-      formData.append("amenities", JSON.stringify(data.parsedAmenities.split(',').map(i=>i.trim()).filter(Boolean)));
-    }
-    
-    if (data.parsedRoomTypes) {
-      formData.append("roomTypes", JSON.stringify(data.parsedRoomTypes.split(',').map(i=>i.trim()).filter(Boolean)));
-    }
-
-    if (newPhotoFiles.length > 0) {
-        newPhotoFiles.forEach(f => formData.append("HotelPhotos", f));
-    }
-    formData.append("existingPhotos", JSON.stringify(hotel.photos || []));
-
     try {
-      if(hotel.service && hotel.service._id) {
-         await updateMutation.mutateAsync({ id: hotel.service._id, formData });
-      } else {
-         await updateMutation.mutateAsync({ id: hotel._id, formData }); // fallback
+      let newlyUploadedR2 = [];
+      if (newPhotoFiles.length > 0) {
+        setIsUploadingR2(true);
+        newlyUploadedR2 = await uploadMultipleFilesDirectToR2(newPhotoFiles, "services/hotels", "image");
       }
+
+      const payload = {
+        title: data.title,
+        location: data.location,
+        subCategory: data.subCategory,
+        priceRange: data.priceRange,
+        rating: Number(data.rating || 0),
+        distanceFromCenter: Number(data.distanceFromCenter || 0),
+        description: data.description,
+        ...(data.contactPhone || data.contactEmail ? {
+          contact: {
+            phone: data.contactPhone,
+            email: data.contactEmail,
+            website: data.contactWebsite
+          }
+        } : {}),
+        ...(data.parsedAmenities ? {
+          amenities: data.parsedAmenities.split(',').map(i=>i.trim()).filter(Boolean)
+        } : {}),
+        ...(data.parsedRoomTypes ? {
+          roomTypes: data.parsedRoomTypes.split(',').map(i=>i.trim()).filter(Boolean)
+        } : {}),
+        photos: [...(hotel.photos || []), ...newlyUploadedR2],
+      };
+
+      const targetId = hotel.service?._id || hotel._id;
+      await updateMutation.mutateAsync({ id: targetId, formData: payload });
       toast.success("Hotel updated successfully!");
       setIsEditing(false);
       setNewPhotoFiles([]);
+      setIsUploadingR2(false);
     } catch(err) {
-      toast.error(err?.response?.data?.message || "Failed to update");
+      setIsUploadingR2(false);
+      toast.error(err?.response?.data?.message || err?.message || "Failed to update");
     }
   };
 
@@ -110,12 +106,16 @@ const HotelDetails = () => {
             <div className="flex gap-3">
               <button
                 onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
-                disabled={updateMutation.isPending}
+                disabled={updateMutation.isPending || isUploadingR2}
                 className={`flex items-center px-4 py-2 rounded-lg font-bold transition ${
                   isEditing ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 } disabled:opacity-50`}
               >
-                {updateMutation.isPending ? (
+                {isUploadingR2 ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin mr-2" /> Uploading to R2...
+                  </>
+                ) : updateMutation.isPending ? (
                   <>
                     <Loader2 size={16} className="animate-spin mr-2" /> Saving...
                   </>
@@ -260,6 +260,12 @@ const HotelDetails = () => {
               }} accept="image/*" className="hidden"/>
                       <label htmlFor="hPhotoUpdate" className="text-blue-600 text-sm font-bold flex items-center gap-1 cursor-pointer w-fit bg-blue-50 py-1.5 px-3 rounded-lg"><UploadCloud size={16}/> Replace Photos (Max 4)</label>
                     </div>
+                 )}
+
+                 {(updateMutation.isPending || isUploadingR2) && (
+                   <div className="mt-3">
+                     <UploadProgressBar isUploading={updateMutation.isPending || isUploadingR2} />
+                   </div>
                  )}
               </div>
             </div>

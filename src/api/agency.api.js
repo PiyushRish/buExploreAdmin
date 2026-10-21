@@ -10,17 +10,19 @@ export const getAgencyById = async (id) => {
   return res.data;
 };
 
-export const addAgency = async (formData) => {
-  const res = await axiosClient.post("/services/createAgency", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
+export const addAgency = async (data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.post("/services/createAgency", data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 60000,
   });
   return res.data;
 };
 
-export const updateAgency = async (id, formData) => {
-  const res = await axiosClient.put(`/services/agency/${id}`, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
+export const updateAgency = async (id, data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.put(`/services/agency/${id}`, data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 60000,
   });
   return res.data;

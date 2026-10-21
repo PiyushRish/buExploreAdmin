@@ -30,6 +30,7 @@ import {
 } from "../api/surpriseEvents.api";
 import toast from "react-hot-toast";
 import UploadProgressBar from "./UploadProgressBar";
+import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const SurpriseEventDetailsModal = ({
   event,
@@ -127,43 +128,51 @@ const SurpriseEventDetailsModal = ({
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const data = new FormData();
-      data.append("title", editForm.title);
-      data.append("description", editForm.description);
-      data.append("city", editForm.city);
-      data.append("location", editForm.location);
-      data.append("eventType", editForm.eventType);
-      data.append("eventDate", editForm.eventDate);
-      if (editForm.endDate) data.append("endDate", editForm.endDate);
-      data.append("isActive", editForm.isActive ? "true" : "false");
+      const keptPhotos = (event.photos || []).filter(
+        (p) => !removedPhotoIds.includes(p.public_id || p.key || p.url)
+      );
+      const keptVideos = (event.videos || []).filter(
+        (v) => !removedVideoIds.includes(v.public_id || v.key || v.url)
+      );
 
-      const dynamicMeta = {
-        ...(event.dynamicMetadata || {}),
-        entryFee: editForm.entryFee,
-        organizer: editForm.organizer,
+      let uploadedNewPhotos = [];
+      let uploadedNewVideos = [];
+
+      if (newPhotos && newPhotos.length > 0) {
+        uploadedNewPhotos = await uploadMultipleFilesDirectToR2(
+          newPhotos,
+          "events/surprise/photos",
+          "image"
+        );
+      }
+
+      if (newVideos && newVideos.length > 0) {
+        uploadedNewVideos = await uploadMultipleFilesDirectToR2(
+          newVideos,
+          "events/surprise/videos",
+          "video"
+        );
+      }
+
+      const payload = {
+        title: editForm.title,
+        description: editForm.description,
+        city: editForm.city,
+        location: editForm.location,
+        eventType: editForm.eventType,
+        eventDate: editForm.eventDate,
+        endDate: editForm.endDate || undefined,
+        isActive: editForm.isActive,
+        dynamicMetadata: {
+          ...(event.dynamicMetadata || {}),
+          entryFee: editForm.entryFee,
+          organizer: editForm.organizer,
+        },
+        photos: [...keptPhotos, ...uploadedNewPhotos],
+        videos: [...keptVideos, ...uploadedNewVideos],
       };
-      data.append("dynamicMetadata", JSON.stringify(dynamicMeta));
 
-      if (removedPhotoIds.length > 0) {
-        data.append("removedPhotoIds", JSON.stringify(removedPhotoIds));
-      }
-      if (removedVideoIds.length > 0) {
-        data.append("removedVideoIds", JSON.stringify(removedVideoIds));
-      }
-
-      if (newPhotos) {
-        for (let i = 0; i < newPhotos.length; i++) {
-          data.append("photos", newPhotos[i]);
-        }
-      }
-
-      if (newVideos) {
-        for (let i = 0; i < newVideos.length; i++) {
-          data.append("videos", newVideos[i]);
-        }
-      }
-
-      await updateSurpriseEvent(event._id, data);
+      await updateSurpriseEvent(event._id, payload);
       toast.success("Surprise event details updated successfully!");
       setMode("view");
       onUpdated();
@@ -483,6 +492,7 @@ const SurpriseEventDetailsModal = ({
                EDIT DETAILS MODE
                ══════════════════════════════════════════════ */
             <form onSubmit={handleSaveEdit} className="space-y-6">
+              {isSubmitting && <UploadProgressBar isUploading={isSubmitting} className="mb-4" />}
               {/* Basic Fields */}
               <div className="bg-slate-50/60 border border-slate-200 rounded-2xl p-5 space-y-4">
                 <h4 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">

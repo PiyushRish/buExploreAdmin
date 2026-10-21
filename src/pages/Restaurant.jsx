@@ -11,6 +11,7 @@ import { validators, runValidators, validateMediaType } from "../utils/validator
 import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
 import { useNotificationDraft } from "../utils/useNotificationDraft.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const RestaurantCard = ({ restaurant }) => {
   const { setClickedPlaceHandler } = useContext(PlaceContext);
@@ -54,6 +55,7 @@ const Restaurants = () => {
   });
   
   const [photoFiles, setPhotoFiles] = useState([]);
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   const RULES = {
     title: [validators.required],
@@ -113,28 +115,28 @@ const Restaurants = () => {
       return;
     }
 
-    const payload = {
-      title: form.title,
-      location: form.location,
-      subCategory: form.subCategory,
-      rating: Number(form.rating),
-      timings: form.timings,
-      averageCost: Number(form.averageCost),
-      description: form.description,
-      contact: JSON.stringify({
-        phone: form.phone,
-        email: form.email,
-        website: form.website
-      }),
-      cuisine: JSON.stringify(form.cuisine.split(',').map(i=>i.trim()).filter(Boolean)),
-    };
-
-    const formData = new FormData();
-    Object.keys(payload).forEach((k) => formData.append(k, payload[k]));
-    photoFiles.forEach(f => formData.append("RestaurantPhotos", f));
-
     try {
-      const result = await addRestaurantMutation.mutateAsync(formData);
+      setIsUploadingR2(true);
+      const uploadedPhotos = await uploadMultipleFilesDirectToR2(photoFiles, "services/restaurants", "image");
+
+      const payload = {
+        title: form.title,
+        location: form.location,
+        subCategory: form.subCategory,
+        rating: Number(form.rating) || 4.5,
+        timings: form.timings,
+        averageCost: Number(form.averageCost) || 0,
+        description: form.description,
+        contact: {
+          phone: form.phone,
+          email: form.email,
+          website: form.website
+        },
+        cuisine: form.cuisine ? form.cuisine.split(',').map(i=>i.trim()).filter(Boolean) : [],
+        photos: uploadedPhotos,
+      };
+
+      const result = await addRestaurantMutation.mutateAsync(payload);
       await sendIfEnabled({ serviceId: result?.restaurant?._id || result?._id });
       toast.success("Restaurant added successfully!");
       setShowModal(false);
@@ -143,8 +145,10 @@ const Restaurants = () => {
       setTouched({});
       setFieldErrors({});
       resetNotif();
+      setIsUploadingR2(false);
     } catch(err) {
-      toast.error(err?.response?.data?.message || "Failed to add restaurant");
+      setIsUploadingR2(false);
+      toast.error(err?.response?.data?.message || err?.message || "Failed to add restaurant");
     }
   };
 
@@ -333,9 +337,9 @@ const Restaurants = () => {
                 onChange={setNotif}
               />
 
-              {addRestaurantMutation.isPending && (
+              {(addRestaurantMutation.isPending || isUploadingR2) && (
                 <div className="pt-2">
-                  <UploadProgressBar isUploading={addRestaurantMutation.isPending} />
+                  <UploadProgressBar isUploading={addRestaurantMutation.isPending || isUploadingR2} />
                 </div>
               )}
             </div>
@@ -345,20 +349,25 @@ const Restaurants = () => {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                disabled={addRestaurantMutation.isPending}
+                disabled={addRestaurantMutation.isPending || isUploadingR2}
                 className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={addRestaurantMutation.isPending}
+                disabled={addRestaurantMutation.isPending || isUploadingR2}
                 className="px-6 py-2.5 bg-orange-600 hover:bg-orange-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition disabled:bg-orange-300 flex items-center gap-2 cursor-pointer"
               >
-                {addRestaurantMutation.isPending ? (
+                {isUploadingR2 ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    <span>Uploading Venue Assets...</span>
+                    <span>Uploading directly to Cloudflare R2...</span>
+                  </>
+                ) : addRestaurantMutation.isPending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Saving Dining Venue...</span>
                   </>
                 ) : (
                   <span>Create Dining Venue</span>

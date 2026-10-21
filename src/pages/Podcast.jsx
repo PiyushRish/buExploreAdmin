@@ -8,6 +8,7 @@ import { Req, RequiredNotice } from "../components/RequiredTag.jsx";
 import FormField from "../components/FormField.jsx";
 import { validators, runValidators, validateMediaType } from "../utils/validators.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadFileDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const Podcast = () => {
   const { data, isLoading } = usePodcastsQuery();
@@ -19,6 +20,7 @@ const Podcast = () => {
   const [videoFile, setVideoFile] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [activeVideoModal, setActiveVideoModal] = useState(null);
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   const addYtMutation = useAddYoutubeVideoMutation();
   const deleteYtMutation = useDeleteYoutubeVideoMutation();
@@ -102,7 +104,7 @@ const Podcast = () => {
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setTouched({ title: true });
     const titleError = validate("title", form.title || "");
     setFieldErrors({ title: titleError });
@@ -113,27 +115,39 @@ const Podcast = () => {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("data", JSON.stringify({ title: form.title }));
-    formData.append("PodcastVideo", videoFile);
-    if (imageFile) {
-      formData.append("PodcastImage", imageFile);
-    }
+    try {
+      setIsUploadingR2(true);
+      const videoAsset = await uploadFileDirectToR2(videoFile, "podcasts/videos", "video");
+      let imageAsset = null;
+      if (imageFile) {
+        imageAsset = await uploadFileDirectToR2(imageFile, "podcasts/images", "image");
+      }
 
-    addMutation.mutate(formData, {
-      onSuccess: () => {
-        toast.success("Podcast successfully uploaded!");
-        setShowModal(false);
-        setForm({ title: "" });
-        setVideoFile(null);
-        setImageFile(null);
-        setTouched({});
-        setFieldErrors({});
-      },
-      onError: (err) => {
-        toast.error(err?.response?.data?.message || "Failed to upload podcast");
-      },
-    });
+      const payload = {
+        title: form.title,
+        PodcastVideo: videoAsset,
+        ...(imageAsset && { PodcastImage: imageAsset }),
+      };
+
+      addMutation.mutate(payload, {
+        onSuccess: () => {
+          toast.success("Podcast successfully uploaded!");
+          setShowModal(false);
+          setForm({ title: "" });
+          setVideoFile(null);
+          setImageFile(null);
+          setTouched({});
+          setFieldErrors({});
+        },
+        onError: (err) => {
+          toast.error(err?.response?.data?.message || "Failed to upload podcast");
+        },
+      });
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to upload podcast media directly to R2");
+    } finally {
+      setIsUploadingR2(false);
+    }
   };
 
   const handleDelete = (id) => {
@@ -332,16 +346,16 @@ const Podcast = () => {
               )}
             </div>
 
-            {addMutation.isPending && (
-              <UploadProgressBar isUploading={addMutation.isPending} />
+            {(addMutation.isPending || isUploadingR2) && (
+              <UploadProgressBar isUploading={true} />
             )}
 
             <button
               onClick={handleSubmit}
-              disabled={addMutation.isPending}
+              disabled={addMutation.isPending || isUploadingR2}
               className="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white py-3 rounded-xl font-bold shadow-md transition disabled:bg-indigo-300 flex items-center justify-center gap-2 cursor-pointer"
             >
-              {addMutation.isPending ? (
+              {addMutation.isPending || isUploadingR2 ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
                   <span>Uploading Episode Media...</span>

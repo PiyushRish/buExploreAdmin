@@ -13,6 +13,7 @@ import {
 import toast from "react-hot-toast";
 import { validateMediaType } from "../utils/validators.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadFileDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const getImageUrl = (photo) => {
   if (!photo) return "https://picsum.photos/600/400";
@@ -26,6 +27,7 @@ const PlaceDetails = ({ onBack, onNavigateToReviews }) => {
   const [data, setData] = useState(clickedPlace || {});
   const [isEditing, setIsEditing] = useState(false);
   const [deleteMode, setDeleteMode] = useState(null); // 'soft' | 'hard' | null
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   const updatePlaceMutation = useUpdatePlaceMutation();
   const deletePlaceMutation = useDeletePlaceMutation();
@@ -60,7 +62,24 @@ const PlaceDetails = ({ onBack, onNavigateToReviews }) => {
 
   const handleSave = async () => {
     try {
-      const formData = new FormData();
+      setIsUploadingR2(true);
+      let updatedPhotos = data.photos ? [...data.photos] : [];
+      let updatedVideos = data.videos ? [...data.videos] : [];
+
+      if (newPhotoFile) {
+        const uploadedPhoto = await uploadFileDirectToR2(newPhotoFile, "places/photos", "image");
+        if (uploadedPhoto) {
+          updatedPhotos.push(uploadedPhoto);
+        }
+      }
+
+      if (newVideoFile) {
+        const uploadedVideo = await uploadFileDirectToR2(newVideoFile, "places/videos", "video");
+        if (uploadedVideo) {
+          updatedVideos = [uploadedVideo];
+        }
+      }
+
       const payload = {
         name: data.name,
         description: data.description,
@@ -73,19 +92,20 @@ const PlaceDetails = ({ onBack, onNavigateToReviews }) => {
           lat: Number(data.location?.lat) || 0,
           lng: Number(data.location?.lng) || 0,
         },
+        photos: updatedPhotos,
+        videos: updatedVideos,
       };
 
-      formData.append("data", JSON.stringify(payload));
-      if (newPhotoFile) formData.append("placePhoto", newPhotoFile);
-      if (newVideoFile) formData.append("placeVideo", newVideoFile);
-
-      await updatePlaceMutation.mutateAsync({ id: data._id, formData });
+      await updatePlaceMutation.mutateAsync({ id: data._id, data: payload });
+      setData((prev) => ({ ...prev, photos: updatedPhotos, videos: updatedVideos }));
       setIsEditing(false);
       setNewPhotoFile(null);
       setNewVideoFile(null);
       toast.success("Destination details saved successfully!");
     } catch (_err) {
       toast.error(_err?.response?.data?.message || "Failed to update destination");
+    } finally {
+      setIsUploadingR2(false);
     }
   };
 
@@ -141,7 +161,7 @@ const PlaceDetails = ({ onBack, onNavigateToReviews }) => {
           onBack={onBack || (() => setClickedPlaceHandler(null))}
           isDeleted={data.isDeleted}
           isEditing={isEditing}
-          isPending={updatePlaceMutation.isPending}
+          isPending={updatePlaceMutation.isPending || isUploadingR2}
           onRestore={handleRestore}
           onSoftDeleteClick={() => setDeleteMode("soft")}
           onHardDeleteClick={() => setDeleteMode("hard")}
@@ -152,8 +172,8 @@ const PlaceDetails = ({ onBack, onNavigateToReviews }) => {
 
         {/* CONTENT FIELD CONTAINER */}
         <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-gray-50/50">
-          {updatePlaceMutation.isPending && (
-            <UploadProgressBar isUploading={updatePlaceMutation.isPending} />
+          {(updatePlaceMutation.isPending || isUploadingR2) && (
+            <UploadProgressBar isUploading={true} />
           )}
 
           {/* STATUS BADGES & ID */}

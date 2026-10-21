@@ -11,6 +11,7 @@ import { validators, runValidators, validateMediaType } from "../utils/validator
 import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
 import { useNotificationDraft } from "../utils/useNotificationDraft.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const VehicleCard = ({ vehicle }) => {
   const { setClickedPlaceHandler } = useContext(PlaceContext);
@@ -53,6 +54,7 @@ const Vehicles = () => {
   });
   
   const [photoFiles, setPhotoFiles] = useState([]);
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   const RULES = {
     title: [validators.required],
@@ -111,28 +113,28 @@ const Vehicles = () => {
       return;
     }
 
-    const payload = {
-      title: form.title,
-      subCategory: form.subCategory,
-      vehicleType: form.vehicleType,
-      seats: Number(form.seats || 4),
-      price: Number(form.price || 0),
-      transmissionType: form.transmissionType,
-      fuelType: form.fuelType,
-      description: form.description,
-      contact: JSON.stringify({
-        phone: form.phone,
-        email: form.email,
-        website: form.website
-      }),
-    };
-
-    const formData = new FormData();
-    Object.keys(payload).forEach((k) => formData.append(k, payload[k]));
-    photoFiles.forEach(f => formData.append("VehiclePhotos", f));
-
     try {
-      const result = await addMutation.mutateAsync(formData);
+      setIsUploadingR2(true);
+      const uploadedPhotos = await uploadMultipleFilesDirectToR2(photoFiles, "services/vehicles", "image");
+
+      const payload = {
+        title: form.title,
+        subCategory: form.subCategory,
+        vehicleType: form.vehicleType,
+        seats: Number(form.seats || 4),
+        price: Number(form.price || 0),
+        transmissionType: form.transmissionType,
+        fuelType: form.fuelType,
+        description: form.description,
+        contact: {
+          phone: form.phone,
+          email: form.email,
+          website: form.website
+        },
+        photos: uploadedPhotos,
+      };
+
+      const result = await addMutation.mutateAsync(payload);
       await sendIfEnabled({ serviceId: result?.vehicle?._id || result?._id });
       toast.success("Vehicle added successfully!");
       setShowModal(false);
@@ -141,8 +143,10 @@ const Vehicles = () => {
       setTouched({});
       setFieldErrors({});
       resetNotif();
+      setIsUploadingR2(false);
     } catch(err) {
-      toast.error(err?.response?.data?.message || "Failed to add vehicle");
+      setIsUploadingR2(false);
+      toast.error(err?.response?.data?.message || err?.message || "Failed to add vehicle");
     }
   };
 
@@ -326,9 +330,9 @@ const Vehicles = () => {
                 onChange={setNotif}
               />
 
-              {addMutation.isPending && (
+              {(addMutation.isPending || isUploadingR2) && (
                 <div className="pt-2">
-                  <UploadProgressBar isUploading={addMutation.isPending} />
+                  <UploadProgressBar isUploading={addMutation.isPending || isUploadingR2} />
                 </div>
               )}
             </div>
@@ -338,20 +342,25 @@ const Vehicles = () => {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                disabled={addMutation.isPending}
+                disabled={addMutation.isPending || isUploadingR2}
                 className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={addMutation.isPending}
+                disabled={addMutation.isPending || isUploadingR2}
                 className="px-6 py-2.5 bg-red-600 hover:bg-red-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition disabled:bg-red-300 flex items-center gap-2 cursor-pointer"
               >
-                {addMutation.isPending ? (
+                {isUploadingR2 ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    <span>Uploading Vehicle Assets...</span>
+                    <span>Uploading directly to Cloudflare R2...</span>
+                  </>
+                ) : addMutation.isPending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Saving Vehicle...</span>
                   </>
                 ) : (
                   <span>Add Rental Vehicle</span>

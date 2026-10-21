@@ -14,13 +14,12 @@ export const getAdsByPlacement = async (placement, limit = 1) => {
   return res.data;
 };
 
-// 3. Bundled Advertiser + Ad Campaign Creation (FormData)
-export const createAds = async (formData) => {
-  const res = await axiosClient.post("/advertisment/new", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-    timeout: 300000, // 5 minutes timeout for video processing
+// 3. Bundled Advertiser + Ad Campaign Creation (JSON or FormData)
+export const createAds = async (data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.post("/advertisment/new", data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
+    timeout: 300000,
   });
   return res.data;
 };
@@ -43,12 +42,12 @@ export const updateAdStatus = async (adId, status) => {
   return res.data;
 };
 
-// 6.5 Full Ad Update (FormData)
-export const updateAd = async ({ adId, formData }) => {
-  const res = await axiosClient.put(`/advertisment/${adId}`, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+// 6.5 Full Ad Update (JSON or FormData)
+export const updateAd = async ({ adId, formData, data }) => {
+  const payload = data !== undefined ? data : formData;
+  const isFormData = typeof FormData !== "undefined" && payload instanceof FormData;
+  const res = await axiosClient.put(`/advertisment/${adId}`, payload, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 300000,
   });
   return res.data;

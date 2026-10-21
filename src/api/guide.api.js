@@ -5,21 +5,19 @@ export const getGuides = async () => {
   return res.data;
 };
 
-export const addGuide = async (guideData) => {
-  const res = await axiosClient.post("/services/createGuide", guideData, {
-    headers: {  
-      "Content-Type": "multipart/form-data",  
-    },
+export const addGuide = async (data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.post("/services/createGuide", data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 60000,
   });
   return res.data;
 };
 
-export const updateGuide = async (guideId, guideData) => {
-  const res = await axiosClient.patch(`/services/updateGuide/${guideId}`, guideData, {
-    headers: {  
-      "Content-Type": "multipart/form-data",  
-    },
+export const updateGuide = async (guideId, data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.patch(`/services/updateGuide/${guideId}`, data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 60000,
   });
   return res.data;

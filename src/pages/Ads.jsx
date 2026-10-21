@@ -8,6 +8,7 @@ import { RequiredNotice } from "../components/RequiredTag.jsx";
 import FormField from "../components/FormField.jsx";
 import { validators, runValidators, validateMediaType } from "../utils/validators.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadFileDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const getImageUrl = (photo) => {
   if (!photo) return null;
@@ -40,6 +41,7 @@ const Ads = () => {
 
   const [showCampaignModal, setShowCampaignModal] = useState(false);
   const [showAdModal, setShowAdModal] = useState(false);
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   // --- Campaign Form State ---
   const [campaignForm, setCampaignForm] = useState({
@@ -158,7 +160,7 @@ const Ads = () => {
     }
   };
 
-  const handleAdSubmit = () => {
+  const handleAdSubmit = async () => {
     const requiredFields = ["headline", "startDate"];
     const allOptional = ["linkUrl", "pricePaid", "maxImpressions", "priority", "endDate"];
     const allFields = [...requiredFields, ...allOptional];
@@ -182,42 +184,71 @@ const Ads = () => {
       return;
     }
 
-    const formData = new FormData();
-    if (imageFile) formData.append("ImageAd", imageFile);
-    if (videoFile) formData.append("VideoAd", videoFile);
+    try {
+      setIsUploadingR2(true);
+      let uploadedPhotos = [];
+      let uploadedVideos = [];
 
-    const payload = {
-      campaignId: activeCampaign._id,
-      placement: adForm.placement,
-      status: "active",
-      startDate: adForm.startDate,
-      ...(adForm.endDate && { endDate: adForm.endDate }),
-      ...(adForm.priority && { priority: Number(adForm.priority) }),
-      ...(adForm.pricePaid && { pricePaid: Number(adForm.pricePaid) }),
-      ...(adForm.maxImpressions && { maxImpressions: Number(adForm.maxImpressions) }),
-      content: {
-        creativeFormat: adForm.creativeFormat,
-        headline: adForm.headline,
-        ...(adForm.bodyText && { bodyText: adForm.bodyText }),
-        ...(adForm.ctaText && { ctaText: adForm.ctaText }),
-        ...(adForm.linkUrl && { linkUrl: adForm.linkUrl }),
-      },
-    };
+      if (imageFile) {
+        const photoAsset = await uploadFileDirectToR2(imageFile, "ads/banners", "image");
+        if (photoAsset) uploadedPhotos.push(photoAsset);
+      }
 
-    formData.append("data", JSON.stringify(payload));
+      if (videoFile) {
+        const videoAsset = await uploadFileDirectToR2(videoFile, "ads/videos", "video");
+        if (videoAsset) uploadedVideos.push(videoAsset);
+      }
 
-    createAdMutation.mutate(formData, {
-      onSuccess: () => {
-        toast.success("Ad Placement created!");
-        setShowAdModal(false);
-        setImageFile(null);
-        setVideoFile(null);
-        setAdTouched({});
-        setAdFieldErrors({});
-        setAdForm({ placement: "feed_native", creativeFormat: "image_single", headline: "", bodyText: "", ctaText: "Learn More", linkUrl: "", priority: "1", pricePaid: "", maxImpressions: "", frequencyCap: "", startDate: "", endDate: "" });
-      },
-      onError: (err) => toast.error(err?.response?.data?.message || "Failed to create ad placement"),
-    });
+      const payload = {
+        campaignId: activeCampaign._id,
+        placement: adForm.placement,
+        status: "active",
+        startDate: adForm.startDate,
+        ...(adForm.endDate && { endDate: adForm.endDate }),
+        ...(adForm.priority && { priority: Number(adForm.priority) }),
+        ...(adForm.pricePaid && { pricePaid: Number(adForm.pricePaid) }),
+        ...(adForm.maxImpressions && { maxImpressions: Number(adForm.maxImpressions) }),
+        content: {
+          creativeFormat: adForm.creativeFormat,
+          headline: adForm.headline,
+          ...(adForm.bodyText && { bodyText: adForm.bodyText }),
+          ...(adForm.ctaText && { ctaText: adForm.ctaText }),
+          ...(adForm.linkUrl && { linkUrl: adForm.linkUrl }),
+          photos: uploadedPhotos,
+          videos: uploadedVideos,
+        },
+      };
+
+      createAdMutation.mutate(payload, {
+        onSuccess: () => {
+          toast.success("Ad Placement created!");
+          setShowAdModal(false);
+          setImageFile(null);
+          setVideoFile(null);
+          setAdTouched({});
+          setAdFieldErrors({});
+          setAdForm({
+            placement: "feed_native",
+            creativeFormat: "image_single",
+            headline: "",
+            bodyText: "",
+            ctaText: "Learn More",
+            linkUrl: "",
+            priority: "1",
+            pricePaid: "",
+            maxImpressions: "",
+            frequencyCap: "",
+            startDate: "",
+            endDate: "",
+          });
+        },
+        onError: (err) => toast.error(err?.response?.data?.message || "Failed to create ad placement"),
+      });
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to upload ad media directly to storage");
+    } finally {
+      setIsUploadingR2(false);
+    }
   };
 
   const campaigns = campaignsData?.campaigns || [];
@@ -496,16 +527,16 @@ const Ads = () => {
               </div>
             )}
 
-            {createAdMutation.isPending && (
-              <UploadProgressBar isUploading={createAdMutation.isPending} />
+            {(createAdMutation.isPending || isUploadingR2) && (
+              <UploadProgressBar isUploading={true} />
             )}
 
             <button
               onClick={handleAdSubmit}
-              disabled={createAdMutation.isPending}
+              disabled={createAdMutation.isPending || isUploadingR2}
               className="w-full bg-purple-600 hover:bg-purple-700 active:scale-98 text-white py-3 rounded-xl font-bold shadow-md transition disabled:bg-purple-300 flex items-center justify-center gap-2 cursor-pointer"
             >
-              {createAdMutation.isPending ? (
+              {createAdMutation.isPending || isUploadingR2 ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
                   <span>Uploading Ad Assets...</span>

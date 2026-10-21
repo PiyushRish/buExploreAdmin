@@ -33,23 +33,22 @@ export const getPlacesByCategory = async (categoryId) => {
   return res.data;
 };
 
-// 6. Add New Place (FormData)
-export const addPlace = async (formData) => {
-  const res = await axiosClient.post("/places/addPlace", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+// 6. Add New Place (JSON or FormData)
+export const addPlace = async (data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.post("/places/addPlace", data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 300000,
   });
   return res.data;
 };
 
-// 7. Update Place (FormData)
-export const updatePlace = async ({ id, formData }) => {
-  const res = await axiosClient.patch(`/places/${id}`, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+// 7. Update Place (JSON or FormData)
+export const updatePlace = async ({ id, formData, data }) => {
+  const payload = data !== undefined ? data : formData;
+  const isFormData = typeof FormData !== "undefined" && payload instanceof FormData;
+  const res = await axiosClient.patch(`/places/${id}`, payload, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 300000,
   });
   return res.data;

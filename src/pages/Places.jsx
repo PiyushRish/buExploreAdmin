@@ -21,6 +21,7 @@ import { validators, runValidators, validateMediaType } from "../utils/validator
 import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
 import { useNotificationDraft } from "../utils/useNotificationDraft.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadFileDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const getImageUrl = (photo) => {
   if (!photo) return "https://picsum.photos/600/400";
@@ -158,6 +159,7 @@ const Places = ({ onNavigateToReviews }) => {
 
   const [photoFile, setPhotoFile] = useState(null);
   const [videoFile, setVideoFile] = useState(null);
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   // Validation
   const RULES = {
@@ -225,34 +227,39 @@ const Places = ({ onNavigateToReviews }) => {
       return;
     }
 
-    const formData = new FormData();
-    const payload = {
-      name: form.name,
-      description: form.description,
-      category: form.category,
-      city: form.city,
-      ytVideoLink: form.ytVideoLink,
-      location: {
-        address: form.address,
-        lat: Number(form.lat) || 0,
-        lng: Number(form.lng) || 0,
-      },
-    };
-
-    formData.append("data", JSON.stringify(payload));
-    formData.append("placePhoto", photoFile);
-    if (videoFile) formData.append("placeVideo", videoFile);
-
     try {
-      const result = await addPlace(formData);
+      setIsUploadingR2(true);
+      const [uploadedPhoto, uploadedVideo] = await Promise.all([
+        uploadFileDirectToR2(photoFile, "places/photos", "image"),
+        videoFile ? uploadFileDirectToR2(videoFile, "places/videos", "video") : null,
+      ]);
+
+      const payload = {
+        name: form.name,
+        description: form.description,
+        category: form.category,
+        city: form.city,
+        ytVideoLink: form.ytVideoLink,
+        location: {
+          address: form.address,
+          lat: Number(form.lat) || 0,
+          lng: Number(form.lng) || 0,
+        },
+        photos: uploadedPhoto ? [uploadedPhoto] : [],
+        videos: uploadedVideo ? [uploadedVideo] : [],
+      };
+
+      const result = await addPlace(payload);
       await sendIfEnabled({ serviceId: result?.place?._id || result?._id });
       toast.success("Destination created successfully!");
       setShowModal(false);
       setPhotoFile(null);
       setVideoFile(null);
       resetNotif();
+      setIsUploadingR2(false);
     } catch (_err) {
-      toast.error(_err?.response?.data?.message || "Failed to create destination");
+      setIsUploadingR2(false);
+      toast.error(_err?.response?.data?.message || _err?.message || "Failed to create destination");
     }
   };
 
@@ -601,9 +608,9 @@ const Places = ({ onNavigateToReviews }) => {
               />
 
               {/* Upload Progress Indicator when uploading */}
-              {isPending && (
+              {(isPending || isUploadingR2) && (
                 <div className="pt-2">
-                  <UploadProgressBar isUploading={isPending} />
+                  <UploadProgressBar isUploading={isPending || isUploadingR2} />
                 </div>
               )}
             </div>
@@ -613,20 +620,25 @@ const Places = ({ onNavigateToReviews }) => {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                disabled={isPending}
+                disabled={isPending || isUploadingR2}
                 className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={isPending}
+                disabled={isPending || isUploadingR2}
                 className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition disabled:bg-blue-300 flex items-center gap-2 cursor-pointer"
               >
-                {isPending ? (
+                {isUploadingR2 ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    <span>Uploading Assets...</span>
+                    <span>Uploading directly to Cloudflare R2...</span>
+                  </>
+                ) : isPending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Saving Destination...</span>
                   </>
                 ) : (
                   <span>Save Destination</span>
