@@ -134,10 +134,10 @@ const NotificationDraftSection = ({ entityName, serviceType, value, onChange }) 
         <div className="flex items-center gap-3">
           <div className="flex flex-col items-end text-right">
             <span className="text-xs font-black select-none text-slate-800">
-              {isEnabled ? "Push Notification Enabled" : "Push Notification Disabled"}
+              {isEnabled ? "In-App + FCM Push Enabled" : "Push Notification Disabled"}
             </span>
             <span className="text-[10px] font-semibold text-slate-400">
-              {isEnabled ? "Will broadcast to tourists" : "Silent creation (No alert)"}
+              {isEnabled ? "Will broadcast via Socket & FCM to all tourists" : "Silent creation (No alert)"}
             </span>
           </div>
 
@@ -190,7 +190,7 @@ const NotificationDraftSection = ({ entityName, serviceType, value, onChange }) 
       {isEnabled && (
         <div className="space-y-2.5 pt-1">
           <div className="flex items-center justify-between text-[10px] text-blue-700 font-semibold bg-blue-100/70 px-2.5 py-1.5 rounded-xl">
-            <span>⏱️ Active notification retention: 1 day (24 hours)</span>
+            <span>⏱️ Delivery: In-App (Socket + DB) &amp; FCM Push simultaneously</span>
             <span className="text-emerald-700 font-bold">● Broadcasts instantly on save</span>
           </div>
 

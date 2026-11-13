@@ -9,6 +9,7 @@ import {
   CheckCheck,
   Check,
   RefreshCw,
+  Smartphone,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -160,7 +161,12 @@ const Notifications = () => {
         <div className="bg-white p-6 rounded-2xl border shadow-sm space-y-4 h-fit">
           <div className="flex items-center gap-2 text-blue-600 border-b pb-3">
             <Bell size={20} />
-            <h2 className="text-xl font-bold text-gray-900">Broadcast Alert</h2>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Broadcast Alert</h2>
+              <p className="text-[10px] text-gray-400 font-medium mt-0.5 flex items-center gap-1">
+                <Smartphone size={9} /> Sends In-App + FCM Push Notification
+              </p>
+            </div>
           </div>
 
           <form onSubmit={handleSend} className="space-y-4">
@@ -261,6 +267,12 @@ const Notifications = () => {
               <Send size={16} />
               {sendMutation.isPending ? "Sending..." : "Dispatch Notification"}
             </button>
+
+            {/* FCM info note */}
+            <p className="text-[10px] text-gray-400 text-center flex items-center justify-center gap-1">
+              <Smartphone size={9} />
+              Delivers via <span className="font-bold text-gray-500">In-App</span> (Socket + DB) &amp; <span className="font-bold text-orange-500">FCM Push</span> simultaneously
+            </p>
           </form>
         </div>
 
@@ -276,7 +288,7 @@ const Notifications = () => {
                 </span>
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">
-                Active notifications log • 1-day retention limit
+                Active notifications log • 3-day retention limit • In-App + FCM Push
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -337,6 +349,10 @@ const Notifications = () => {
                           <Globe size={9} /> Broadcast
                         </span>
                       )}
+                      {/* FCM Push delivery badge — always shown since backend fires FCM for every notification */}
+                      <span className="flex items-center gap-1 bg-orange-50 text-orange-500 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                        <Smartphone size={9} /> FCM Push
+                      </span>
                     </div>
 
                     {/* Message */}
