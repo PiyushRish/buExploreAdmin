@@ -224,7 +224,11 @@ const Places = ({ onNavigateToReviews }) => {
 
   const handleChangeValidated = (e) => {
     const { name, value } = e.target;
-    setForm((p) => ({ ...p, [name]: value }));
+    setForm((p) => ({
+      ...p,
+      [name]: value,
+      ...(name === "category" && value !== "JhansiSmartCity" ? { bookingLink: "" } : {}),
+    }));
     if (touched[name]) {
       const result = runValidators(value, RULES[name] || [], name);
       setFieldErrors((p) => ({ ...p, [name]: result }));
@@ -280,7 +284,9 @@ const Places = ({ onNavigateToReviews }) => {
         category: form.category,
         city: form.city,
         ytVideoLink: form.ytVideoLink,
-        bookingLink: form.bookingLink.trim() || null,
+        ...(form.category === "JhansiSmartCity"
+          ? { bookingLink: form.bookingLink.trim() || null }
+          : {}),
         location: {
           address: form.address,
           lat: Number(form.lat) || 0,
@@ -533,24 +539,26 @@ const Places = ({ onNavigateToReviews }) => {
                   </div>
                 </div>
 
-                <FormField
-                  label="Booking Link"
-                  optional
-                  error={fieldErrors.bookingLink?.error}
-                  hint={fieldErrors.bookingLink?.hint || "HTTP or HTTPS link where visitors can book this place"}
-                  touched={touched.bookingLink}
-                  valid={touched.bookingLink && !fieldErrors.bookingLink}
-                >
-                  <input
-                    type="url"
-                    name="bookingLink"
-                    value={form.bookingLink}
-                    placeholder="https://tickets.example.com/place"
-                    onChange={handleChangeValidated}
-                    onBlur={handleBlur}
-                    className="w-full px-3.5 py-2.5 rounded-xl text-sm text-blue-600 border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-hidden"
-                  />
-                </FormField>
+                {form.category === "JhansiSmartCity" && (
+                  <FormField
+                    label="Booking Link"
+                    optional
+                    error={fieldErrors.bookingLink?.error}
+                    hint={fieldErrors.bookingLink?.hint || "HTTP or HTTPS link where visitors can book this place"}
+                    touched={touched.bookingLink}
+                    valid={touched.bookingLink && !fieldErrors.bookingLink}
+                  >
+                    <input
+                      type="url"
+                      name="bookingLink"
+                      value={form.bookingLink}
+                      placeholder="https://tickets.example.com/place"
+                      onChange={handleChangeValidated}
+                      onBlur={handleBlur}
+                      className="w-full px-3.5 py-2.5 rounded-xl text-sm text-blue-600 border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-hidden"
+                    />
+                  </FormField>
+                )}
 
                 <FormField
                   label="Description"
