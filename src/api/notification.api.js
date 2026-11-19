@@ -17,15 +17,3 @@ export const deleteNotification = async (id) => {
   const res = await axiosClient.delete(`/notification/${id}`);
   return res.data;
 };
-
-/** User: Mark single notification as read by UUID notificationId */
-export const markAsRead = async (notificationId) => {
-  const res = await axiosClient.patch(`/notification/${notificationId}/read`);
-  return res.data;
-};
-
-/** User: Mark all notifications as read */
-export const markAllAsRead = async () => {
-  const res = await axiosClient.patch("/notification/read-all");
-  return res.data;
-};

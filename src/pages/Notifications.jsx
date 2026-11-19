@@ -6,8 +6,6 @@ import {
   Globe,
   Tag,
   Layers,
-  CheckCheck,
-  Check,
   RefreshCw,
   Smartphone,
 } from "lucide-react";
@@ -16,7 +14,6 @@ import {
   getNotifications,
   sendNotification,
   deleteNotification,
-  markAllAsRead,
 } from "../api/notification.api";
 import toast from "react-hot-toast";
 
@@ -96,15 +93,6 @@ const Notifications = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       toast.success("Notification removed");
-    },
-  });
-
-  // ── Mark all as read (admin utility) ──
-  const markAllMutation = useMutation({
-    mutationFn: markAllAsRead,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      toast.success("All marked as read");
     },
   });
 
@@ -288,7 +276,7 @@ const Notifications = () => {
                 </span>
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">
-                Active notifications log • 3-day retention limit • In-App + FCM Push
+                Persistent notification history • In-App + FCM Push
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -301,16 +289,6 @@ const Notifications = () => {
                 <RefreshCw size={13} className={isFetching ? "animate-spin" : ""} />
                 Refresh
               </button>
-              {notifications.length > 0 && (
-                <button
-                  onClick={() => markAllMutation.mutate()}
-                  disabled={markAllMutation.isPending}
-                  className="flex items-center gap-1.5 text-xs font-bold text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 px-3 py-2 rounded-xl transition-colors"
-                >
-                  <CheckCheck size={14} />
-                  Mark All Read
-                </button>
-              )}
             </div>
           </div>
 
@@ -363,10 +341,9 @@ const Notifications = () => {
                       <span className="text-[10px] text-gray-400 font-mono">
                         {new Date(n.createdAt).toLocaleString()}
                       </span>
-                      {n.readBy?.length > 0 && (
-                        <span className="flex items-center gap-1 text-[10px] text-green-600 font-bold">
-                          <Check size={10} />
-                          {n.readBy.length} read
+                      {n.readCount > 0 && (
+                        <span className="text-[10px] text-green-600 font-bold">
+                          {n.readCount} user{n.readCount === 1 ? "" : "s"} read
                         </span>
                       )}
                       {n.notificationId && (
@@ -379,10 +356,15 @@ const Notifications = () => {
 
                   {/* Delete button */}
                   <button
-                    onClick={() => deleteMutation.mutate(n._id)}
+                    onClick={() => {
+                      const confirmed = window.confirm(
+                        "Permanently delete this notification from everyone's history?"
+                      );
+                      if (confirmed) deleteMutation.mutate(n._id);
+                    }}
                     disabled={deleteMutation.isPending}
                     className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors flex-shrink-0"
-                    title="Delete notification"
+                    title="Permanently delete notification for everyone"
                   >
                     <Trash2 size={15} />
                   </button>

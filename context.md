@@ -58,7 +58,7 @@ The Notifications page (`pages/Notifications.jsx`) was upgraded to support:
 
 1. **Service-specific notifications** — Admin can pick a service type (hotel, guide, restaurant, event, tour, etc.) and optionally paste the service's ObjectId so the notification links to that specific record
 2. **UUID-based deduplication** — Backend generates a `notificationId` (UUID v4). Frontend uses this to deduplicate real-time socket notifications vs. fetched ones
-3. **Read/Unread badge** — The admin sees total sent count; the mobile app fetches only unread
+3. **Read/Unread state** — The admin sees aggregate read counts; the mobile app keeps read items until the user explicitly cleans them up
 
 ### API calls used
 | Function | Method | Endpoint |
@@ -66,8 +66,6 @@ The Notifications page (`pages/Notifications.jsx`) was upgraded to support:
 | `getNotifications` | GET | `/notification/all` |
 | `sendNotification` | POST | `/notification/send` |
 | `deleteNotification` | DELETE | `/notification/:id` |
-| `markAsRead` | PATCH | `/notification/:notificationId/read` |
-| `markAllAsRead` | PATCH | `/notification/read-all` |
 
 ### Notification send payload
 ```js
@@ -129,10 +127,10 @@ The Notifications page (`pages/Notifications.jsx`) was upgraded to support:
   - Integrated `refetchInterval` for hands-free live synchronization of dispatched notifications.
   - Safe payload normalization supporting both `{ data: [...] }` and `{ notifications: [...] }` envelopes.
   - Graceful error boundary with dedicated "Retry" button.
-  - Manual "Refresh" button alongside "Mark All Read" with visual 1-day retention badge indicator.
+  - Manual "Refresh" button and persistent notification history.
 - **Mark as Read Endpoints:**
   - `PATCH /api/notification/:notificationId/read` supports UUID `notificationId` as well as MongoDB `_id`.
-  - `PATCH /api/notification/read-all` marks all unread notifications within 24h retention window.
+  - `PATCH /api/notification/read-all` marks current user notifications read without dismissing them.
 
 ---
 
