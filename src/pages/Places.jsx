@@ -190,6 +190,7 @@ const Places = ({ onNavigateToReviews }) => {
     category: "Heritage",
     city: "Jhansi",
     ytVideoLink: "",
+    bookingLink: "",
     address: "",
     lat: "",
     lng: "",
@@ -207,6 +208,7 @@ const Places = ({ onNavigateToReviews }) => {
     city:        [validators.required],
     address:     [validators.required],
     ytVideoLink: [validators.youtubeUrl],
+    bookingLink: [validators.httpUrl],
     lat:         [validators.required, validators.latitude],
     lng:         [validators.required, validators.longitude],
   };
@@ -231,7 +233,7 @@ const Places = ({ onNavigateToReviews }) => {
 
   const handleSubmit = async () => {
     const requiredFields = ["name", "description", "category", "city", "address", "lat", "lng"];
-    const optionalValidated = ["ytVideoLink"];
+    const optionalValidated = ["ytVideoLink", "bookingLink"];
     const allFields = [...requiredFields, ...optionalValidated];
 
     const newTouched = {};
@@ -278,6 +280,7 @@ const Places = ({ onNavigateToReviews }) => {
         category: form.category,
         city: form.city,
         ytVideoLink: form.ytVideoLink,
+        bookingLink: form.bookingLink.trim() || null,
         location: {
           address: form.address,
           lat: Number(form.lat) || 0,
@@ -529,6 +532,25 @@ const Places = ({ onNavigateToReviews }) => {
                     </FormField>
                   </div>
                 </div>
+
+                <FormField
+                  label="Booking Link"
+                  optional
+                  error={fieldErrors.bookingLink?.error}
+                  hint={fieldErrors.bookingLink?.hint || "HTTP or HTTPS link where visitors can book this place"}
+                  touched={touched.bookingLink}
+                  valid={touched.bookingLink && !fieldErrors.bookingLink}
+                >
+                  <input
+                    type="url"
+                    name="bookingLink"
+                    value={form.bookingLink}
+                    placeholder="https://tickets.example.com/place"
+                    onChange={handleChangeValidated}
+                    onBlur={handleBlur}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-sm text-blue-600 border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-hidden"
+                  />
+                </FormField>
 
                 <FormField
                   label="Description"

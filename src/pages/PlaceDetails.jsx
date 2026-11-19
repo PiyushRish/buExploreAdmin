@@ -11,7 +11,7 @@ import {
   useRestorePlaceMutation,
 } from "../mutations/placeMutation.js";
 import toast from "react-hot-toast";
-import { validateMediaType } from "../utils/validators.js";
+import { validateMediaType, validators } from "../utils/validators.js";
 import UploadProgressBar from "../components/UploadProgressBar.jsx";
 import { uploadFileDirectToR2 } from "../utils/r2DirectUpload.js";
 
@@ -62,6 +62,12 @@ const PlaceDetails = ({ onBack, onNavigateToReviews }) => {
 
   const handleSave = async () => {
     try {
+      const bookingLinkError = validators.httpUrl(data.bookingLink || "", "Booking link");
+      if (bookingLinkError) {
+        toast.error(bookingLinkError.error);
+        return;
+      }
+
       setIsUploadingR2(true);
       let updatedPhotos = data.photos ? [...data.photos] : [];
       let updatedVideos = data.videos ? [...data.videos] : [];
@@ -86,6 +92,7 @@ const PlaceDetails = ({ onBack, onNavigateToReviews }) => {
         category: data.category,
         city: data.city,
         ytVideoLink: data.ytVideoLink,
+        bookingLink: data.bookingLink?.trim() || null,
         likes: Number(data.likes) || 0,
         views: Number(data.views) || 0,
         shares: Number(data.shares) || 0,
@@ -366,6 +373,36 @@ const PlaceDetails = ({ onBack, onNavigateToReviews }) => {
                   )}
                 </div>
               </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                Booking Link
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="url"
+                  name="bookingLink"
+                  disabled={!isEditing}
+                  value={data.bookingLink || ""}
+                  onChange={handleChange}
+                  placeholder="https://tickets.example.com/place"
+                  className="w-full p-2.5 border rounded-xl bg-white disabled:bg-gray-50 text-sm text-blue-600 font-medium"
+                />
+                {data.bookingLink && (
+                  <a
+                    href={data.bookingLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100"
+                    aria-label="Open booking link"
+                    title="Open booking link"
+                  >
+                    <ExternalLink size={16} />
+                  </a>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-gray-400">Optional; must be an HTTP or HTTPS URL.</p>
             </div>
 
             <div>
