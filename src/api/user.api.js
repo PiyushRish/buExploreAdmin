@@ -14,3 +14,8 @@ export const restoreUser = async (id) => {
   const res = await axiosClient.patch(`/users/restore/${id}`);
   return res.data;
 };
+
+export const getUserStats = async () => {
+  const res = await axiosClient.get("/users/getUserCount");
+  return res.data;
+};

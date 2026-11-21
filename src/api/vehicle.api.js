@@ -5,21 +5,19 @@ export const getVehicles = async () => {
   return res.data;
 };
 
-export const addVehicle = async (vehicleData) => {
-  const res = await axiosClient.post("/services/createVehicle", vehicleData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+export const addVehicle = async (data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.post("/services/createVehicle", data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 60000,
   });
   return res.data;
 };
 
-export const updateVehicle = async (vehicleId, vehicleData) => {
-  const res = await axiosClient.put(`/services/vehicle/${vehicleId}`, vehicleData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+export const updateVehicle = async (vehicleId, data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.put(`/services/vehicle/${vehicleId}`, data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 60000,
   });
   return res.data;

@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from "react";
 import {
   Image as ImageIcon, Film, ExternalLink,
-  Globe, Compass, Tag, Calendar, Eye, Heart, UploadCloud, AlertTriangle
+  Globe, Compass, Tag, Calendar, Eye, Heart, UploadCloud, AlertTriangle, Star, MessageSquare, Share2
 } from "lucide-react";
 import { GenericDetailsHeader } from "../components/layout/GenericDetailsHeader.jsx";
 import { PlaceContext } from "../contextApi/places.jsx";
@@ -11,7 +11,9 @@ import {
   useRestorePlaceMutation,
 } from "../mutations/placeMutation.js";
 import toast from "react-hot-toast";
-import { validateMediaType } from "../utils/validators.js";
+import { validateMediaType, validators } from "../utils/validators.js";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadFileDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const getImageUrl = (photo) => {
   if (!photo) return "https://picsum.photos/600/400";
@@ -19,12 +21,13 @@ const getImageUrl = (photo) => {
   return photo.url || photo.secure_url || "https://picsum.photos/600/400";
 };
 
-const PlaceDetails = () => {
+const PlaceDetails = ({ onBack, onNavigateToReviews }) => {
   const { clickedPlace, setClickedPlaceHandler } = useContext(PlaceContext);
 
   const [data, setData] = useState(clickedPlace || {});
   const [isEditing, setIsEditing] = useState(false);
   const [deleteMode, setDeleteMode] = useState(null); // 'soft' | 'hard' | null
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   const updatePlaceMutation = useUpdatePlaceMutation();
   const deletePlaceMutation = useDeletePlaceMutation();
@@ -43,7 +46,11 @@ const PlaceDetails = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setData((prev) => ({ ...prev, [name]: value }));
+    setData((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === "category" && value !== "JhansiSmartCity" ? { bookingLink: "" } : {}),
+    }));
   };
 
   const handleLocationChange = (e) => {
@@ -59,32 +66,63 @@ const PlaceDetails = () => {
 
   const handleSave = async () => {
     try {
-      const formData = new FormData();
+      const bookingLinkError = data.category === "JhansiSmartCity"
+        ? validators.httpUrl(data.bookingLink || "", "Booking link")
+        : null;
+      if (bookingLinkError) {
+        toast.error(bookingLinkError.error);
+        return;
+      }
+
+      setIsUploadingR2(true);
+      let updatedPhotos = data.photos ? [...data.photos] : [];
+      let updatedVideos = data.videos ? [...data.videos] : [];
+
+      if (newPhotoFile) {
+        const uploadedPhoto = await uploadFileDirectToR2(newPhotoFile, "places/photos", "image");
+        if (uploadedPhoto) {
+          updatedPhotos.push(uploadedPhoto);
+        }
+      }
+
+      if (newVideoFile) {
+        const uploadedVideo = await uploadFileDirectToR2(newVideoFile, "places/videos", "video");
+        if (uploadedVideo) {
+          updatedVideos = [uploadedVideo];
+        }
+      }
+
       const payload = {
         name: data.name,
         description: data.description,
         category: data.category,
         city: data.city,
         ytVideoLink: data.ytVideoLink,
+        bookingLink: data.category === "JhansiSmartCity"
+          ? data.bookingLink?.trim() || null
+          : null,
         likes: Number(data.likes) || 0,
+        views: Number(data.views) || 0,
+        shares: Number(data.shares) || 0,
         location: {
           address: data.location?.address || "",
           lat: Number(data.location?.lat) || 0,
           lng: Number(data.location?.lng) || 0,
         },
+        photos: updatedPhotos,
+        videos: updatedVideos,
       };
 
-      formData.append("data", JSON.stringify(payload));
-      if (newPhotoFile) formData.append("placePhoto", newPhotoFile);
-      if (newVideoFile) formData.append("placeVideo", newVideoFile);
-
-      await updatePlaceMutation.mutateAsync({ id: data._id, formData });
+      await updatePlaceMutation.mutateAsync({ id: data._id, data: payload });
+      setData((prev) => ({ ...prev, photos: updatedPhotos, videos: updatedVideos }));
       setIsEditing(false);
       setNewPhotoFile(null);
       setNewVideoFile(null);
       toast.success("Destination details saved successfully!");
     } catch (_err) {
       toast.error(_err?.response?.data?.message || "Failed to update destination");
+    } finally {
+      setIsUploadingR2(false);
     }
   };
 
@@ -137,10 +175,10 @@ const PlaceDetails = () => {
       <div className="w-[70%] h-full flex flex-col bg-white border-r shadow-sm z-10">
         
         <GenericDetailsHeader
-          onBack={() => setClickedPlaceHandler(null)}
+          onBack={onBack || (() => setClickedPlaceHandler(null))}
           isDeleted={data.isDeleted}
           isEditing={isEditing}
-          isPending={updatePlaceMutation.isPending}
+          isPending={updatePlaceMutation.isPending || isUploadingR2}
           onRestore={handleRestore}
           onSoftDeleteClick={() => setDeleteMode("soft")}
           onHardDeleteClick={() => setDeleteMode("hard")}
@@ -151,6 +189,10 @@ const PlaceDetails = () => {
 
         {/* CONTENT FIELD CONTAINER */}
         <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-gray-50/50">
+          {(updatePlaceMutation.isPending || isUploadingR2) && (
+            <UploadProgressBar isUploading={true} />
+          )}
+
           {/* STATUS BADGES & ID */}
           <div className="flex items-center justify-between bg-white p-4 rounded-2xl border shadow-sm">
             <div className="flex items-center gap-3">
@@ -168,19 +210,94 @@ const PlaceDetails = () => {
               )}
             </div>
 
-            <div className="flex items-center gap-4 text-xs font-bold text-gray-600">
-              <span className="flex items-center gap-1">
-                <Heart size={14} className="text-red-500 fill-red-500" />
-                Likes:
-                <input
-                  type="number"
-                  name="likes"
-                  disabled={!isEditing}
-                  value={data.likes || 0}
-                  onChange={handleChange}
-                  className="w-16 border rounded px-1 text-center ml-1 disabled:bg-transparent"
-                />
-              </span>
+            {onNavigateToReviews && (
+              <button
+                type="button"
+                onClick={() => onNavigateToReviews(data)}
+                className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl border border-indigo-200 shadow-xs transition cursor-pointer"
+                title="View and moderate reviews for this place"
+              >
+                <Star size={13} className="text-amber-500 fill-amber-400" />
+                <span>Moderate Reviews</span>
+                {data.reviews?.length > 0 && (
+                  <span className="bg-indigo-200/80 text-indigo-900 text-[10px] px-1.5 py-0.2 rounded-full font-black">
+                    {data.reviews.length}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* ─── REAL-TIME ANALYTICS & STATS STRIP ─── */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 bg-blue-50/70 border border-blue-100 rounded-2xl flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                <Eye size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500 block mb-0.5">Total Views</span>
+                {isEditing ? (
+                  <input
+                    type="number"
+                    name="views"
+                    value={data.views || 0}
+                    onChange={handleChange}
+                    className="w-full font-black text-blue-950 text-base bg-white border border-blue-200 rounded-lg px-2 py-0.5 outline-hidden"
+                  />
+                ) : (
+                  <span className="font-black text-blue-950 text-base">{Number(data.views || 0).toLocaleString()}</span>
+                )}
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-rose-50/70 border border-rose-100 rounded-2xl flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <Heart size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500 block mb-0.5">Total Likes</span>
+                {isEditing ? (
+                  <input
+                    type="number"
+                    name="likes"
+                    value={data.likes || 0}
+                    onChange={handleChange}
+                    className="w-full font-black text-rose-950 text-base bg-white border border-rose-200 rounded-lg px-2 py-0.5 outline-hidden"
+                  />
+                ) : (
+                  <span className="font-black text-rose-950 text-base">{Number(data.likes || 0).toLocaleString()}</span>
+                )}
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-emerald-50/70 border border-emerald-100 rounded-2xl flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                <Share2 size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 block mb-0.5">Total Shares</span>
+                {isEditing ? (
+                  <input
+                    type="number"
+                    name="shares"
+                    value={data.shares || 0}
+                    onChange={handleChange}
+                    className="w-full font-black text-emerald-950 text-base bg-white border border-emerald-200 rounded-lg px-2 py-0.5 outline-hidden"
+                  />
+                ) : (
+                  <span className="font-black text-emerald-950 text-base">{Number(data.shares || 0).toLocaleString()}</span>
+                )}
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-amber-50/70 border border-amber-100 rounded-2xl flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                <Star size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 block mb-0.5">Total Reviews</span>
+                <span className="font-black text-amber-950 text-base">{Array.isArray(data.reviews) ? data.reviews.length : 0}</span>
+              </div>
             </div>
           </div>
 
@@ -265,6 +382,38 @@ const PlaceDetails = () => {
                 </div>
               </div>
             </div>
+
+            {data.category === "JhansiSmartCity" && (
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                  Booking Link
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="url"
+                    name="bookingLink"
+                    disabled={!isEditing}
+                    value={data.bookingLink || ""}
+                    onChange={handleChange}
+                    placeholder="https://tickets.example.com/place"
+                    className="w-full p-2.5 border rounded-xl bg-white disabled:bg-gray-50 text-sm text-blue-600 font-medium"
+                  />
+                  {data.bookingLink && (
+                    <a
+                      href={data.bookingLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100"
+                      aria-label="Open booking link"
+                      title="Open booking link"
+                    >
+                      <ExternalLink size={16} />
+                    </a>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-gray-400">Optional; must be an HTTP or HTTPS URL.</p>
+              </div>
+            )}
 
             <div>
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">

@@ -5,21 +5,19 @@ export const getRestaurants = async () => {
   return res.data;
 };
 
-export const addRestaurant = async (restaurantData) => {
-  const res = await axiosClient.post("/services/createRestaurant", restaurantData, {
-    headers: {  
-      "Content-Type": "multipart/form-data",
-    },
+export const addRestaurant = async (data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.post("/services/createRestaurant", data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 60000,
   });
   return res.data;
 };
 
-export const updateRestaurant = async (restaurantId, restaurantData) => {
-  const res = await axiosClient.put(`/services/restaurant/${restaurantId}`, restaurantData, {
-    headers: {  
-      "Content-Type": "multipart/form-data",
-    },
+export const updateRestaurant = async (restaurantId, data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.put(`/services/restaurant/${restaurantId}`, data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 60000,
   });
   return res.data;

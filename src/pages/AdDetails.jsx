@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { ArrowLeft, Save, Trash2, Eye, MousePointer, ExternalLink, Image as ImageIcon, Video, UploadCloud, X } from "lucide-react";
+import React, { useState } from "react";
+import { ArrowLeft, Save, Trash2, Eye, MousePointer, ExternalLink, Image as ImageIcon, Video, UploadCloud, X, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useDeleteAdMutation, useUpdateAdMutation } from "../mutations/adsMutation";
 import axiosClient from "../api/axiosClient";
@@ -7,6 +7,8 @@ import toast from "react-hot-toast";
 import FormField from "../components/FormField";
 import { validators, runValidators, validateMediaType } from "../utils/validators";
 import { RequiredNotice, Req } from "../components/RequiredTag";
+import UploadProgressBar from "../components/UploadProgressBar";
+import { uploadFileDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const STATUS_OPTIONS = ["active", "paused", "draft", "scheduled", "ended"];
 
@@ -19,6 +21,7 @@ const getImageUrl = (photo) => {
 const AdDetails = ({ ad, onBack }) => {
   const updateAdMutation = useUpdateAdMutation();
   const deleteAdMutation = useDeleteAdMutation();
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   const { data: statsData } = useQuery({
     queryKey: ["adStats", ad._id],
@@ -81,7 +84,7 @@ const AdDetails = ({ ad, onBack }) => {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const requiredFields = ["headline", "startDate"];
     const optionalFields = ["linkUrl", "pricePaid", "maxImpressions", "frequencyCap", "priority", "endDate"];
     const allFields = [...requiredFields, ...optionalFields];
@@ -105,38 +108,61 @@ const AdDetails = ({ ad, onBack }) => {
       return;
     }
 
-    const formData = new FormData();
-    if (imageFile) formData.append("photos", imageFile); // backend expects 'photos'
-    if (videoFile) formData.append("videos", videoFile); // backend expects 'videos'
+    try {
+      setIsUploadingR2(true);
+      let updatedPhotos = ad.content?.photos ? [...ad.content.photos] : [];
+      let updatedVideos = ad.content?.videos ? [...ad.content.videos] : [];
 
-    const payload = {
-      status: adForm.status,
-      startDate: adForm.startDate,
-      ...(adForm.endDate && { endDate: adForm.endDate }),
-      priority: Number(adForm.priority) || 1,
-      ...(adForm.pricePaid && { pricePaid: Number(adForm.pricePaid) }),
-      ...(adForm.maxImpressions && { maxImpressions: Number(adForm.maxImpressions) }),
-      ...(adForm.frequencyCap && { frequencyCap: Number(adForm.frequencyCap) }),
-      content: {
-        ...ad.content,
-        headline: adForm.headline,
-        ...(adForm.bodyText && { bodyText: adForm.bodyText }),
-        ...(adForm.ctaText && { ctaText: adForm.ctaText }),
-        ...(adForm.linkUrl && { linkUrl: adForm.linkUrl }),
-      },
-    };
-
-    formData.append("data", JSON.stringify(payload));
-
-    updateAdMutation.mutate(
-      { adId: ad._id, formData },
-      {
-        onSuccess: () => {
-          toast.success("Ad updated successfully!");
-          onBack();
-        },
+      if (imageFile) {
+        const photoAsset = await uploadFileDirectToR2(imageFile, "ads/banners", "image");
+        if (photoAsset) {
+          updatedPhotos = [photoAsset];
+        }
       }
-    );
+
+      if (videoFile) {
+        const videoAsset = await uploadFileDirectToR2(videoFile, "ads/videos", "video");
+        if (videoAsset) {
+          updatedVideos = [videoAsset];
+        }
+      }
+
+      const payload = {
+        status: adForm.status,
+        startDate: adForm.startDate,
+        ...(adForm.endDate && { endDate: adForm.endDate }),
+        priority: Number(adForm.priority) || 1,
+        ...(adForm.pricePaid && { pricePaid: Number(adForm.pricePaid) }),
+        ...(adForm.maxImpressions && { maxImpressions: Number(adForm.maxImpressions) }),
+        ...(adForm.frequencyCap && { frequencyCap: Number(adForm.frequencyCap) }),
+        content: {
+          ...ad.content,
+          headline: adForm.headline,
+          ...(adForm.bodyText && { bodyText: adForm.bodyText }),
+          ...(adForm.ctaText && { ctaText: adForm.ctaText }),
+          ...(adForm.linkUrl && { linkUrl: adForm.linkUrl }),
+          photos: updatedPhotos,
+          videos: updatedVideos,
+        },
+      };
+
+      updateAdMutation.mutate(
+        { adId: ad._id, data: payload },
+        {
+          onSuccess: () => {
+            toast.success("Ad updated successfully!");
+            onBack();
+          },
+          onError: (err) => {
+            toast.error(err?.response?.data?.message || "Failed to update ad");
+          },
+        }
+      );
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to upload ad media directly to storage");
+    } finally {
+      setIsUploadingR2(false);
+    }
   };
 
   const handleDelete = () => {
@@ -154,20 +180,31 @@ const AdDetails = ({ ad, onBack }) => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 font-sans">
-      <div className="h-16 border-b px-8 flex items-center justify-between bg-white sticky top-0 z-20">
-        <button onClick={onBack} className="flex items-center text-gray-600 font-semibold hover:text-gray-900">
-          <ArrowLeft size={18} className="mr-2" /> Back to Campaign
-        </button>
-
-        <div className="flex items-center gap-3">
-          <button onClick={handleDelete} className="flex items-center px-4 py-2 rounded-xl bg-red-50 text-red-600 font-bold text-xs border border-red-200">
-            <Trash2 size={14} className="mr-1.5" /> Permanent Delete Ad
+      <div className="border-b px-8 py-3 bg-white sticky top-0 z-20">
+        <div className="flex items-center justify-between">
+          <button onClick={onBack} className="flex items-center text-gray-600 font-semibold hover:text-gray-900">
+            <ArrowLeft size={18} className="mr-2" /> Back to Campaign
           </button>
 
-          <button onClick={handleSave} disabled={updateAdMutation.isPending} className="flex items-center px-6 py-2 rounded-xl bg-purple-600 text-white font-bold text-xs shadow-md">
-            <Save size={14} className="mr-1.5" /> Save Changes
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={handleDelete} disabled={updateAdMutation.isPending || deleteAdMutation.isPending} className="flex items-center px-4 py-2 rounded-xl bg-red-50 text-red-600 font-bold text-xs border border-red-200 disabled:opacity-50">
+              <Trash2 size={14} className="mr-1.5" /> Permanent Delete Ad
+            </button>
+
+            <button onClick={handleSave} disabled={updateAdMutation.isPending || isUploadingR2} className="flex items-center px-6 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition disabled:bg-purple-300">
+              {updateAdMutation.isPending || isUploadingR2 ? (
+                <>
+                  <Loader2 size={14} className="animate-spin mr-1.5" /> Saving Changes...
+                </>
+              ) : (
+                <>
+                  <Save size={14} className="mr-1.5" /> Save Changes
+                </>
+              )}
+            </button>
+          </div>
         </div>
+        <UploadProgressBar isUploading={updateAdMutation.isPending || isUploadingR2} className="mt-3" />
       </div>
 
       <div className="flex-1 overflow-y-auto p-8 space-y-8 max-w-5xl mx-auto w-full">

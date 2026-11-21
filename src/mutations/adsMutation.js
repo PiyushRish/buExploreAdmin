@@ -55,7 +55,7 @@ export const useUpdateAdMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ adId, formData }) => updateAd({ adId, formData }),
+    mutationFn: ({ adId, formData, data }) => updateAd({ adId, formData, data }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ads"] });
     },

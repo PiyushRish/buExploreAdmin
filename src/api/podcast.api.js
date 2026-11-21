@@ -5,9 +5,10 @@ export const getPodcasts = async () => {
   return res.data;
 };
 
-export const addPodcast = async (formData) => {
-  const res = await axiosClient.post("/podcasts/addPodcast", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
+export const addPodcast = async (data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.post("/podcasts/addPodcast", data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
   });
   return res.data;
 };

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { User, MapPin, Star, UploadCloud, Save, X, Edit2, ShieldAlert, ArrowLeft, Trash2 } from "lucide-react";
+import { User, MapPin, Star, UploadCloud, Save, X, Edit2, ShieldAlert, ArrowLeft, Trash2, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { validateMediaType } from "../utils/validators.js";
 import { useUpdateGuideMutation, useDeleteGuideMutation } from "../mutations/guideMutation";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const getImageUrl = (photo) => {
   if (!photo) return "";
@@ -14,6 +16,7 @@ const GuideDetails = ({ guide, setSelectedGuide }) => {
   const [data, setData] = useState({});
   const [isEditing, setIsEditing] = useState(false);
   const [newPhotoFiles, setNewPhotoFiles] = useState([]);
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   const updateMutation = useUpdateGuideMutation();
   const deleteMutation = useDeleteGuideMutation();
@@ -36,44 +39,44 @@ const GuideDetails = ({ guide, setSelectedGuide }) => {
   };
 
   const handleSave = async () => {
-    const payload = {
-      title: data.title,
-      name: data.name,
-      subCategory: data.subCategory,
-      experienceYears: Number(data.experienceYears || 0),
-      fee: Number(data.fee || 0),
-    };
-
-    const formData = new FormData();
-    Object.keys(payload).forEach((k) => formData.append(k, payload[k]));
-
-    if (data.contactPhone || data.contactEmail) {
-      formData.append("contact", JSON.stringify({
-        phone: data.contactPhone,
-        email: data.contactEmail,
-        website: data.contactWebsite
-      }));
-    }
-    if (data.parsedLanguages) {
-      formData.append("languages", JSON.stringify(data.parsedLanguages.split(',').map(i=>i.trim()).filter(Boolean)));
-    }
-    if (data.parsedSpeciality) {
-      formData.append("speciality", JSON.stringify(data.parsedSpeciality.split(',').map(i=>i.trim()).filter(Boolean)));
-    }
-    if (newPhotoFiles.length > 0) {
-        newPhotoFiles.forEach(f => formData.append("GuidePhotos", f));
-    }
-    // We send existing photos state so the backend doesn't delete them. 
-    formData.append("existingPhotos", JSON.stringify(guide.photos || []));
-
     try {
+      let newlyUploadedR2 = [];
+      if (newPhotoFiles.length > 0) {
+        setIsUploadingR2(true);
+        newlyUploadedR2 = await uploadMultipleFilesDirectToR2(newPhotoFiles, "services/guides", "image");
+      }
+
+      const payload = {
+        title: data.title,
+        name: data.name,
+        subCategory: data.subCategory,
+        experienceYears: Number(data.experienceYears || 0),
+        fee: Number(data.fee || 0),
+        ...(data.contactPhone || data.contactEmail ? {
+          contact: {
+            phone: data.contactPhone,
+            email: data.contactEmail,
+            website: data.contactWebsite
+          }
+        } : {}),
+        ...(data.parsedLanguages ? {
+          languages: data.parsedLanguages.split(',').map(i=>i.trim()).filter(Boolean)
+        } : {}),
+        ...(data.parsedSpeciality ? {
+          speciality: data.parsedSpeciality.split(',').map(i=>i.trim()).filter(Boolean)
+        } : {}),
+        photos: [...(guide.photos || []), ...newlyUploadedR2],
+      };
+
       const targetId = guide.service?._id || guide._id;
-      await updateMutation.mutateAsync({ guideId: targetId, guideData: formData });
+      await updateMutation.mutateAsync({ guideId: targetId, guideData: payload });
       toast.success("Profile updated!");
       setIsEditing(false);
       setNewPhotoFiles([]);
+      setIsUploadingR2(false);
     } catch(err) {
-      toast.error(err?.response?.data?.message || "Failed to update");
+      setIsUploadingR2(false);
+      toast.error(err?.response?.data?.message || err?.message || "Failed to update");
     }
   };
 
@@ -93,28 +96,49 @@ const GuideDetails = ({ guide, setSelectedGuide }) => {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
       <div className="w-full h-full flex flex-col bg-white">
-        <div className="h-16 border-b px-8 flex items-center justify-between">
-          <button onClick={() => setSelectedGuide(null)} className="flex items-center text-gray-600 hover:text-black">
-            <ArrowLeft size={20} className="mr-2" /> Back summary
-          </button>
-
-          <div className="flex gap-3">
-            <button
-              onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
-              className={`flex items-center px-4 py-2 rounded-lg font-bold ${
-                isEditing ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-700"
-              }`}
-            >
-              {isEditing ? <><Save size={16} className="mr-2" /> Save</> : <><Edit2 size={16} className="mr-2" /> Edit</>}
+        <div className="border-b px-8 py-3 bg-white sticky top-0 z-20">
+          <div className="flex items-center justify-between">
+            <button onClick={() => setSelectedGuide(null)} className="flex items-center text-gray-600 hover:text-black">
+              <ArrowLeft size={20} className="mr-2" /> Back summary
             </button>
 
-            <button
-              onClick={handleDelete}
-              className="px-4 py-2 bg-red-50 text-red-600 rounded-lg flex items-center font-bold hover:bg-red-100 focus:outline-none"
-            >
-              <Trash2 size={16} className="mr-2" /> Delete 
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
+                disabled={updateMutation.isPending || isUploadingR2}
+                className={`flex items-center px-4 py-2 rounded-lg font-bold transition ${
+                  isEditing ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                } disabled:opacity-50`}
+              >
+                {isUploadingR2 ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin mr-2" /> Uploading to R2...
+                  </>
+                ) : updateMutation.isPending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin mr-2" /> Saving...
+                  </>
+                ) : isEditing ? (
+                  <>
+                    <Save size={16} className="mr-2" /> Save
+                  </>
+                ) : (
+                  <>
+                    <Edit2 size={16} className="mr-2" /> Edit
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending || updateMutation.isPending || isUploadingR2}
+                className="px-4 py-2 bg-red-50 text-red-600 rounded-lg flex items-center font-bold hover:bg-red-100 focus:outline-none disabled:opacity-50"
+              >
+                <Trash2 size={16} className="mr-2" /> Delete 
+              </button>
+            </div>
           </div>
+          <UploadProgressBar isUploading={updateMutation.isPending || isUploadingR2} className="mt-2" />
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 space-y-6">

@@ -1,9 +1,11 @@
 import React from "react";
 import { ExternalLink, FileCode } from "lucide-react";
+import axiosClient from "../api/axiosClient.js";
 
 const SwaggerDocView = () => {
-  const backendUrl = "http://localhost:5500/api-docs";
-  const productionUrl = "https://buexplorebackend.onrender.com/api-docs";
+  const configuredApiRoot = axiosClient.defaults.baseURL.replace(/\/api\/?$/, "");
+  const backendUrl = `${configuredApiRoot}/api-docs`;
+  const productionUrl = "https://www.explorebundelkhand.com/api-docs";
 
   return (
     <div className="flex flex-col h-[80vh]">
@@ -24,7 +26,7 @@ const SwaggerDocView = () => {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-semibold transition"
           >
-            Local Docs <ExternalLink size={14} />
+            Configured API Docs <ExternalLink size={14} />
           </a>
           <a
             href={productionUrl}
@@ -32,7 +34,7 @@ const SwaggerDocView = () => {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-xl text-xs font-semibold transition"
           >
-            Render Docs <ExternalLink size={14} />
+            Production Docs <ExternalLink size={14} />
           </a>
         </div>
       </div>

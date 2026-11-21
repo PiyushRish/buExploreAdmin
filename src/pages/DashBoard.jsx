@@ -1,11 +1,15 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import {
-  MapPin, Bell, User, Car, Megaphone, MessageSquare, AlertCircle,
+  MapPin, Bell, User, Users as UsersIcon, Car, Megaphone, MessageSquare, AlertCircle,
   Film, Video, Menu, X, ChevronLeft, LayoutDashboard, Mic,
-  Compass, Sparkles,
+  Compass, Sparkles, Star,
 } from "lucide-react";
+import { io } from "socket.io-client";
+import axiosClient from "../api/axiosClient.js";
+import { useUserStatsQuery } from "../queries/userQueries.js";
 
 import Places from "./Places.jsx";
+import PlaceReviews from "./PlaceReviews.jsx";
 import Hotels from "./Hotels.jsx";
 import Restaurants from "./Restaurant.jsx";
 import Guides from "./Guide.jsx";
@@ -20,23 +24,27 @@ import IntroVideoPage from "./IntroVideo.jsx";
 import ReelsFeed from "./ReelsFeed.jsx";
 import ToursPage from "./Tours.jsx";
 import SurpriseEventsPage from "./SurpriseEvents.jsx";
+import EmergencyPage from "./Emergency.jsx";
+import ServiceTemplatesPage from "./ServiceTemplates.jsx";
+import Services from "./Services.jsx";
+import ReportsPage from "./Reports.jsx";
 import { PlaceContext } from "../contextApi/places.jsx";
+import { ShieldAlert, Layers, Shield } from "lucide-react";
 
 const navItems = [
-  { name: "Places",          icon: MapPin },
-  { name: "Hotels",          icon: MapPin },
-  { name: "Restaurants",     icon: MapPin },
-  { name: "Guides & Agency", icon: User },
-  { name: "Tours & Plans",   icon: Compass },
-  { name: "Surprise Events", icon: Sparkles },
-  { name: "Vehicles",        icon: Car },
-  { name: "Ads",             icon: Megaphone },
-  { name: "Testimonials",    icon: MessageSquare },
-  { name: "Notifications",   icon: Bell },
-  { name: "Users",           icon: User },
-  { name: "Podcasts",        icon: Mic },
-  { name: "Intro Video",     icon: Video },
-  { name: "Reels Feed",      icon: Film },
+  { name: "Places",            icon: MapPin },
+  { name: "Place Reviews",     icon: MessageSquare },
+  { name: "Services",          icon: Layers },
+  { name: "Surprise Events",   icon: Sparkles },
+  { name: "Tours & Plans",     icon: Compass },
+  { name: "Ads",               icon: Megaphone },
+  { name: "Testimonials",      icon: MessageSquare },
+  { name: "Reports & Safety",  icon: Shield },
+  { name: "Notifications",     icon: Bell },
+  { name: "Users",             icon: User },
+  { name: "Podcasts",          icon: Mic },
+  { name: "Intro Video",       icon: Video },
+  { name: "Reels Feed",        icon: Film },
 ];
 
 const DashBoard = () => {
@@ -44,6 +52,47 @@ const DashBoard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);   // mobile drawer
   const [collapsed, setCollapsed]   = useState(false);     // desktop icon-only mode
   const { clickedPlace, setClickedPlaceHandler } = useContext(PlaceContext);
+
+  const { data: userStats } = useUserStatsQuery();
+  const [liveUsersCount, setLiveUsersCount] = useState(null);
+
+  useEffect(() => {
+    let socket;
+    try {
+      const socketServer =
+        import.meta.env?.VITE_SOCKET_URL ||
+        (axiosClient?.defaults?.baseURL
+          ? axiosClient.defaults.baseURL.replace(/\/api\/?$/, "")
+          : "http://localhost:5000");
+
+      socket = io(socketServer, {
+        transports: ["websocket", "polling"],
+        reconnectionAttempts: 5,
+      });
+      socket.emit("getLiveUsers");
+      socket.on("userCountLatest", (count) => {
+        if (typeof count === "number") {
+          setLiveUsersCount(count);
+        }
+      });
+    } catch (_e) {
+      // fallback to polling userStats
+    }
+
+  }, []);
+
+  useEffect(() => {
+    const handleTabNav = (e) => {
+      if (e?.detail) {
+        handleNav(e.detail);
+      }
+    };
+    window.addEventListener("navigate-tab", handleTabNav);
+    return () => window.removeEventListener("navigate-tab", handleTabNav);
+  }, []);
+
+  const totalUsers = userStats?.totalUsers ?? userStats?.userCount ?? 0;
+  const onlineUsers = liveUsersCount !== null ? liveUsersCount : (userStats?.onlineUsers ?? userStats?.onlineCount ?? 0);
 
   const handleNav = (name) => {
     setActiveTab(name);
@@ -68,7 +117,9 @@ const DashBoard = () => {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
-        {navItems.map(({ name, icon: Icon }) => {
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const name = item.name;
           const isActive = activeTab === name;
           return (
             <button
@@ -149,7 +200,7 @@ const DashBoard = () => {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {/* Top bar */}
-        <header className="flex items-center gap-4 h-14 px-4 bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
+        <header className="flex items-center gap-3 sm:gap-4 h-14 px-4 bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
           {/* Hamburger (mobile only) */}
           <button
             className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100"
@@ -158,14 +209,36 @@ const DashBoard = () => {
             <Menu size={20} />
           </button>
 
-          <h2 className="font-black text-slate-800 text-sm sm:text-base flex-1 truncate">{activeTab}</h2>
+          <h2 className="font-black text-slate-800 text-sm sm:text-base truncate mr-auto">
+            {activeTab}
+          </h2>
 
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-block text-xs text-slate-400 font-medium bg-slate-100 px-3 py-1 rounded-full">
-              Admin
-            </span>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
-              A
+          {/* User Metrics Counters */}
+          <div className="flex items-center gap-2 sm:gap-3">
+
+            {/* Total Users Count Badge */}
+            <button
+              onClick={() => handleNav("Users")}
+              className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200/90 rounded-full shadow-xs text-xs transition-all duration-150 cursor-pointer"
+              title="Total registered users (Click to view users)"
+            >
+              <UsersIcon size={14} className="text-indigo-600" />
+              <span className="font-black text-indigo-900 text-xs sm:text-sm tabular-nums">
+                {totalUsers}
+              </span>
+              <span className="text-[11px] text-indigo-700 font-semibold hidden sm:inline">
+                Total Users
+              </span>
+            </button>
+
+            {/* Admin Badge */}
+            <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+              <span className="hidden md:inline-block text-xs text-slate-500 font-semibold bg-slate-100 px-2.5 py-0.5 rounded-full">
+                Admin
+              </span>
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                A
+              </div>
             </div>
           </div>
         </header>
@@ -175,17 +248,41 @@ const DashBoard = () => {
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 min-h-full p-3 sm:p-4 md:p-6">
             {activeTab === "Places" && (
               clickedPlace
-                ? <PlaceDetails onBack={() => setClickedPlaceHandler(null)} />
-                : <Places />
+                ? <PlaceDetails
+                    onBack={() => setClickedPlaceHandler(null)}
+                    onNavigateToReviews={(place) => {
+                      setClickedPlaceHandler(place);
+                      setActiveTab("Place Reviews");
+                    }}
+                  />
+                : <Places
+                    onNavigateToReviews={(place) => {
+                      setClickedPlaceHandler(place);
+                      setActiveTab("Place Reviews");
+                    }}
+                  />
             )}
-            {activeTab === "Hotels font-medium" || activeTab === "Hotels" && <Hotels />}
-            {activeTab === "Restaurants flex"  || activeTab === "Restaurants" && <Restaurants />}
-            {(activeTab === "Guides & Agency"  || activeTab === "Guides") && <Guides />}
-            {activeTab === "Tours & Plans"     && <ToursPage />}
+            {activeTab === "Place Reviews" && (
+              <PlaceReviews
+                initialPlace={clickedPlace}
+                onBackToPlace={() => {
+                  if (clickedPlace) {
+                    setActiveTab("Places");
+                  }
+                }}
+              />
+            )}
+            {(activeTab === "Services" || activeTab === "Service Templates") && <Services />}
             {activeTab === "Surprise Events"   && <SurpriseEventsPage />}
-            {activeTab === "Vehicles"          && <Vehicle />}
+            {activeTab === "Tours & Plans"     && <ToursPage />}
+            {activeTab === "Hotels"            && <Services />}
+            {activeTab === "Restaurants"       && <Services />}
+            {activeTab === "Emergency 24/7"    && <Services />}
+            {(activeTab === "Guides & Agency" || activeTab === "Guides") && <Services />}
+            {activeTab === "Vehicles"          && <Services />}
             {activeTab === "Ads"               && <Ads />}
             {activeTab === "Testimonials"      && <TestimonialsPage />}
+            {activeTab === "Reports & Safety"  && <ReportsPage />}
             {activeTab === "Notifications"     && <Notifications />}
             {activeTab === "Users"             && <Users />}
             {activeTab === "Podcasts"          && <Podcast />}

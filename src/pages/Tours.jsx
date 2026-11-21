@@ -2,12 +2,15 @@ import React, { useState, useEffect } from "react";
 import { Compass, Plus, Trash2, X, Eye, Users, Calendar, DollarSign, UserCheck, RefreshCw } from "lucide-react";
 import { getAllTours, addTour, deleteTour } from "../api/tours.api";
 import toast from "react-hot-toast";
+import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
+import { useNotificationDraft } from "../utils/useNotificationDraft.js";
 
 const ToursPage = () => {
   const [tours, setTours] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTour, setSelectedTour] = useState(null); // Side panel selected tour
   const [showAddModal, setShowAddModal] = useState(false); // Admin test post modal
+  const { notif, setNotif, sendIfEnabled, resetNotif } = useNotificationDraft("tour");
 
   const [formData, setFormData] = useState({
     tourPackage: "family",
@@ -22,7 +25,7 @@ const ToursPage = () => {
     try {
       const data = await getAllTours();
       setTours(data.tours || []);
-    } catch (err) {
+    } catch (_err) {
       toast.error("Failed to load tour requests");
     } finally {
       setLoading(false);
@@ -45,9 +48,11 @@ const ToursPage = () => {
           rupee: Number(formData.rupeeBudget),
         },
       };
-      await addTour(payload);
+      const res = await addTour(payload);
+      await sendIfEnabled({ serviceId: res?.tour?._id || res?.data?._id || res?._id });
       toast.success("Test tour request posted successfully!");
       setShowAddModal(false);
+      resetNotif();
       fetchTours();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to post tour");
@@ -61,7 +66,7 @@ const ToursPage = () => {
       toast.success("Tour request deleted");
       if (selectedTour?._id === id) setSelectedTour(null);
       fetchTours();
-    } catch (err) {
+    } catch (_err) {
       toast.error("Failed to delete tour");
     }
   };
@@ -293,6 +298,14 @@ const ToursPage = () => {
                   />
                 </div>
               </div>
+
+              {/* Notification draft with toggle */}
+              <NotificationDraftSection
+                serviceType="tour"
+                entityName={`${formData.tourPackage.toUpperCase()} Tour Package`}
+                value={notif}
+                onChange={setNotif}
+              />
 
               <div className="pt-2 flex justify-end gap-2">
                 <button

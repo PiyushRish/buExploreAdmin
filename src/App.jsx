@@ -5,25 +5,35 @@ import Login from './pages/Login';
 import DashBoard from './pages/DashBoard';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
+import { UploadProgressProvider } from './contextApi/uploadProgress';
+import GlobalUploadProgressWidget from './components/GlobalUploadProgressWidget';
+
 const queryClient = new QueryClient();
 
 const App = () => {
   return (
     <GlobalErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        
-        {/* ✅ Mount Toaster ONCE here */}
-        <Toaster position="bottom-center" reverseOrder={false} toastOptions={{
-      style: {
-        zIndex: 999999,
-      },
-    }} />
+        <UploadProgressProvider>
+          {/* Global Toast Notifications */}
+          <Toaster
+            position="bottom-center"
+            reverseOrder={false}
+            toastOptions={{
+              style: {
+                zIndex: 999999,
+              },
+            }}
+          />
 
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/dashboard" element={<DashBoard />} />
-        </Routes>
+          {/* Global Upload Progress Float Widget */}
+          <GlobalUploadProgressWidget />
 
+          <Routes>
+            <Route path="/" element={<Login />} />
+            <Route path="/dashboard" element={<DashBoard />} />
+          </Routes>
+        </UploadProgressProvider>
       </QueryClientProvider>
     </GlobalErrorBoundary>
   );

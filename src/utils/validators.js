@@ -53,9 +53,22 @@ export const validators = {
     }
   },
 
+  httpUrl: (value, label = "URL") => {
+    if (!value) return null;
+    try {
+      const parsed = new URL(value.trim());
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        throw new Error("Unsupported URL protocol");
+      }
+      return null;
+    } catch {
+      return { error: `${label} must be a valid HTTP or HTTPS URL.`, hint: "e.g. https://tickets.example.com/place" };
+    }
+  },
+
   youtubeUrl: (value, label = "YouTube URL") => {
     if (!value) return null;
-    const re = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w\-]+/;
+    const re = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/;
     if (!re.test(value.trim())) {
       return { error: `${label} must be a valid YouTube link.`, hint: "e.g. https://youtube.com/watch?v=abc123" };
     }

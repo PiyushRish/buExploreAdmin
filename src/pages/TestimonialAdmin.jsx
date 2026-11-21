@@ -1,10 +1,12 @@
 import React, { useState } from "react";
-import { MessageSquare, Plus, X, Trash2, Star, User, UploadCloud } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { MessageSquare, Plus, X, Trash2, Star, User, UploadCloud, Heart, Loader2 } from "lucide-react";
 import { useCreateTestimonialMutation, useDeleteTestimonialMutation } from "../mutations/testimonialMutation.js";
 import axiosClient from "../api/axiosClient.js";
 import toast from "react-hot-toast";
 import { validateMediaType } from "../utils/validators.js";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const Testimonials = () => {
   const [showModal, setShowModal] = useState(false);
@@ -19,27 +21,46 @@ const Testimonials = () => {
 
   const [content, setContent] = useState("");
   const [photos, setPhotos] = useState([]);
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   const addMutation = useCreateTestimonialMutation();
   const deleteMutation = useDeleteTestimonialMutation();
 
-  const handleCreate = () => {
-    if (!content) return toast.error("Content is required");
-    const formData = new FormData();
-    formData.append("content", content);
-    photos.forEach(f => formData.append("photos", f));
-
-    addMutation.mutate(formData, {
-      onSuccess: () => {
-        toast.success("Testimonial saved!");
-        setShowModal(false);
-        setContent("");
-        setPhotos([]);
-      },
-      onError: (err) => {
-        toast.error(err?.response?.data?.message || "Failed to create");
+  const handleCreate = async () => {
+    if (!content.trim()) return toast.error("Content is required");
+    try {
+      let uploadedAssets = [];
+      if (photos.length > 0) {
+        setIsUploadingR2(true);
+        uploadedAssets = await uploadMultipleFilesDirectToR2(photos, "testimonials", "image");
       }
-    });
+
+      addMutation.mutate({ content, photos: uploadedAssets }, {
+        onSuccess: () => {
+          toast.success("Testimonial saved!");
+          setShowModal(false);
+          setContent("");
+          setPhotos([]);
+          setIsUploadingR2(false);
+        },
+        onError: (err) => {
+          setIsUploadingR2(false);
+          toast.error(err?.response?.data?.message || "Failed to create testimonial");
+        }
+      });
+    } catch (err) {
+      setIsUploadingR2(false);
+      toast.error(err?.response?.data?.message || err?.message || "Failed to upload images directly to Cloudflare R2");
+    }
+  };
+
+  const handleDelete = (id) => {
+    if (window.confirm("Are you sure you want to remove this testimonial?")) {
+      deleteMutation.mutate(id, {
+        onSuccess: () => toast.success("Testimonial removed successfully"),
+        onError: (err) => toast.error(err?.response?.data?.message || "Failed to remove testimonial"),
+      });
+    }
   };
 
   const testimonials = data?.testimonials || data?.data || [];
@@ -84,8 +105,17 @@ const Testimonials = () => {
               </div>
 
               <div className="pt-4 mt-4 border-t flex justify-between items-center text-[10px] text-gray-400 font-mono">
-                <span>{new Date(t.date || t.createdAt || Date.now()).toLocaleString()}</span>
-                <button onClick={() => deleteMutation.mutate(t._id)} className="text-xs font-bold text-red-600 flex items-center gap-1 hover:underline">
+                <div className="flex items-center gap-3">
+                  <span>{new Date(t.date || t.createdAt || Date.now()).toLocaleDateString()}</span>
+                  <span className="flex items-center gap-1 text-pink-600 font-semibold text-xs">
+                    <Heart size={13} className="fill-pink-500 text-pink-500" /> {t.likes || 0}
+                  </span>
+                </div>
+                <button
+                  onClick={() => handleDelete(t._id)}
+                  disabled={deleteMutation.isPending}
+                  className="text-xs font-bold text-red-600 flex items-center gap-1 hover:underline disabled:opacity-50 cursor-pointer"
+                >
                   <Trash2 size={14} /> Remove Review
                 </button>
               </div>
@@ -118,8 +148,30 @@ const Testimonials = () => {
               </label>
             </div>
 
-            <button onClick={handleCreate} disabled={addMutation.isPending} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-md mt-4">
-              Publish Testimonial
+            {(addMutation.isPending || isUploadingR2) && (
+              <div className="mt-3">
+                <UploadProgressBar isUploading={addMutation.isPending || isUploadingR2} />
+              </div>
+            )}
+
+            <button
+              onClick={handleCreate}
+              disabled={addMutation.isPending || isUploadingR2}
+              className="w-full bg-blue-600 hover:bg-blue-700 active:scale-98 text-white py-3 rounded-xl font-bold shadow-md mt-4 transition disabled:bg-blue-300 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isUploadingR2 ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Uploading to Cloudflare R2...</span>
+                </>
+              ) : addMutation.isPending ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Publishing Testimonial...</span>
+                </>
+              ) : (
+                <span>Publish Testimonial</span>
+              )}
             </button>
           </div>
         </div>

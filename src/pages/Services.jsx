@@ -1,0 +1,2893 @@
+import React, { useState, useMemo } from "react";
+import {
+  Folder, Layers, Plus, Trash2, Edit, Loader2, Sparkles, X, Check,
+  ChevronRight, ArrowLeft, Hotel, Utensils, Car, ShieldAlert,
+  Compass, ShoppingBag, Search, CheckCircle, RefreshCw, AlertCircle,
+  SlidersHorizontal, Info, Eye, BookmarkCheck, ArrowRight, ShieldCheck,
+  FileText, MapPin, Phone, Mail, Globe, ExternalLink, RotateCcw, AlertTriangle,
+  UploadCloud, Tag, Lock, Unlock, Share2, MousePointer, Heart
+} from "lucide-react";
+import toast from "react-hot-toast";
+import {
+  useServiceTemplatesQuery,
+  useCustomServicesQuery,
+} from "../queries/serviceTemplateQueries.js";
+import {
+  useCreateServiceTemplateMutation,
+  useUpdateServiceTemplateMutation,
+  useDeleteServiceTemplateMutation,
+  useSeedDefaultTemplatesMutation,
+  useCreateCustomServiceMutation,
+  useUpdateCustomServiceMutation,
+  useDeleteCustomServiceMutation,
+} from "../mutations/serviceTemplateMutation.js";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadMultipleFilesDirectToR2 } from "../utils/r2DirectUpload.js";
+
+/* ─── 7 CORE SERVICE CATEGORIES ─── */
+const SERVICE_CATEGORIES = [
+  {
+    key: "hotel/resorts",
+    name: "Hotels & Resorts",
+    singular: "Hotel / Resort",
+    icon: Hotel,
+    gradient: "from-blue-600 to-indigo-700",
+    description: "Luxury resorts, boutique stays, lodges, homestays & heritage palaces",
+  },
+  {
+    key: "restaurants/bars",
+    name: "Restaurants & Bars",
+    singular: "Restaurant / Bar",
+    icon: Utensils,
+    gradient: "from-amber-500 to-orange-600",
+    description: "Fine dining, rooftop cafes, specialty bars, family bistros & street hubs",
+  },
+  {
+    key: "vehicle",
+    name: "Vehicles & Rentals",
+    singular: "Vehicle Rental",
+    icon: Car,
+    gradient: "from-emerald-500 to-teal-700",
+    description: "Self-drive cars, bike rentals, airport taxis, e-rickshaws & tourist vans",
+  },
+  {
+    key: "emergency",
+    name: "Emergency 24/7",
+    singular: "Emergency Service",
+    icon: ShieldAlert,
+    gradient: "from-rose-500 to-red-700",
+    description: "24/7 ambulances, emergency hospitals, police stations & roadside help",
+  },
+  {
+    key: "guide/travel agency",
+    name: "Guides & Agencies",
+    singular: "Guide / Agency",
+    icon: Compass,
+    gradient: "from-cyan-500 to-blue-600",
+    description: "Certified heritage guides, local tour operators, custom trip planners",
+  },
+  {
+    key: "shopping",
+    name: "Shopping & Stores",
+    singular: "Store / Shop",
+    icon: ShoppingBag,
+    gradient: "from-violet-500 to-purple-700",
+    description: "Handicraft emporiums, brassware markets, local souvenir shops & boutiques",
+  },
+  {
+    key: "others",
+    name: "Other Services",
+    singular: "Service",
+    icon: Layers,
+    gradient: "from-slate-700 to-slate-900",
+    description: "Luggage storage, photo/drone shoots, equipment rental & local conveniences",
+  },
+];
+
+/* ─── CURATED RELATABLE SUBSERVICES PER SERVICE CATEGORY ─── */
+const RELATABLE_SUBSERVICES_BY_CATEGORY = {
+  "hotel/resorts": [
+    { name: "Resorts & Retreats", slug: "resort", description: "Luxury resorts, wellness retreats and palace stays" },
+    { name: "Homestays & Guest Houses", slug: "homestay", description: "Local family homestays, bed & breakfasts and guest houses" },
+    { name: "Heritage Havelis & Palaces", slug: "heritage_palace", description: "Historic forts, royal havelis and heritage properties" },
+    { name: "Boutique & City Hotels", slug: "boutique_hotel", description: "Modern boutique hotels, business stays and lodges" },
+    { name: "Farmstays & Campsites", slug: "farmstay_camp", description: "Eco cottages, nature camps and rural farmstays" },
+  ],
+  "restaurants/bars": [
+    { name: "Cafes & Roasteries", slug: "cafe", description: "Artisan cafes, specialty coffee roasters, and bakeries" },
+    { name: "Fine Dining & Bistros", slug: "fine_dining", description: "Multi-cuisine family restaurants, bistros and gourmet dining" },
+    { name: "Rooftop Lounges & Bars", slug: "rooftop_bar", description: "Scenic rooftop lounges, craft cocktail bars and pubs" },
+    { name: "Street Food Hubs", slug: "street_food", description: "Famous street food stalls, chaat corners and evening eateries" },
+    { name: "Family Dhabas", slug: "dhaba", description: "Traditional roadside and highway dhabas with authentic thalis" },
+    { name: "Bakeries & Sweet Shops", slug: "bakery_sweets", description: "Heritage sweet shops, patisseries and confectioneries" },
+  ],
+  "vehicle": [
+    { name: "Self-Drive Cars", slug: "self_drive_car", description: "Self-drive hatchbacks, sedans and SUVs" },
+    { name: "Bikes & Scooters", slug: "bike_scooter", description: "Daily two-wheeler and scooty rentals" },
+    { name: "City Taxis & Cabs", slug: "taxi_cab", description: "Chauffeur-driven local cabs and outstation taxis" },
+    { name: "E-Rickshaws & Autos", slug: "auto_rickshaw", description: "Local electric rickshaws and tourist autos" },
+    { name: "Tempo Travelers & Buses", slug: "tempo_bus", description: "Large group tempo travelers and luxury tourist mini-buses" },
+  ],
+  "emergency": [
+    { name: "24/7 Ambulances", slug: "ambulance", description: "Emergency basic and ICU ambulance response units" },
+    { name: "Emergency Trauma Hospitals", slug: "emergency_hospital", description: "24/7 emergency casualty wards and multi-specialty hospitals" },
+    { name: "Police Stations & Helpdesks", slug: "police_station", description: "District police stations, tourist police posts & PCRs" },
+    { name: "Roadside Assistance", slug: "roadside_assistance", description: "24/7 towing, breakdown support and mechanical help" },
+    { name: "Blood Banks & Diagnostic Centers", slug: "blood_bank", description: "24-hour blood bank reserves and critical diagnostic labs" },
+  ],
+  "guide/travel agency": [
+    { name: "Certified Heritage Tour Guides", slug: "heritage_guide", description: "Government-certified regional historians and monument guides" },
+    { name: "Travel & Tour Agencies", slug: "tour_agency", description: "Custom tour planners, itinerary operators and ticket booking" },
+    { name: "Adventure & Safari Organizers", slug: "adventure_organizer", description: "Trekking expeditions, river rafting, and wildlife safaris" },
+    { name: "Pilgrimage & Spiritual Guides", slug: "pilgrimage_guide", description: "Temple trails, spiritual walks and cultural circuit guides" },
+  ],
+  "shopping": [
+    { name: "Handicrafts & Artisans", slug: "handicrafts", description: "Handmade local crafts, pottery, terracotta and wood art" },
+    { name: "Brassware & Metal Arts", slug: "brassware", description: "Famous regional brass crafts, metal idols and heritage utensils" },
+    { name: "Traditional Apparel & Textiles", slug: "textiles", description: "Chanderi sarees, handloom silks, and traditional ethnic wear" },
+    { name: "Local Sweets & Food Specialties", slug: "sweets_specialties", description: "Regional spices, peda, sweets and authentic edible souvenirs" },
+  ],
+  "others": [
+    { name: "Luggage Storage & Cloakrooms", slug: "luggage_storage", description: "Safe travel luggage drop-off, lockers and transit cloakrooms" },
+    { name: "Photography & Drone Shoots", slug: "photo_video_shoot", description: "Heritage photographers, pre-wedding & drone videography" },
+    { name: "Equipment & Gear Rentals", slug: "equipment_rental", description: "Camping gear, audio guides, cameras and travel accessories" },
+  ],
+};
+
+/* ─── RECOMMENDED STARTER BLUEPRINTS PER SUBSERVICE SLUG ─── */
+const RECOMMENDED_BLUEPRINT_FIELDS = {
+  resort: [
+    { fieldKey: "amenities", label: "Amenities", fieldType: "multiselect", defaultValue: ["Swimming Pool", "Spa & Wellness", "Free WiFi", "Multi-Cuisine Dining"] },
+    { fieldKey: "room_types", label: "Available Room Categories", fieldType: "multiselect", defaultValue: ["Deluxe Heritage Room", "Royal Suite", "Executive Villa"] },
+    { fieldKey: "check_in_time", label: "Check-in Timings", fieldType: "text", defaultValue: "02:00 PM" },
+    { fieldKey: "check_out_time", label: "Check-out Timings", fieldType: "text", defaultValue: "11:00 AM" },
+    { fieldKey: "starting_price", label: "Starting Price Per Night (₹)", fieldType: "number", defaultValue: 4500 },
+    { fieldKey: "complimentary_breakfast", label: "Complimentary Breakfast", fieldType: "boolean", defaultValue: true },
+  ],
+  homestay: [
+    { fieldKey: "homestay_amenities", label: "Homestay Amenities", fieldType: "multiselect", defaultValue: ["Home-Cooked Food", "WiFi", "Hot Water", "Parking"] },
+    { fieldKey: "host_languages", label: "Host Languages Spoken", fieldType: "text", defaultValue: "Hindi, English" },
+    { fieldKey: "pet_friendly", label: "Pet Friendly", fieldType: "boolean", defaultValue: false },
+    { fieldKey: "starting_price", label: "Starting Price (₹)", fieldType: "number", defaultValue: 1800 },
+  ],
+  cafe: [
+    { fieldKey: "coffee_specialties", label: "Coffee Specialties", fieldType: "multiselect", defaultValue: ["Espresso", "Cold Brew", "Pour-Over", "Matcha Latte"] },
+    { fieldKey: "outdoor_seating", label: "Outdoor / Garden Seating", fieldType: "boolean", defaultValue: true },
+    { fieldKey: "wifi_available", label: "High-Speed WiFi for Working", fieldType: "boolean", defaultValue: true },
+    { fieldKey: "average_cost_for_two", label: "Avg Cost for Two (₹)", fieldType: "number", defaultValue: 400 },
+  ],
+  fine_dining: [
+    { fieldKey: "cuisines", label: "Cuisine Types", fieldType: "multiselect", defaultValue: ["North Indian", "Bundelkhandi Special", "Mughlai", "Continental"] },
+    { fieldKey: "table_reservation_required", label: "Reservation Recommended", fieldType: "boolean", defaultValue: true },
+    { fieldKey: "alcohol_served", label: "Bar / Alcohol Served", fieldType: "boolean", defaultValue: false },
+    { fieldKey: "valet_parking", label: "Valet Parking Available", fieldType: "boolean", defaultValue: true },
+  ],
+  ambulance: [
+    { fieldKey: "ambulance_type", label: "Ambulance Category", fieldType: "select", options: ["Basic Life Support (BLS)", "Advanced ICU Ambulance", "Oxygen Ambulance"], defaultValue: "Basic Life Support (BLS)" },
+    { fieldKey: "oxygen_equipped", label: "Oxygen Cylinder Onboard", fieldType: "boolean", defaultValue: true },
+    { fieldKey: "doctor_paramedic_onboard", label: "Paramedic / Doctor Accompanied", fieldType: "boolean", defaultValue: true },
+    { fieldKey: "response_time_mins", label: "Avg Response Time (Mins)", fieldType: "number", defaultValue: 15 },
+  ],
+  self_drive_car: [
+    { fieldKey: "available_car_types", label: "Vehicle Fleet Types", fieldType: "multiselect", defaultValue: ["Hatchback (Swift/i20)", "Sedan (Dzire)", "SUV (Creta/Scorpio)"] },
+    { fieldKey: "fuel_included", label: "Fuel Included in Rent", fieldType: "boolean", defaultValue: false },
+    { fieldKey: "security_deposit", label: "Security Deposit (₹)", fieldType: "number", defaultValue: 3000 },
+    { fieldKey: "per_day_starting_price", label: "Per Day Starting Rate (₹)", fieldType: "number", defaultValue: 1500 },
+  ],
+  heritage_guide: [
+    { fieldKey: "certified_monuments", label: "Certified Monument Circuits", fieldType: "multiselect", defaultValue: ["Jhansi Fort & Museum", "Orchha Palaces & Temples", "Khajuraho Group of Temples"] },
+    { fieldKey: "languages", label: "Languages Fluently Spoken", fieldType: "text", defaultValue: "Hindi, English, French" },
+    { fieldKey: "hourly_rate", label: "Half-Day Tour Rate (₹)", fieldType: "number", defaultValue: 1200 },
+  ],
+};
+
+const ServicesPage = () => {
+  // Navigation Hierarchy:
+  // Level 1: selectedCategoryKey === null (7 Folders)
+  // Level 2: selectedCategoryKey !== null && selectedSubserviceSlug === null (Subservices of that service)
+  // Level 3: selectedCategoryKey !== null && selectedSubserviceSlug !== null (Inside that subservice: Template + Objects)
+  const [selectedCategoryKey, setSelectedCategoryKey] = useState(null);
+  const [selectedSubserviceSlug, setSelectedSubserviceSlug] = useState(null);
+
+  // Filters
+  const [level2Tab, setLevel2Tab] = useState("live_objects"); // "live_objects" | "subservices"
+  const [subserviceStatusFilter, setSubserviceStatusFilter] = useState("all"); // "all" | "live" | "draft"
+  const [objectStatusFilter, setObjectStatusFilter] = useState("all"); // "all" | "published" | "draft" | "archived"
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Subservice Category Modal State (Class creation only)
+  const [showSubserviceModal, setShowSubserviceModal] = useState(false);
+  const [editingSubservice, setEditingSubservice] = useState(null);
+  const [subserviceForm, setSubserviceForm] = useState({
+    name: "",
+    slug: "",
+    description: "",
+    isActive: true,
+  });
+
+  // Blueprint Template Modal State (Strictly for that subservice)
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateForm, setTemplateForm] = useState({
+    id: null,
+    templateName: "",
+    description: "",
+    fields: [],
+  });
+
+  // Object (Listing) Modal State (Creating an object from that template)
+  const [showObjectModal, setShowObjectModal] = useState(false);
+  const [editingObject, setEditingObject] = useState(null);
+  const [isSubmittingObject, setIsSubmittingObject] = useState(false);
+  const [objectForm, setObjectForm] = useState({
+    title: "",
+    description: "",
+    contact: { phone: "", email: "", website: "" },
+    location: { address: "", city: "Jhansi", googleMapsUrl: "" },
+    customDetails: {},
+    photos: [],
+    existingPhotos: [],
+    views: 0,
+    shares: 0,
+    clicks: 0,
+    likes: 0,
+    status: "published",
+  });
+
+  // Object Details Modal View (Full details view with Edit, Soft Delete, Hard Delete)
+  const [selectedObjectForDetails, setSelectedObjectForDetails] = useState(null);
+
+  // Queries & Mutations
+  const {
+    data: templatesRes,
+    isLoading: loadingTemplates,
+    refetch: refetchTemplates,
+  } = useServiceTemplatesQuery({ all: "true", includeInactive: "true" });
+
+  const {
+    data: customServicesRes,
+    isLoading: loadingCustomServices,
+    refetch: refetchCustomServices,
+  } = useCustomServicesQuery({
+    category: selectedCategoryKey || undefined,
+    subService: selectedSubserviceSlug || undefined,
+    status: "ALL",
+  });
+
+  const createTemplateMut = useCreateServiceTemplateMutation();
+  const updateTemplateMut = useUpdateServiceTemplateMutation();
+  const deleteTemplateMut = useDeleteServiceTemplateMutation();
+  const seedTemplatesMut = useSeedDefaultTemplatesMutation();
+
+  const createCustomServiceMut = useCreateCustomServiceMutation();
+  const updateCustomServiceMut = useUpdateCustomServiceMutation();
+  const deleteCustomServiceMut = useDeleteCustomServiceMutation();
+
+  const allTemplates = useMemo(() => {
+    return templatesRes?.data || templatesRes?.templates || (Array.isArray(templatesRes) ? templatesRes : []);
+  }, [templatesRes]);
+
+  const allCustomServices = useMemo(() => {
+    return customServicesRes?.data || (Array.isArray(customServicesRes) ? customServicesRes : []);
+  }, [customServicesRes]);
+
+  // Current Selected Category Object
+  const selectedCategory = useMemo(() => {
+    return SERVICE_CATEGORIES.find((c) => c.key === selectedCategoryKey) || null;
+  }, [selectedCategoryKey]);
+
+  // Subservices list for the selected category folder (Actual created subservices only)
+  const currentCategorySubservices = useMemo(() => {
+    if (!selectedCategoryKey) return [];
+
+    const catTemplates = allTemplates.filter((t) => t.category === selectedCategoryKey);
+    const presets = RELATABLE_SUBSERVICES_BY_CATEGORY[selectedCategoryKey] || [];
+    const presetMap = new Map(presets.map((p) => [p.slug.toLowerCase(), p]));
+
+    const map = new Map();
+
+    catTemplates.forEach((t) => {
+      const slug = (t.subService || "").toLowerCase().trim();
+      if (!slug) return;
+      if (map.has(slug)) return; // Prevent duplicate rows if database has duplicate records
+
+      const preset = presetMap.get(slug);
+      map.set(slug, {
+        name: preset ? preset.name : (t.templateName || slug).replace(/ Blueprint$/i, ""),
+        slug,
+        description: t.description || preset?.description || "",
+        template: t,
+        isActive: t.isActive !== false,
+      });
+    });
+
+    return Array.from(map.values());
+  }, [selectedCategoryKey, allTemplates]);
+
+  // Filtered subservices based on search and status tabs
+  const filteredCategorySubservices = useMemo(() => {
+    let list = currentCategorySubservices;
+
+    if (searchQuery.trim() && level2Tab === "subservices") {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (item) =>
+          item.name.toLowerCase().includes(q) ||
+          item.slug.toLowerCase().includes(q) ||
+          item.description.toLowerCase().includes(q)
+      );
+    }
+
+    if (subserviceStatusFilter === "live") {
+      list = list.filter((item) => item.isActive);
+    } else if (subserviceStatusFilter === "draft") {
+      list = list.filter((item) => !item.isActive);
+    }
+
+    return list;
+  }, [currentCategorySubservices, searchQuery, level2Tab, subserviceStatusFilter]);
+
+  // Uncreated preset suggestions for "+ Create Subservice" (Excludes any preset that is ALREADY created!)
+  const availablePresets = useMemo(() => {
+    if (!selectedCategoryKey) return [];
+    const existingSlugs = new Set(
+      allTemplates
+        .filter((t) => t.category === selectedCategoryKey)
+        .map((t) => (t.subService || "").toLowerCase().trim())
+    );
+    const presets = RELATABLE_SUBSERVICES_BY_CATEGORY[selectedCategoryKey] || [];
+    return presets.filter((p) => !existingSlugs.has(p.slug.toLowerCase().trim()));
+  }, [selectedCategoryKey, allTemplates]);
+
+  // Real-time duplicate slug validation
+  const isSlugTaken = useMemo(() => {
+    if (!selectedCategoryKey) return false;
+    const cleanSlug = subserviceForm.slug.trim().toLowerCase().replace(/[\s.-]+/g, "_");
+    if (!cleanSlug) return false;
+    return allTemplates.some((t) => {
+      if (t.category !== selectedCategoryKey) return false;
+      if (editingSubservice && t._id === editingSubservice.template?._id) return false;
+      return (t.subService || "").toLowerCase().trim() === cleanSlug;
+    });
+  }, [subserviceForm.slug, selectedCategoryKey, allTemplates, editingSubservice]);
+
+  // Currently Selected Subservice Object (when inside level 3)
+  const currentSubservice = useMemo(() => {
+    if (!selectedSubserviceSlug || !selectedCategoryKey) return null;
+    return (
+      currentCategorySubservices.find((s) => s.slug === selectedSubserviceSlug) || {
+        name: selectedSubserviceSlug,
+        slug: selectedSubserviceSlug,
+        description: "",
+        template: allTemplates.find(
+          (t) => t.category === selectedCategoryKey && t.subService === selectedSubserviceSlug
+        ),
+        isActive: true,
+      }
+    );
+  }, [selectedSubserviceSlug, selectedCategoryKey, currentCategorySubservices, allTemplates]);
+
+  // Objects (Listings) belonging to this selected subservice
+  const currentSubserviceObjects = useMemo(() => {
+    if (!selectedSubserviceSlug || !selectedCategoryKey) return [];
+
+    let list = allCustomServices.filter(
+      (obj) =>
+        obj.category === selectedCategoryKey &&
+        obj.subService?.toLowerCase() === selectedSubserviceSlug.toLowerCase()
+    );
+
+    if (objectStatusFilter === "published") {
+      list = list.filter((obj) => obj.status === "published");
+    } else if (objectStatusFilter === "draft") {
+      list = list.filter((obj) => obj.status === "draft");
+    } else if (objectStatusFilter === "archived") {
+      list = list.filter((obj) => obj.status === "archived");
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (obj) =>
+          obj.title?.toLowerCase().includes(q) ||
+          obj.location?.city?.toLowerCase().includes(q) ||
+          obj.location?.address?.toLowerCase().includes(q)
+      );
+    }
+
+    return list;
+  }, [selectedSubserviceSlug, selectedCategoryKey, allCustomServices, objectStatusFilter, searchQuery]);
+
+  // All Live / Published Objects across the entire selected category (For Level 2 Section 1)
+  const categoryLiveObjects = useMemo(() => {
+    if (!selectedCategoryKey) return [];
+    return allCustomServices.filter(
+      (obj) => obj.category === selectedCategoryKey && obj.status === "published"
+    );
+  }, [selectedCategoryKey, allCustomServices]);
+
+  // Filtered Live Objects based on Search
+  const filteredCategoryLiveObjects = useMemo(() => {
+    let list = categoryLiveObjects;
+    if (searchQuery.trim() && level2Tab === "live_objects") {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (obj) =>
+          obj.title?.toLowerCase().includes(q) ||
+          obj.subService?.toLowerCase().includes(q) ||
+          obj.location?.city?.toLowerCase().includes(q) ||
+          obj.location?.address?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [categoryLiveObjects, searchQuery, level2Tab]);
+
+  // Live vs Draft subservices count for tabs
+  const liveSubservicesCount = useMemo(() => {
+    return currentCategorySubservices.filter((s) => s.isActive).length;
+  }, [currentCategorySubservices]);
+
+  const draftSubservicesCount = useMemo(() => {
+    return currentCategorySubservices.filter((s) => !s.isActive).length;
+  }, [currentCategorySubservices]);
+
+  // Active subservice configuration for the object modal (works whether in Level 2 or Level 3)
+  const activeModalSubservice = useMemo(() => {
+    const slug = editingObject?.subService || selectedSubserviceSlug;
+    if (!slug || !selectedCategoryKey) return null;
+    return (
+      currentCategorySubservices.find((s) => s.slug === slug) || {
+        name: slug.replace(/_/g, " "),
+        slug,
+        description: "",
+        template: allTemplates.find(
+          (t) => t.category === selectedCategoryKey && t.subService === slug
+        ),
+        isActive: true,
+      }
+    );
+  }, [editingObject, selectedSubserviceSlug, currentCategorySubservices, allTemplates, selectedCategoryKey]);
+
+  // Catalog Statistics (Accurate counts of strictly created subservices and objects)
+  const catalogStats = useMemo(() => {
+    const totalCategories = SERVICE_CATEGORIES.length;
+    const totalObjects = allCustomServices.length;
+    const publishedObjects = allCustomServices.filter((o) => o.status === "published").length;
+    const totalViews = allCustomServices.reduce((sum, o) => sum + (Number(o.views) || 0), 0);
+    const totalShares = allCustomServices.reduce((sum, o) => sum + (Number(o.shares) || 0), 0);
+    const totalClicks = allCustomServices.reduce((sum, o) => sum + (Number(o.clicks) || 0), 0);
+
+    const byCategory = {};
+    let totalSubservicesCount = 0;
+
+    SERVICE_CATEGORIES.forEach((cat) => {
+      const catTemplates = allTemplates.filter((t) => t.category === cat.key);
+      const catObjects = allCustomServices.filter((o) => o.category === cat.key);
+      const uniqueCreatedSlugs = new Set(
+        catTemplates
+          .map((t) => (t.subService || "").toLowerCase().trim())
+          .filter(Boolean)
+      );
+      byCategory[cat.key] = {
+        subservicesCount: uniqueCreatedSlugs.size,
+        objectsCount: catObjects.length,
+        viewsCount: catObjects.reduce((acc, o) => acc + (Number(o.views) || 0), 0),
+        sharesCount: catObjects.reduce((acc, o) => acc + (Number(o.shares) || 0), 0),
+        clicksCount: catObjects.reduce((acc, o) => acc + (Number(o.clicks) || 0), 0),
+      };
+      totalSubservicesCount += uniqueCreatedSlugs.size;
+    });
+
+    return {
+      totalCategories,
+      totalTemplates: allTemplates.length,
+      totalSubservices: totalSubservicesCount,
+      totalObjects,
+      publishedObjects,
+      totalViews,
+      totalShares,
+      totalClicks,
+      byCategory,
+    };
+  }, [allTemplates, allCustomServices]);
+
+  /* ─── LEVEL 2: SUBSERVICE CLASS CREATION / EDITING ─── */
+  const handleOpenAddSubservice = () => {
+    setEditingSubservice(null);
+    setSubserviceForm({
+      name: "",
+      slug: "",
+      description: "",
+      isActive: true,
+    });
+    setShowSubserviceModal(true);
+  };
+
+  const handleOpenEditSubservice = (subservice, e) => {
+    e?.stopPropagation();
+    setEditingSubservice(subservice);
+    setSubserviceForm({
+      name: subservice.name,
+      slug: subservice.slug,
+      description: subservice.description,
+      isActive: subservice.isActive,
+    });
+    setShowSubserviceModal(true);
+  };
+
+  const handleSaveSubservice = async (e) => {
+    e.preventDefault();
+    const cleanSlug = subserviceForm.slug.trim().toLowerCase().replace(/[\s.-]+/g, "_");
+    if (!cleanSlug) {
+      toast.error("Please enter a relatable slug");
+      return;
+    }
+
+    if (isSlugTaken) {
+      toast.error(`A subservice with slug "${cleanSlug}" already exists in ${selectedCategory?.name}! Duplicate subservices are not allowed.`);
+      return;
+    }
+
+    try {
+      const existingTemplate = editingSubservice?.template;
+      if (existingTemplate?._id) {
+        await updateTemplateMut.mutateAsync({
+          id: existingTemplate._id,
+          data: {
+            subService: cleanSlug,
+            description: subserviceForm.description,
+            isActive: subserviceForm.isActive,
+          },
+        });
+        toast.success(`Subservice "${subserviceForm.name}" updated!`);
+      } else {
+        const defaultFields = RECOMMENDED_BLUEPRINT_FIELDS[cleanSlug] || [
+          { fieldKey: "amenities", label: "Special Features / Amenities", fieldType: "tags", defaultValue: [] },
+          { fieldKey: "starting_price", label: "Starting Price (₹)", fieldType: "number", defaultValue: 1000 },
+        ];
+        await createTemplateMut.mutateAsync({
+          templateName: `${subserviceForm.name} Blueprint`,
+          category: selectedCategoryKey,
+          subService: cleanSlug,
+          description: subserviceForm.description,
+          fields: defaultFields,
+          isActive: subserviceForm.isActive,
+        });
+        toast.success(`Subservice "${subserviceForm.name}" created!`);
+      }
+      setShowSubserviceModal(false);
+      refetchTemplates();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to save subservice");
+    }
+  };
+
+  // 1-Click Subservice Offline (Private) <-> Live Toggle
+  const handleToggleSubserviceStatus = async (subservice, e) => {
+    e?.stopPropagation();
+    const newActive = !subservice.isActive;
+    const statusText = newActive ? "Live (Public on Mobile App)" : "Private / Offline (Hidden from Users)";
+    try {
+      if (subservice.template?._id) {
+        await updateTemplateMut.mutateAsync({
+          id: subservice.template._id,
+          data: { isActive: newActive },
+        });
+      } else {
+        const defaultFields = RECOMMENDED_BLUEPRINT_FIELDS[subservice.slug] || [
+          { fieldKey: "amenities", label: "Special Features / Amenities", fieldType: "tags", defaultValue: [] },
+          { fieldKey: "starting_price", label: "Starting Price (₹)", fieldType: "number", defaultValue: 1000 },
+        ];
+        await createTemplateMut.mutateAsync({
+          templateName: `${subservice.name} Blueprint`,
+          category: selectedCategoryKey,
+          subService: subservice.slug,
+          description: subservice.description,
+          fields: defaultFields,
+          isActive: newActive,
+        });
+      }
+      toast.success(`Subservice "${subservice.name}" is now ${statusText}!`);
+      refetchTemplates();
+    } catch (err) {
+      toast.error("Failed to update subservice status");
+    }
+  };
+
+  /* ─── LEVEL 3: TEMPLATE BLUEPRINT CONFIGURATION (FOR THIS SUBSERVICE ONLY) ─── */
+  const handleOpenConfigureTemplate = () => {
+    if (!currentSubservice) return;
+    const t = currentSubservice.template;
+    if (t) {
+      setTemplateForm({
+        id: t._id,
+        templateName: t.templateName || `${currentSubservice.name} Blueprint`,
+        description: t.description || currentSubservice.description || "",
+        fields: t.fields || [],
+      });
+    } else {
+      const defaultFields = RECOMMENDED_BLUEPRINT_FIELDS[currentSubservice.slug] || [
+        { fieldKey: "amenities", label: "Special Features", fieldType: "tags", defaultValue: [] },
+        { fieldKey: "starting_price", label: "Starting Price (₹)", fieldType: "number", defaultValue: 1000 },
+      ];
+      setTemplateForm({
+        id: null,
+        templateName: `${currentSubservice.name} Blueprint`,
+        description: currentSubservice.description || "",
+        fields: defaultFields,
+      });
+    }
+    setShowTemplateModal(true);
+  };
+
+  const handleSaveTemplate = async (e) => {
+    e.preventDefault();
+    if (!templateForm.templateName.trim()) {
+      toast.error("Template name is required");
+      return;
+    }
+
+    try {
+      const payload = {
+        templateName: templateForm.templateName.trim(),
+        category: selectedCategoryKey,
+        subService: currentSubservice.slug,
+        description: templateForm.description,
+        fields: templateForm.fields,
+        isActive: currentSubservice.isActive,
+      };
+
+      if (templateForm.id) {
+        await updateTemplateMut.mutateAsync({ id: templateForm.id, data: payload });
+        toast.success(`Template "${templateForm.templateName}" updated!`);
+      } else {
+        await createTemplateMut.mutateAsync(payload);
+        toast.success(`Template "${templateForm.templateName}" created!`);
+      }
+
+      setShowTemplateModal(false);
+      refetchTemplates();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to save template");
+    }
+  };
+
+  const handleSeedCurrentSubserviceTemplate = async () => {
+    if (!currentSubservice) return;
+    const defaultFields = RECOMMENDED_BLUEPRINT_FIELDS[currentSubservice.slug] || [
+      { fieldKey: "amenities", label: "Amenities & Highlights", fieldType: "tags", defaultValue: [] },
+      { fieldKey: "starting_price", label: "Starting Price (₹)", fieldType: "number", defaultValue: 1000 },
+    ];
+    try {
+      await createTemplateMut.mutateAsync({
+        templateName: `${currentSubservice.name} Blueprint`,
+        category: selectedCategoryKey,
+        subService: currentSubservice.slug,
+        description: currentSubservice.description,
+        fields: defaultFields,
+        isActive: true,
+      });
+      toast.success(`Seeded blueprint template for "${currentSubservice.name}"!`);
+      refetchTemplates();
+    } catch (err) {
+      toast.error("Template already exists or failed to seed");
+    }
+  };
+
+  /* ─── LEVEL 3: OBJECT (LISTING) CREATION / EDITING USING TEMPLATE ─── */
+  const handleOpenCreateObject = () => {
+    setEditingObject(null);
+    const initialCustomDetails = {};
+    const templateFields = currentSubservice?.template?.fields || [];
+    templateFields.forEach((f) => {
+      initialCustomDetails[f.fieldKey] = f.defaultValue !== null ? f.defaultValue : "";
+    });
+
+    setObjectForm({
+      title: "",
+      description: "",
+      contact: { phone: "", email: "", website: "" },
+      location: { address: "", city: "Jhansi", googleMapsUrl: "" },
+      customDetails: initialCustomDetails,
+      photos: [],
+      existingPhotos: [],
+      views: 0,
+      shares: 0,
+      clicks: 0,
+      likes: 0,
+      status: "published",
+    });
+    setShowObjectModal(true);
+  };
+
+  const handleOpenEditObject = (obj) => {
+    // Dismiss details modal so the edit modal opens cleanly in front and is never trapped behind
+    setSelectedObjectForDetails(null);
+    setEditingObject(obj);
+    setObjectForm({
+      title: obj.title || "",
+      description: obj.description || "",
+      contact: {
+        phone: obj.contact?.phone || "",
+        email: obj.contact?.email || "",
+        website: obj.contact?.website || "",
+      },
+      location: {
+        address: obj.location?.address || "",
+        city: obj.location?.city || "Jhansi",
+        googleMapsUrl: obj.location?.googleMapsUrl || "",
+      },
+      customDetails: obj.customDetails || {},
+      photos: [],
+      existingPhotos: obj.photos || [],
+      views: Number(obj.views) || 0,
+      shares: Number(obj.shares) || 0,
+      clicks: Number(obj.clicks) || 0,
+      likes: Number(obj.likes) || 0,
+      status: obj.status || "published",
+    });
+    setShowObjectModal(true);
+  };
+
+  // 1-Click Take Offline (Set to Private) <-> Go Live (Publish) Toggle
+  const handleToggleObjectStatus = async (obj, e) => {
+    e?.stopPropagation();
+    const newStatus = obj.status === "published" ? "draft" : "published";
+    const statusText = newStatus === "published" ? "Live / Published" : "Private / Offline (Hidden from Users)";
+    try {
+      await updateCustomServiceMut.mutateAsync({
+        id: obj._id,
+        data: { status: newStatus },
+      });
+      toast.success(`"${obj.title}" is now ${statusText}!`);
+      if (selectedObjectForDetails?._id === obj._id) {
+        setSelectedObjectForDetails((prev) => (prev ? { ...prev, status: newStatus } : null));
+      }
+      refetchCustomServices();
+    } catch (err) {
+      toast.error("Failed to update status");
+    }
+  };
+
+  const handleSaveObject = async (e) => {
+    e.preventDefault();
+    if (!objectForm.title.trim()) {
+      toast.error("Object / Business title is required");
+      return;
+    }
+
+    setIsSubmittingObject(true);
+    try {
+      const effectiveSlug = editingObject?.subService || selectedSubserviceSlug;
+      const effectiveTemplate = activeModalSubservice?.template;
+
+      let uploadedPhotoAssets = [];
+      if (objectForm.photos && objectForm.photos.length > 0) {
+        uploadedPhotoAssets = await uploadMultipleFilesDirectToR2(
+          objectForm.photos,
+          `services/${effectiveSlug}`,
+          "image"
+        );
+      }
+
+      const finalPhotos = editingObject
+        ? [...(objectForm.existingPhotos || []), ...uploadedPhotoAssets]
+        : uploadedPhotoAssets;
+
+      const payload = {
+        title: objectForm.title.trim(),
+        category: selectedCategoryKey,
+        subService: effectiveSlug,
+        templateId: effectiveTemplate?._id || undefined,
+        description: objectForm.description,
+        contact: objectForm.contact,
+        location: objectForm.location,
+        customDetails: objectForm.customDetails,
+        status: objectForm.status,
+        photos: finalPhotos,
+        views: Number(objectForm.views) || 0,
+        shares: Number(objectForm.shares) || 0,
+        clicks: Number(objectForm.clicks) || 0,
+        likes: Number(objectForm.likes) || 0,
+      };
+
+      if (editingObject?._id) {
+        await updateCustomServiceMut.mutateAsync({ id: editingObject._id, data: payload });
+        toast.success(`Object "${objectForm.title}" updated successfully!`);
+        if (selectedObjectForDetails?._id === editingObject._id) {
+          setSelectedObjectForDetails((prev) => ({ ...prev, ...payload }));
+        }
+      } else {
+        await createCustomServiceMut.mutateAsync(payload);
+        toast.success(`New ${activeModalSubservice?.name || effectiveSlug} object created!`);
+      }
+
+      setShowObjectModal(false);
+      refetchCustomServices();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to save object");
+    } finally {
+      setIsSubmittingObject(false);
+    }
+  };
+
+  /* ─── OBJECT DETAILS: SOFT DELETE, RESTORE, HARD DELETE ─── */
+  const handleSoftDeleteObject = async (obj) => {
+    try {
+      await updateCustomServiceMut.mutateAsync({
+        id: obj._id,
+        data: { status: "archived" },
+      });
+      toast.success(`Moved "${obj.title}" to Trash (soft-deleted).`);
+      setSelectedObjectForDetails(null);
+      refetchCustomServices();
+    } catch (err) {
+      toast.error("Failed to soft-delete object");
+    }
+  };
+
+  const handleRestoreObject = async (obj) => {
+    try {
+      await updateCustomServiceMut.mutateAsync({
+        id: obj._id,
+        data: { status: "published" },
+      });
+      toast.success(`Restored "${obj.title}" to Live!`);
+      setSelectedObjectForDetails(null);
+      refetchCustomServices();
+    } catch (err) {
+      toast.error("Failed to restore object");
+    }
+  };
+
+  const handleHardDeleteObject = async (obj) => {
+    const confirmed = window.confirm(
+      `⚠️ PERMANENT DELETION:\n\nAre you sure you want to permanently delete "${obj.title}"?\nThis cannot be undone and will delete all photos from Cloud storage.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteCustomServiceMut.mutateAsync(obj._id);
+      toast.success(`Permanently deleted "${obj.title}".`);
+      setSelectedObjectForDetails(null);
+      refetchCustomServices();
+    } catch (err) {
+      toast.error("Failed to delete object");
+    }
+  };
+
+  return (
+    <div className="space-y-6 pb-12 animate-in fade-in duration-150">
+      {/* ════════════════════════════════════════════════════════════
+          TOP EXECUTIVE STATS HUB
+          ════════════════════════════════════════════════════════════ */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black">
+              <Layers size={22} />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                Services & Subservices Architecture
+              </h1>
+              <p className="text-xs text-slate-500 font-medium">
+                {selectedSubserviceSlug
+                  ? `Level 3: ${currentSubservice?.name} Template & Live Objects`
+                  : selectedCategoryKey
+                  ? `Level 2: ${selectedCategory?.name} Subservice Categories`
+                  : "Level 1: 7 Core Service Folders Directory"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                refetchTemplates();
+                refetchCustomServices();
+              }}
+              className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+              title="Refresh Data"
+            >
+              <RefreshCw
+                size={16}
+                className={loadingTemplates || loadingCustomServices ? "animate-spin text-indigo-600" : ""}
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* 5 Executive Stat Counters */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+              Service Domains
+            </span>
+            <span className="text-2xl font-black text-slate-900">{catalogStats.totalCategories}</span>
+          </div>
+
+          <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-3.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 block mb-0.5">
+              Total Subservices
+            </span>
+            <span className="text-2xl font-black text-indigo-950">{catalogStats.totalSubservices}</span>
+          </div>
+
+          <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-3.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 block mb-0.5">
+              Live Business Objects
+            </span>
+            <span className="text-2xl font-black text-emerald-950">{catalogStats.publishedObjects}</span>
+          </div>
+
+          <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-3.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 block mb-0.5">
+              Total Views
+            </span>
+            <span className="text-2xl font-black text-blue-950">{catalogStats.totalViews.toLocaleString()}</span>
+          </div>
+
+          <div className="bg-purple-50/60 border border-purple-100 rounded-2xl p-3.5 col-span-2 sm:col-span-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 block mb-0.5">
+              Shares & Clicks
+            </span>
+            <span className="text-2xl font-black text-purple-950">
+              {(catalogStats.totalShares + catalogStats.totalClicks).toLocaleString()}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════════════════════════════
+          LEVEL 1: ALL 7 SERVICE FOLDERS
+          ════════════════════════════════════════════════════════════ */}
+      {!selectedCategoryKey ? (
+        <div className="space-y-6">
+          {/* Surprise Events Regional Domain Spotlight */}
+          <div className="bg-gradient-to-r from-purple-50 via-pink-50 to-indigo-50 border border-purple-200/80 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 text-white flex items-center justify-center font-bold shadow-md shadow-purple-500/20 shrink-0">
+                <Sparkles size={22} />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm sm:text-base font-black text-slate-900">
+                    Regional Surprise Events (Occasional Happenings)
+                  </h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200">
+                    Vast Regional Domain · Standalone Service
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+                  Surprise Events does not have subservices — it is an expansive service for occasional regional happenings across Bundelkhand (festivals, pop-ups, cultural nights, secret gigs). Managed independently in the sidebar with flexible key-value variables.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("navigate-tab", { detail: "Surprise Events" }));
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-500/20 transition cursor-pointer whitespace-nowrap self-start sm:self-auto"
+            >
+              <Sparkles size={14} />
+              <span>Open Surprise Events</span>
+              <ArrowRight size={14} />
+            </button>
+          </div>
+
+          {/* 7 Clean Folder Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {SERVICE_CATEGORIES.map((cat) => {
+              const Icon = cat.icon;
+              const stats = catalogStats.byCategory[cat.key] || { subservicesCount: 0, objectsCount: 0 };
+              return (
+                <div
+                  key={cat.key}
+                  onClick={() => {
+                    setSelectedCategoryKey(cat.key);
+                    setSelectedSubserviceSlug(null);
+                    setLevel2Tab("live_objects");
+                    setSearchQuery("");
+                  }}
+                  className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xs hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer flex flex-col justify-between group"
+                >
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div
+                        className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${cat.gradient} text-white flex items-center justify-center font-bold shadow-md shadow-indigo-500/10 group-hover:scale-105 transition`}
+                      >
+                        <Icon size={24} />
+                      </div>
+                      <span className="px-3 py-1 rounded-full text-xs font-black bg-slate-100 text-slate-700 border border-slate-200">
+                        {stats.subservicesCount} Subservices
+                      </span>
+                    </div>
+
+                    <div>
+                      <h3 className="font-black text-slate-900 text-lg group-hover:text-indigo-600 transition">
+                        {cat.name}
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                        {cat.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 mt-3 border-t border-slate-100 flex flex-col gap-2">
+                    <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500">
+                      <span className="flex items-center gap-1 text-blue-600">
+                        <Eye size={12} /> {stats.viewsCount.toLocaleString()} views
+                      </span>
+                      <span className="flex items-center gap-1 text-emerald-600">
+                        <Share2 size={12} /> {stats.sharesCount} shares
+                      </span>
+                      <span className="flex items-center gap-1 text-purple-600">
+                        <MousePointer size={12} /> {stats.clicksCount} clicks
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs font-bold pt-1">
+                      <span className="text-slate-600 font-extrabold">{stats.objectsCount} Live Object{stats.objectsCount !== 1 ? "s" : ""}</span>
+                      <div className="flex items-center gap-1 text-indigo-600 group-hover:translate-x-1 transition">
+                        <span>Open Folder</span>
+                        <ChevronRight size={14} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : !selectedSubserviceSlug ? (
+        /* ════════════════════════════════════════════════════════════
+            LEVEL 2: SUBSERVICES OF THIS SERVICE
+            (Only "+ Create Subservice" option here! No direct template or seed)
+            ════════════════════════════════════════════════════════════ */
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setSelectedCategoryKey(null)}
+                  className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                  title="Back to All 7 Folders"
+                >
+                  <ArrowLeft size={16} />
+                </button>
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
+                    <span>Services</span>
+                    <ChevronRight size={12} />
+                    <span className="text-indigo-600">{selectedCategory.name}</span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-0.5">
+                    {selectedCategory.name} Subservices
+                  </h2>
+                </div>
+              </div>
+
+              {/* ONLY OPTION HERE: Create Subservice for this particular service */}
+              <button
+                onClick={handleOpenAddSubservice}
+                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 transition cursor-pointer self-start sm:self-auto"
+              >
+                <Plus size={16} />
+                <span>Create Subservice</span>
+              </button>
+            </div>
+
+            {/* Filter Tabs & Search: LIVE OBJECTS FIRST */}
+            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-100">
+              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl flex-wrap">
+                {/* 1st SECTION: ALL LIVE OBJECTS IN THIS SERVICE */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLevel2Tab("live_objects");
+                    setSearchQuery("");
+                  }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+                    level2Tab === "live_objects"
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "text-emerald-700 hover:bg-emerald-100/60"
+                  }`}
+                >
+                  <span>🟢 Live Objects ({categoryLiveObjects.length})</span>
+                </button>
+
+                {/* Subservice Class Sections */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLevel2Tab("subservices");
+                    setSubserviceStatusFilter("all");
+                    setSearchQuery("");
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    level2Tab === "subservices" && subserviceStatusFilter === "all"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  All Subservices ({currentCategorySubservices.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLevel2Tab("subservices");
+                    setSubserviceStatusFilter("live");
+                    setSearchQuery("");
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    level2Tab === "subservices" && subserviceStatusFilter === "live"
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  🟢 Live Subservices ({liveSubservicesCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLevel2Tab("subservices");
+                    setSubserviceStatusFilter("draft");
+                    setSearchQuery("");
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    level2Tab === "subservices" && subserviceStatusFilter === "draft"
+                      ? "bg-amber-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  🟡 Draft Subservices ({draftSubservicesCount})
+                </button>
+              </div>
+
+              <div className="relative flex-1 max-w-xs">
+                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={
+                    level2Tab === "live_objects"
+                      ? `Search ${selectedCategory.name} live objects...`
+                      : "Search subservices..."
+                  }
+                  className="w-full pl-9 pr-3.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 outline-hidden transition"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ══════════════════════════════════════════════════════════
+              LEVEL 2 CONTENT: EITHER LIVE OBJECTS (1st SECTION) OR SUBSERVICES
+              ══════════════════════════════════════════════════════════ */}
+          {level2Tab === "live_objects" ? (
+            /* SECTION 1: ALL LIVE OBJECTS IN THIS SERVICE */
+            filteredCategoryLiveObjects.length === 0 ? (
+              <div className="py-20 text-center bg-white rounded-3xl border border-dashed border-slate-200 p-8 space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto shadow-xs">
+                  <CheckCircle size={28} />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-base font-black text-slate-800">
+                    No Live Objects Found in {selectedCategory.name}
+                  </h4>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    {searchQuery
+                      ? `No live listings matching "${searchQuery}". Try clearing search.`
+                      : `There are currently no live/published listings under ${selectedCategory.name}. Open any subservice below to create an object and publish it live.`}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      Clear Search
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setLevel2Tab("subservices");
+                      setSubserviceStatusFilter("all");
+                    }}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Folder size={14} />
+                    <span>Browse Subservices ({currentCategorySubservices.length})</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* ─── LEVEL 2 LIVE ENGAGEMENT STATS STRIP ─── */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                      <CheckCircle size={15} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block">Live Listings</span>
+                      <span className="text-sm font-black text-slate-900">{filteredCategoryLiveObjects.length}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                      <Eye size={15} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block">Total Views</span>
+                      <span className="text-sm font-black text-blue-900">
+                        {categoryLiveObjects.reduce((acc, o) => acc + (Number(o.views) || 0), 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                      <Share2 size={15} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block">Total Shares</span>
+                      <span className="text-sm font-black text-emerald-900">
+                        {categoryLiveObjects.reduce((acc, o) => acc + (Number(o.shares) || 0), 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                      <MousePointer size={15} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block">Inquiries / Clicks</span>
+                      <span className="text-sm font-black text-purple-900">
+                        {categoryLiveObjects.reduce((acc, o) => acc + (Number(o.clicks) || 0), 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {filteredCategoryLiveObjects.map((obj) => {
+                    const subserviceObj = currentCategorySubservices.find((s) => s.slug === obj.subService);
+                    const subserviceLabel = subserviceObj ? subserviceObj.name : (obj.subService || "Listing");
+
+                    return (
+                      <div
+                        key={obj._id}
+                        onClick={() => setSelectedObjectForDetails(obj)}
+                        className="bg-white rounded-3xl border border-slate-200 shadow-xs hover:shadow-lg hover:border-emerald-300 transition-all cursor-pointer overflow-hidden flex flex-col justify-between group"
+                      >
+                        <div>
+                          {/* Media Thumbnail */}
+                          <div className="relative h-44 bg-slate-100 overflow-hidden">
+                            {obj.photos?.[0]?.url ? (
+                              <img
+                                src={obj.photos[0].url}
+                                alt={obj.title}
+                                className="w-full h-full object-cover group-hover:scale-102 transition duration-300"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-emerald-600 font-black bg-emerald-50/60 text-sm px-4 text-center">
+                                {obj.title}
+                              </div>
+                            )}
+
+                            {/* Subservice & Status Badges */}
+                            <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 max-w-[80%]">
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/95 text-indigo-700 backdrop-blur-xs shadow-xs border border-indigo-100">
+                                {subserviceLabel}
+                              </span>
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500 text-white shadow-xs flex items-center gap-1">
+                                🟢 Live
+                              </span>
+                            </div>
+
+                            {/* 1-Click Take Offline Quick Action */}
+                            <button
+                              type="button"
+                              onClick={(e) => handleToggleObjectStatus(obj, e)}
+                              className="absolute top-3 right-3 p-1.5 rounded-xl bg-white/90 hover:bg-amber-50 text-slate-500 hover:text-amber-700 backdrop-blur-xs border border-slate-200 transition cursor-pointer shadow-xs"
+                              title="Take offline / set to private (hide from mobile app users while updating)"
+                            >
+                              <Lock size={13} />
+                            </button>
+                          </div>
+
+                          {/* Body Content */}
+                          <div className="p-5 space-y-2.5">
+                            <h4 className="font-black text-slate-900 text-base leading-snug group-hover:text-emerald-700 transition">
+                              {obj.title}
+                            </h4>
+
+                            {obj.description && (
+                              <p className="text-xs text-slate-500 line-clamp-2">
+                                {obj.description}
+                              </p>
+                            )}
+
+                            {/* Engagement Stats Strip */}
+                            <div className="flex items-center gap-3 py-1.5 px-3 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 my-1">
+                              <span className="flex items-center gap-1 text-blue-600" title="Views">
+                                <Eye size={12} /> {Number(obj.views || 0).toLocaleString()} views
+                              </span>
+                              <span className="flex items-center gap-1 text-emerald-600" title="Shares">
+                                <Share2 size={12} /> {Number(obj.shares || 0).toLocaleString()} shares
+                              </span>
+                              <span className="flex items-center gap-1 text-purple-600" title="Clicks">
+                                <MousePointer size={12} /> {Number(obj.clicks || 0).toLocaleString()} clicks
+                              </span>
+                            </div>
+
+                            <div className="space-y-1 pt-1 text-xs text-slate-600">
+                              {(obj.location?.city || obj.location?.address) && (
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <MapPin size={13} className="text-slate-400 shrink-0" />
+                                  <span className="truncate">
+                                    {obj.location?.address ? `${obj.location.address}, ` : ""}{obj.location?.city || "Jhansi"}
+                                  </span>
+                                </div>
+                              )}
+                              {obj.contact?.phone && (
+                                <div className="flex items-center gap-1.5">
+                                  <Phone size={13} className="text-slate-400 shrink-0" />
+                                  <span>{obj.contact.phone}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Card Footer: Open Details with Edit & Delete */}
+                        <div className="px-5 py-3.5 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs">
+                          <span className="text-[11px] font-bold text-slate-400">
+                            Click to view, edit or delete
+                          </span>
+                          <div className="flex items-center gap-1 font-bold text-emerald-700 group-hover:translate-x-1 transition">
+                            <span>Open Details</span>
+                            <ChevronRight size={14} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )
+          ) : (
+            /* SECTION 2: SUBSERVICES LIST (Clicking opens Level 3) */
+            currentCategorySubservices.length === 0 ? (
+              <div className="py-16 text-center bg-white rounded-3xl border border-dashed border-slate-200 p-8 space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center mx-auto">
+                  <Layers size={22} />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-base font-black text-slate-800">
+                    No subservices created yet for {selectedCategory.name}
+                  </h4>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    Click "+ Create Subservice" above to define a new subservice class for this service.
+                  </p>
+                </div>
+
+                {availablePresets.length > 0 && (
+                  <div className="pt-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+                      Quick-Start with an Available Starter Category:
+                    </span>
+                    <div className="flex flex-wrap justify-center gap-2 max-w-xl mx-auto">
+                      {availablePresets.map((preset) => (
+                        <button
+                          key={preset.slug}
+                          type="button"
+                          onClick={() => {
+                            setEditingSubservice(null);
+                            setSubserviceForm({
+                              name: preset.name,
+                              slug: preset.slug,
+                              description: preset.description,
+                              isActive: true,
+                            });
+                            setShowSubserviceModal(true);
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition cursor-pointer"
+                        >
+                          + {preset.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : filteredCategorySubservices.length === 0 ? (
+              <div className="py-12 text-center bg-white rounded-3xl border border-dashed border-slate-200 p-6 space-y-2">
+                <p className="text-xs font-bold text-slate-500">
+                  No subservices match this filter ({subserviceStatusFilter === "live" ? "Live Only" : subserviceStatusFilter === "draft" ? "Drafts Only" : `"${searchQuery}"`})
+                </p>
+                <button
+                  onClick={() => {
+                    setSubserviceStatusFilter("all");
+                    setSearchQuery("");
+                  }}
+                  className="text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
+                >
+                  Reset filter to Show All ({currentCategorySubservices.length})
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {filteredCategorySubservices.map((subservice) => {
+                  const objectsCount = allCustomServices.filter(
+                    (o) => o.category === selectedCategoryKey && o.subService === subservice.slug
+                  ).length;
+
+                  return (
+                    <div
+                      key={subservice.slug}
+                      onClick={() => {
+                        setSelectedSubserviceSlug(subservice.slug);
+                        setSearchQuery("");
+                      }}
+                      className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer flex flex-col justify-between space-y-4 group"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h3 className="font-black text-slate-900 text-base leading-snug group-hover:text-indigo-600 transition">
+                                {subservice.name}
+                              </h3>
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-100 text-slate-600">
+                                slug: {subservice.slug}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                              {subservice.description || "Subservice category class"}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            {subservice.isActive ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-700">
+                                🟢 Live
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-700">
+                                🔒 Private
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => handleToggleSubserviceStatus(subservice, e)}
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition cursor-pointer ${
+                                subservice.isActive
+                                  ? "bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200"
+                                  : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
+                              }`}
+                              title={subservice.isActive ? "Take offline / set to private (hide from mobile app users)" : "Publish live to mobile app"}
+                            >
+                              {subservice.isActive ? "🔒 Set Private" : "🟢 Set Live"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-500">
+                          {objectsCount} Listing Object{objectsCount !== 1 ? "s" : ""}
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => handleOpenEditSubservice(subservice, e)}
+                            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                            title="Edit Subservice Category"
+                          >
+                            <Edit size={14} />
+                          </button>
+
+                          <div className="flex items-center gap-1 text-xs font-bold text-indigo-600 group-hover:translate-x-1 transition">
+                            <span>Open Subservice</span>
+                            <ChevronRight size={14} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          )}
+        </div>
+      ) : (
+        /* ════════════════════════════════════════════════════════════
+            LEVEL 3: INSIDE THAT PARTICULAR SUBSERVICE
+            (Admin sees template available for this subservice, seed option, and objects grid)
+            ════════════════════════════════════════════════════════════ */
+        <div className="space-y-6">
+          {/* Subservice Breadcrumbs Header */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setSelectedSubserviceSlug(null)}
+                  className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                  title={`Back to ${selectedCategory?.name} Subservices`}
+                >
+                  <ArrowLeft size={16} />
+                </button>
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
+                    <span
+                      onClick={() => setSelectedCategoryKey(null)}
+                      className="cursor-pointer hover:underline"
+                    >
+                      Services
+                    </span>
+                    <ChevronRight size={12} />
+                    <span
+                      onClick={() => setSelectedSubserviceSlug(null)}
+                      className="cursor-pointer hover:underline"
+                    >
+                      {selectedCategory?.name}
+                    </span>
+                    <ChevronRight size={12} />
+                    <span className="text-indigo-600">{currentSubservice?.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 mt-0.5 flex-wrap">
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                      {currentSubservice?.name}
+                    </h2>
+                    {currentSubservice?.isActive ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-700 flex items-center gap-1 border border-emerald-200">
+                        🟢 Live
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-700 flex items-center gap-1 border border-amber-200">
+                        🔒 Private / Offline
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleSubserviceStatus(currentSubservice, e)}
+                      className={`px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                        currentSubservice?.isActive
+                          ? "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
+                          : "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200"
+                      }`}
+                      title={currentSubservice?.isActive ? "Take subservice offline (hide from mobile app users)" : "Publish subservice live to mobile app"}
+                    >
+                      {currentSubservice?.isActive ? (
+                        <>
+                          <Lock size={12} />
+                          <span>Take Subservice Offline (Private)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Unlock size={12} />
+                          <span>Publish Subservice Live</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => handleOpenEditSubservice(currentSubservice, e)}
+                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                      title="Edit Subservice Details"
+                    >
+                      <Edit size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Primary Action: Create Object from that template */}
+              <button
+                onClick={handleOpenCreateObject}
+                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 transition cursor-pointer self-start sm:self-auto"
+              >
+                <Plus size={16} />
+                <span>Create {currentSubservice?.name} Object</span>
+              </button>
+            </div>
+
+            {/* Template Available for this Subservice Card */}
+            <div className="bg-gradient-to-r from-indigo-50/70 via-purple-50/50 to-slate-50 border border-indigo-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-600 text-white">
+                    Available Blueprint Template
+                  </span>
+                  <span className="text-xs font-bold text-slate-500">
+                    slug: <code className="text-indigo-700 font-bold">{currentSubservice?.slug}</code>
+                  </span>
+                </div>
+                <h4 className="text-sm font-black text-slate-900">
+                  Template: {currentSubservice?.template?.templateName || `${currentSubservice?.name} Blueprint`}
+                </h4>
+                <p className="text-xs text-slate-600">
+                  {currentSubservice?.template?.fields?.length || 0} blueprint schema fields configured (
+                  {currentSubservice?.template?.fields?.map((f) => f.label).join(", ") || "No fields yet"}
+                  )
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {!currentSubservice?.template && (
+                  <button
+                    type="button"
+                    onClick={handleSeedCurrentSubserviceTemplate}
+                    className="px-3 py-1.5 bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
+                  >
+                    Seed Starter Template
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleOpenConfigureTemplate}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <SlidersHorizontal size={13} />
+                  <span>Configure Template</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Objects Filter Bar: Live vs Drafts vs Trash */}
+            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-slate-100">
+              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+                <button
+                  onClick={() => setObjectStatusFilter("all")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    objectStatusFilter === "all" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  All Objects ({currentSubserviceObjects.length})
+                </button>
+                <button
+                  onClick={() => setObjectStatusFilter("published")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    objectStatusFilter === "published" ? "bg-emerald-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  🟢 Live / Published
+                </button>
+                <button
+                  onClick={() => setObjectStatusFilter("draft")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    objectStatusFilter === "draft" ? "bg-amber-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  🟡 Drafts
+                </button>
+                <button
+                  onClick={() => setObjectStatusFilter("archived")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    objectStatusFilter === "archived" ? "bg-rose-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  🗑️ Trash / Soft-Deleted
+                </button>
+              </div>
+
+              <div className="relative flex-1 max-w-xs">
+                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={`Search ${currentSubservice?.name} objects...`}
+                  className="w-full pl-9 pr-3.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 outline-hidden transition"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Objects (Listings) Grid */}
+          {currentSubserviceObjects.length === 0 ? (
+            <div className="py-20 text-center bg-white rounded-3xl border border-dashed border-slate-200 p-6 space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center mx-auto">
+                <FileText size={22} />
+              </div>
+              <h4 className="text-sm font-bold text-slate-700">No objects found</h4>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                Click "Create {currentSubservice?.name} Object" to instantiate a new listing using this subservice's template blueprint.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {currentSubserviceObjects.map((obj) => (
+                <div
+                  key={obj._id}
+                  onClick={() => setSelectedObjectForDetails(obj)}
+                  className="bg-white rounded-3xl border border-slate-200 shadow-xs hover:shadow-md transition cursor-pointer overflow-hidden flex flex-col justify-between group"
+                >
+                  <div>
+                    {/* Media Thumbnail */}
+                    <div className="relative h-44 bg-slate-100 overflow-hidden">
+                      {obj.photos?.[0]?.url ? (
+                        <img
+                          src={obj.photos[0].url}
+                          alt={obj.title}
+                          className="w-full h-full object-cover group-hover:scale-102 transition duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-indigo-400 font-bold bg-indigo-50">
+                          {obj.title}
+                        </div>
+                      )}
+
+                      <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                        {obj.status === "published" ? (
+                          <span className="px-2.5 py-1 bg-emerald-900/80 backdrop-blur-xs text-white text-[10px] font-extrabold rounded-full uppercase flex items-center gap-1">
+                            <CheckCircle size={10} /> Live
+                          </span>
+                        ) : obj.status === "archived" ? (
+                          <span className="px-2.5 py-1 bg-rose-900/80 backdrop-blur-xs text-white text-[10px] font-extrabold rounded-full uppercase flex items-center gap-1">
+                            <AlertTriangle size={10} /> Trash
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 bg-amber-900/80 backdrop-blur-xs text-white text-[10px] font-extrabold rounded-full uppercase flex items-center gap-1">
+                            <Lock size={10} /> Private
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="absolute top-3 right-3 flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditObject(obj);
+                          }}
+                          className="p-1.5 bg-white/90 hover:bg-white text-slate-700 rounded-xl shadow-xs transition backdrop-blur-xs cursor-pointer"
+                          title="Edit Object"
+                        >
+                          <Edit size={13} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 space-y-2">
+                      <h3 className="font-bold text-slate-900 text-base leading-snug group-hover:text-indigo-600 transition truncate">
+                        {obj.title}
+                      </h3>
+                      <p className="text-xs text-slate-500 line-clamp-2">
+                        {obj.description || "No description provided"}
+                      </p>
+
+                      <div className="space-y-1 text-xs text-slate-500 pt-2 border-t border-slate-100">
+                        {obj.location?.city && (
+                          <div className="flex items-center gap-1.5 truncate">
+                            <MapPin size={13} className="text-indigo-600 shrink-0" />
+                            <span>{obj.location.address || obj.location.city}</span>
+                          </div>
+                        )}
+                        {obj.contact?.phone && (
+                          <div className="flex items-center gap-1.5 truncate">
+                            <Phone size={13} className="text-indigo-600 shrink-0" />
+                            <span>{obj.contact.phone}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Custom Template Attributes Preview */}
+                      {obj.customDetails && Object.keys(obj.customDetails).length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {Object.entries(obj.customDetails).slice(0, 3).map(([k, v]) => {
+                            if (!v) return null;
+                            return (
+                              <span
+                                key={k}
+                                className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-semibold border border-indigo-100 truncate max-w-[140px]"
+                              >
+                                {k}: {Array.isArray(v) ? v.join(", ") : String(v)}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-4 pt-0 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedObjectForDetails(obj);
+                      }}
+                      className="flex-1 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Eye size={13} />
+                      <span>Details</span>
+                    </button>
+
+                    {obj.status === "published" ? (
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleObjectStatus(obj, e)}
+                        className="py-2 px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0"
+                        title="Take offline / set to private (hide from mobile app users while fixing issues)"
+                      >
+                        <Lock size={12} />
+                        <span>Take Offline</span>
+                      </button>
+                    ) : obj.status === "draft" ? (
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleObjectStatus(obj, e)}
+                        className="py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-xs shrink-0"
+                        title="Publish live to mobile app users"
+                      >
+                        <Unlock size={12} />
+                        <span>Go Live</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRestoreObject(obj);
+                        }}
+                        className="py-2 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0"
+                        title="Restore to live"
+                      >
+                        <RotateCcw size={12} />
+                        <span>Restore</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════
+          MODAL A: CREATE / EDIT SUBSERVICE CATEGORY (CLASS ONLY)
+          (Zero contact info, zero email/phone, zero address, zero notifications)
+          ════════════════════════════════════════════════════════════ */}
+      {showSubserviceModal && selectedCategory && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+              <div>
+                <h3 className="text-base font-black text-slate-900">
+                  {editingSubservice ? "Edit Subservice Category" : "Create Subservice Category"}
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Define a subservice class for <strong>{selectedCategory.name}</strong>
+                </p>
+              </div>
+              <button
+                onClick={() => setShowSubserviceModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSubservice} className="p-6 space-y-4">
+              {!editingSubservice && availablePresets.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                    Recommended Presets ({availablePresets.length} available to create):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availablePresets.map((preset) => (
+                      <button
+                        key={preset.slug}
+                        type="button"
+                        onClick={() => {
+                          setSubserviceForm({
+                            name: preset.name,
+                            slug: preset.slug,
+                            description: preset.description,
+                            isActive: true,
+                          });
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition border cursor-pointer ${
+                          subserviceForm.slug === preset.slug
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                            : "bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 border-indigo-200"
+                        }`}
+                      >
+                        + {preset.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Subservice Category Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={subserviceForm.name}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSubserviceForm((prev) => ({
+                      ...prev,
+                      name: val,
+                      slug: prev.slug || val.toLowerCase().replace(/[\s.-]+/g, "_"),
+                    }));
+                  }}
+                  placeholder="e.g. Heritage Palaces & Forts"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 bg-white focus:border-indigo-500 outline-hidden transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Relatable Slug <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={subserviceForm.slug}
+                  onChange={(e) =>
+                    setSubserviceForm({
+                      ...subserviceForm,
+                      slug: e.target.value.toLowerCase().replace(/[\s.-]+/g, "_"),
+                    })
+                  }
+                  placeholder="e.g. heritage_palace"
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-sm font-mono font-bold text-indigo-700 border transition outline-hidden ${
+                    isSlugTaken
+                      ? "border-rose-400 bg-rose-50/50"
+                      : "border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500"
+                  }`}
+                />
+                {isSlugTaken && (
+                  <div className="flex items-center gap-1.5 mt-1.5 p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs font-bold animate-in fade-in">
+                    <AlertTriangle size={13} className="shrink-0 text-rose-600" />
+                    <span>A subservice with slug "{subserviceForm.slug}" already exists in {selectedCategory?.name}. Duplicate subservices are not allowed.</span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Description</label>
+                <textarea
+                  rows={2}
+                  value={subserviceForm.description}
+                  onChange={(e) => setSubserviceForm({ ...subserviceForm, description: e.target.value })}
+                  placeholder="Brief explanation of this subservice class..."
+                  className="w-full px-3.5 py-2 rounded-xl text-xs border border-slate-200 bg-white focus:border-indigo-500 outline-hidden transition resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <span className="text-xs font-bold text-slate-800">Publication Status</span>
+                <button
+                  type="button"
+                  onClick={() => setSubserviceForm((prev) => ({ ...prev, isActive: !prev.isActive }))}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    subserviceForm.isActive ? "bg-emerald-600 text-white" : "bg-amber-600 text-white"
+                  }`}
+                >
+                  {subserviceForm.isActive ? "🟢 Live" : "🟡 Draft"}
+                </button>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSubserviceModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSlugTaken || createTemplateMut.isPending || updateTemplateMut.isPending}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {createTemplateMut.isPending || updateTemplateMut.isPending ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Check size={14} />
+                  )}
+                  <span>Save Subservice</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════
+          MODAL B: CONFIGURE BLUEPRINT TEMPLATE (FOR THIS SUBSERVICE ONLY)
+          (Shows template name clearly as Template on top, NOT business name)
+          ════════════════════════════════════════════════════════════ */}
+      {showTemplateModal && currentSubservice && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 border border-indigo-200">
+                    Template Blueprint
+                  </span>
+                  <span className="text-xs font-bold text-slate-400">
+                    Subservice: <strong>{currentSubservice.name}</strong> ({currentSubservice.slug})
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900">
+                  Template: {templateForm.templateName || "Untitled Blueprint"}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowTemplateModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTemplate} className="flex-1 overflow-y-auto p-6 space-y-5">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Template Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={templateForm.templateName}
+                    onChange={(e) => setTemplateForm({ ...templateForm, templateName: e.target.value })}
+                    placeholder="e.g. Luxury Resort & Palace Blueprint"
+                    className="w-full px-3.5 py-2 rounded-xl text-sm font-semibold border border-slate-200 bg-white focus:border-indigo-500 outline-hidden transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Description</label>
+                  <input
+                    type="text"
+                    value={templateForm.description}
+                    onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl text-xs border border-slate-200 bg-white focus:border-indigo-500 outline-hidden transition"
+                  />
+                </div>
+              </div>
+
+              {/* Schema Fields Builder */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <SlidersHorizontal size={13} className="text-indigo-600" />
+                    Blueprint Schema Fields ({templateForm.fields.length})
+                  </h4>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTemplateForm((prev) => ({
+                        ...prev,
+                        fields: [
+                          ...prev.fields,
+                          {
+                            fieldKey: `field_${Date.now()}`,
+                            label: "New Field",
+                            fieldType: "text",
+                            defaultValue: "",
+                            required: false,
+                          },
+                        ],
+                      }));
+                    }}
+                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus size={13} />
+                    <span>Add Field</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2.5">
+                  {templateForm.fields.map((field, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-2"
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">
+                            Label
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={field.label}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const updated = [...templateForm.fields];
+                              updated[idx].label = val;
+                              if (!field.fieldKey || field.fieldKey.startsWith("field_")) {
+                                updated[idx].fieldKey = val.toLowerCase().replace(/[\s.-]+/g, "_");
+                              }
+                              setTemplateForm({ ...templateForm, fields: updated });
+                            }}
+                            className="w-full px-2.5 py-1.5 text-xs font-bold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white outline-hidden"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">
+                            Key
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={field.fieldKey}
+                            onChange={(e) => {
+                              const updated = [...templateForm.fields];
+                              updated[idx].fieldKey = e.target.value.toLowerCase().replace(/[\s.-]+/g, "_");
+                              setTemplateForm({ ...templateForm, fields: updated });
+                            }}
+                            className="w-full px-2.5 py-1.5 text-xs font-mono font-bold text-indigo-700 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white outline-hidden"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex-1">
+                            <label className="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">
+                              Type
+                            </label>
+                            <select
+                              value={field.fieldType}
+                              onChange={(e) => {
+                                const updated = [...templateForm.fields];
+                                updated[idx].fieldType = e.target.value;
+                                setTemplateForm({ ...templateForm, fields: updated });
+                              }}
+                              className="w-full px-2.5 py-1.5 text-xs font-bold rounded-lg border border-slate-200 bg-slate-50 focus:bg-white outline-hidden"
+                            >
+                              <option value="text">Text</option>
+                              <option value="number">Number</option>
+                              <option value="boolean">Yes / No</option>
+                              <option value="multiselect">Multi-Select</option>
+                              <option value="tags">Tags</option>
+                              <option value="textarea">Textarea</option>
+                            </select>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTemplateForm({
+                                ...templateForm,
+                                fields: templateForm.fields.filter((_, i) => i !== idx),
+                              });
+                            }}
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition self-end cursor-pointer"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createTemplateMut.isPending || updateTemplateMut.isPending}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 transition cursor-pointer flex items-center gap-1.5"
+                >
+                  {createTemplateMut.isPending || updateTemplateMut.isPending ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Check size={14} />
+                  )}
+                  <span>Save Blueprint Template</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════
+          MODAL C: CREATE / EDIT OBJECT (LISTING INSTANCE FROM TEMPLATE)
+          ════════════════════════════════════════════════════════════ */}
+      {showObjectModal && activeModalSubservice && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900">
+                  {editingObject ? `Edit ${editingObject.title}` : `Create New ${activeModalSubservice.name} Object`}
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Instantiating an object under <strong>{activeModalSubservice.name}</strong> ({activeModalSubservice.slug})
+                </p>
+              </div>
+              <button
+                onClick={() => setShowObjectModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveObject} className="flex-1 overflow-y-auto p-6 space-y-5">
+              {isSubmittingObject && <UploadProgressBar isUploading={isSubmittingObject} className="mb-4" />}
+
+              {/* 1. Basic Info */}
+              <div className="bg-slate-50/70 border border-slate-200 rounded-2xl p-4 space-y-4">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-600">
+                  1. Business / Listing Identity
+                </h4>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Business Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={objectForm.title}
+                    onChange={(e) => setObjectForm({ ...objectForm, title: e.target.value })}
+                    placeholder="e.g. Betwa Retreat Orchha"
+                    className="w-full px-3.5 py-2 rounded-xl text-sm font-semibold border border-slate-200 bg-white focus:border-indigo-500 outline-hidden"
+                  />
+                </div>
+
+                {/* Professional 3-Way Publication Status Selector */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Publication Status (Control App Visibility)
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div
+                      onClick={() => setObjectForm((prev) => ({ ...prev, status: "published" }))}
+                      className={`p-3 rounded-2xl border cursor-pointer transition flex flex-col justify-between ${
+                        objectForm.status === "published"
+                          ? "bg-emerald-50 border-emerald-400 ring-2 ring-emerald-200"
+                          : "bg-white border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                          <CheckCircle size={13} className="text-emerald-600" /> Live (Public)
+                        </span>
+                        {objectForm.status === "published" && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                        Visible to all mobile app users
+                      </p>
+                    </div>
+
+                    <div
+                      onClick={() => setObjectForm((prev) => ({ ...prev, status: "draft" }))}
+                      className={`p-3 rounded-2xl border cursor-pointer transition flex flex-col justify-between ${
+                        objectForm.status === "draft"
+                          ? "bg-amber-50 border-amber-400 ring-2 ring-amber-200"
+                          : "bg-white border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-amber-800 flex items-center gap-1.5">
+                          <Lock size={13} className="text-amber-600" /> Private (Offline)
+                        </span>
+                        {objectForm.status === "draft" && (
+                          <span className="w-2 h-2 rounded-full bg-amber-600"></span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                        Hidden from users while fixing issues or editing
+                      </p>
+                    </div>
+
+                    <div
+                      onClick={() => setObjectForm((prev) => ({ ...prev, status: "archived" }))}
+                      className={`p-3 rounded-2xl border cursor-pointer transition flex flex-col justify-between ${
+                        objectForm.status === "archived"
+                          ? "bg-rose-50 border-rose-400 ring-2 ring-rose-200"
+                          : "bg-white border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-rose-800 flex items-center gap-1.5">
+                          <AlertTriangle size={13} className="text-rose-600" /> Trash / Archived
+                        </span>
+                        {objectForm.status === "archived" && (
+                          <span className="w-2 h-2 rounded-full bg-rose-600"></span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                        Soft-deleted and archived
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Description</label>
+                  <textarea
+                    rows={2}
+                    value={objectForm.description}
+                    onChange={(e) => setObjectForm({ ...objectForm, description: e.target.value })}
+                    placeholder="Full description of this business listing..."
+                    className="w-full px-3.5 py-2 rounded-xl text-xs border border-slate-200 bg-white focus:border-indigo-500 outline-hidden resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* 2. Contact & Location */}
+              <div className="bg-slate-50/70 border border-slate-200 rounded-2xl p-4 space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-600">
+                  2. Contact & Location Details
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
+                    <input
+                      type="text"
+                      value={objectForm.contact.phone}
+                      onChange={(e) =>
+                        setObjectForm({
+                          ...objectForm,
+                          contact: { ...objectForm.contact, phone: e.target.value },
+                        })
+                      }
+                      placeholder="+91 9876543210"
+                      className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 bg-white focus:border-indigo-500 outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={objectForm.contact.email}
+                      onChange={(e) =>
+                        setObjectForm({
+                          ...objectForm,
+                          contact: { ...objectForm.contact, email: e.target.value },
+                        })
+                      }
+                      placeholder="info@business.com"
+                      className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 bg-white focus:border-indigo-500 outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">City</label>
+                    <input
+                      type="text"
+                      value={objectForm.location.city}
+                      onChange={(e) =>
+                        setObjectForm({
+                          ...objectForm,
+                          location: { ...objectForm.location, city: e.target.value },
+                        })
+                      }
+                      className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 bg-white focus:border-indigo-500 outline-hidden"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Address</label>
+                    <input
+                      type="text"
+                      value={objectForm.location.address}
+                      onChange={(e) =>
+                        setObjectForm({
+                          ...objectForm,
+                          location: { ...objectForm.location, address: e.target.value },
+                        })
+                      }
+                      placeholder="e.g. Near Betwa River, Orchha"
+                      className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 bg-white focus:border-indigo-500 outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Google Maps Link</label>
+                    <input
+                      type="url"
+                      value={objectForm.location.googleMapsUrl}
+                      onChange={(e) =>
+                        setObjectForm({
+                          ...objectForm,
+                          location: { ...objectForm.location, googleMapsUrl: e.target.value },
+                        })
+                      }
+                      placeholder="https://maps.google.com/..."
+                      className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 bg-white focus:border-indigo-500 outline-hidden"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Custom Template Attributes from Subservice Blueprint */}
+              {activeModalSubservice?.template?.fields && activeModalSubservice.template.fields.length > 0 && (
+                <div className="bg-purple-50/60 border border-purple-100 rounded-2xl p-4 space-y-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-purple-700">
+                    3. Template Schema Attributes ({activeModalSubservice.template.templateName})
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {activeModalSubservice.template.fields.map((f) => (
+                      <div key={f.fieldKey}>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          {f.label} {f.required && <span className="text-red-500">*</span>}
+                        </label>
+                        {f.fieldType === "boolean" ? (
+                          <div className="flex items-center gap-2 pt-1">
+                            <input
+                              type="checkbox"
+                              checked={!!objectForm.customDetails[f.fieldKey]}
+                              onChange={(e) =>
+                                setObjectForm({
+                                  ...objectForm,
+                                  customDetails: {
+                                    ...objectForm.customDetails,
+                                    [f.fieldKey]: e.target.checked,
+                                  },
+                                })
+                              }
+                              className="w-4 h-4 text-indigo-600 rounded"
+                            />
+                            <span className="text-xs text-slate-600">Yes / Enabled</span>
+                          </div>
+                        ) : f.fieldType === "multiselect" || f.fieldType === "tags" ? (
+                          <input
+                            type="text"
+                            value={
+                              Array.isArray(objectForm.customDetails[f.fieldKey])
+                                ? objectForm.customDetails[f.fieldKey].join(", ")
+                                : objectForm.customDetails[f.fieldKey] || ""
+                            }
+                            onChange={(e) =>
+                              setObjectForm({
+                                ...objectForm,
+                                customDetails: {
+                                  ...objectForm.customDetails,
+                                  [f.fieldKey]: e.target.value.split(",").map((s) => s.trim()),
+                                },
+                              })
+                            }
+                            placeholder="Comma separated values..."
+                            className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 bg-white focus:border-indigo-500 outline-hidden"
+                          />
+                        ) : (
+                          <input
+                            type={f.fieldType === "number" ? "number" : "text"}
+                            value={objectForm.customDetails[f.fieldKey] ?? ""}
+                            onChange={(e) =>
+                              setObjectForm({
+                                ...objectForm,
+                                customDetails: {
+                                  ...objectForm.customDetails,
+                                  [f.fieldKey]:
+                                    f.fieldType === "number" ? Number(e.target.value) : e.target.value,
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 bg-white focus:border-indigo-500 outline-hidden"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Existing Photos (When Editing) */}
+              {editingObject && objectForm.existingPhotos && objectForm.existingPhotos.length > 0 && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                    Current Photos ({objectForm.existingPhotos.length}):
+                  </span>
+                  <div className="flex flex-wrap gap-2.5">
+                    {objectForm.existingPhotos.map((photo, pIdx) => (
+                      <div key={pIdx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 group">
+                        <img src={photo.url} alt="" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setObjectForm((prev) => ({
+                              ...prev,
+                              existingPhotos: prev.existingPhotos.filter((_, i) => i !== pIdx),
+                            }));
+                          }}
+                          className="absolute inset-0 bg-rose-600/80 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer text-[10px] font-bold gap-1"
+                          title="Remove photo"
+                        >
+                          <Trash2 size={16} />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 4. Photos Upload */}
+              <div className="border-2 border-dashed border-indigo-200 p-4 rounded-2xl text-center bg-indigo-50/40">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  id="objectPhotosUpload"
+                  onChange={(e) => setObjectForm({ ...objectForm, photos: e.target.files })}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="objectPhotosUpload"
+                  className="cursor-pointer flex flex-col items-center justify-center gap-1.5"
+                >
+                  <UploadCloud size={24} className="text-indigo-600" />
+                  <span className="text-xs font-bold text-indigo-700">
+                    {objectForm.photos && objectForm.photos.length > 0
+                      ? `✓ ${objectForm.photos.length} Photo(s) Selected`
+                      : "Upload Business Photos"}
+                  </span>
+                  <span className="text-[10px] text-slate-400">Direct R2 high-speed upload</span>
+                </label>
+              </div>
+
+              {/* 5. Engagement & Performance Statistics */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <Eye size={13} className="text-blue-600" />
+                  <span>5. Engagement & Performance Statistics</span>
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Views</label>
+                    <input
+                      type="number"
+                      value={objectForm.views || 0}
+                      onChange={(e) => setObjectForm({ ...objectForm, views: Number(e.target.value) })}
+                      className="w-full px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Shares</label>
+                    <input
+                      type="number"
+                      value={objectForm.shares || 0}
+                      onChange={(e) => setObjectForm({ ...objectForm, shares: Number(e.target.value) })}
+                      className="w-full px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Inquiries / Clicks</label>
+                    <input
+                      type="number"
+                      value={objectForm.clicks || 0}
+                      onChange={(e) => setObjectForm({ ...objectForm, clicks: Number(e.target.value) })}
+                      className="w-full px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Likes</label>
+                    <input
+                      type="number"
+                      value={objectForm.likes || 0}
+                      onChange={(e) => setObjectForm({ ...objectForm, likes: Number(e.target.value) })}
+                      className="w-full px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Buttons */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowObjectModal(false)}
+                  disabled={isSubmittingObject}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingObject}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/20 transition cursor-pointer flex items-center gap-1.5"
+                >
+                  {isSubmittingObject ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Check size={14} />
+                  )}
+                  <span>Save Object Listing</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════
+          MODAL D: OBJECT DETAILS VIEW
+          (Shows all details + Edit, Soft Delete, Hard Delete)
+          ════════════════════════════════════════════════════════════ */}
+      {selectedObjectForDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 border border-indigo-200">
+                    {selectedObjectForDetails.subService}
+                  </span>
+                  {selectedObjectForDetails.status === "published" ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-700 flex items-center gap-1 border border-emerald-200">
+                      🟢 Live (Public)
+                    </span>
+                  ) : selectedObjectForDetails.status === "archived" ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-700 flex items-center gap-1 border border-rose-200">
+                      🗑️ Trash
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-700 flex items-center gap-1 border border-amber-200">
+                      🔒 Private / Offline
+                    </span>
+                  )}
+
+                  {selectedObjectForDetails.status === "published" && (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleObjectStatus(selectedObjectForDetails)}
+                      className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition cursor-pointer flex items-center gap-1"
+                      title="Take offline / set to private (hide from mobile app users while fixing issues)"
+                    >
+                      <Lock size={10} />
+                      <span>Take Offline (Private)</span>
+                    </button>
+                  )}
+                  {selectedObjectForDetails.status === "draft" && (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleObjectStatus(selectedObjectForDetails)}
+                      className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                      title="Publish live to mobile app users"
+                    >
+                      <Unlock size={10} />
+                      <span>Publish Live</span>
+                    </button>
+                  )}
+                </div>
+                <h3 className="text-lg font-black text-slate-900">
+                  {selectedObjectForDetails.title}
+                </h3>
+              </div>
+
+              <button
+                onClick={() => setSelectedObjectForDetails(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* ─── REAL-TIME ANALYTICS & PERFORMANCE GRID ─── */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-4 bg-slate-50/80 rounded-2xl border border-slate-200 shadow-2xs">
+                <div className="p-3 bg-white rounded-xl border border-slate-100 flex items-center gap-2.5 shadow-xs">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <Eye size={16} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Total Views</span>
+                    <span className="text-sm font-black text-slate-900">{Number(selectedObjectForDetails.views || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white rounded-xl border border-slate-100 flex items-center gap-2.5 shadow-xs">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <Share2 size={16} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Total Shares</span>
+                    <span className="text-sm font-black text-emerald-900">{Number(selectedObjectForDetails.shares || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white rounded-xl border border-slate-100 flex items-center gap-2.5 shadow-xs">
+                  <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                    <MousePointer size={16} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Inquiries / Clicks</span>
+                    <span className="text-sm font-black text-purple-900">{Number(selectedObjectForDetails.clicks || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white rounded-xl border border-slate-100 flex items-center gap-2.5 shadow-xs">
+                  <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                    <Heart size={16} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Total Likes</span>
+                    <span className="text-sm font-black text-rose-900">{Number(selectedObjectForDetails.likes || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Photos Gallery */}
+              {selectedObjectForDetails.photos && selectedObjectForDetails.photos.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {selectedObjectForDetails.photos.map((p, idx) => (
+                    <div key={idx} className="h-28 rounded-xl overflow-hidden bg-slate-100">
+                      <img src={p.url} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Description */}
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                  Description
+                </span>
+                <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line">
+                  {selectedObjectForDetails.description || "No description provided"}
+                </p>
+              </div>
+
+              {/* Contact & Location Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">Contact</span>
+                  <p className="font-semibold text-slate-800 mt-0.5">
+                    {selectedObjectForDetails.contact?.phone || "No phone"}
+                  </p>
+                  <p className="text-slate-500">{selectedObjectForDetails.contact?.email || "No email"}</p>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">Location</span>
+                  <p className="font-semibold text-slate-800 mt-0.5">
+                    {selectedObjectForDetails.location?.address || selectedObjectForDetails.location?.city}
+                  </p>
+                  {selectedObjectForDetails.location?.googleMapsUrl && (
+                    <a
+                      href={selectedObjectForDetails.location.googleMapsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-indigo-600 hover:underline flex items-center gap-1 font-semibold text-[11px] mt-0.5"
+                    >
+                      <ExternalLink size={11} /> Open in Google Maps
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Custom Details from Blueprint */}
+              {selectedObjectForDetails.customDetails &&
+                Object.keys(selectedObjectForDetails.customDetails).length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block">
+                      Custom Template Attributes
+                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      {Object.entries(selectedObjectForDetails.customDetails).map(([k, v]) => (
+                        <div key={k} className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100">
+                          <span className="text-[10px] font-bold uppercase text-slate-400 block">{k}</span>
+                          <span className="text-xs font-bold text-slate-800">
+                            {Array.isArray(v) ? v.join(", ") : String(v)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+            </div>
+
+            {/* Bottom Actions: Edit, Soft Delete / Restore, Hard Delete */}
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleOpenEditObject(selectedObjectForDetails);
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Edit size={14} />
+                  <span>Edit Object</span>
+                </button>
+
+                {/* 🔒 Take Offline (Set to Private) <-> 🟢 Publish Live Toggle */}
+                {selectedObjectForDetails.status === "published" ? (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleObjectStatus(selectedObjectForDetails)}
+                    className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                    title="Removes from live mobile app so you can fix issues and make changes safely"
+                  >
+                    <Lock size={13} />
+                    <span>Take Offline (Set to Private)</span>
+                  </button>
+                ) : selectedObjectForDetails.status === "draft" ? (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleObjectStatus(selectedObjectForDetails)}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    title="Publish live to mobile app users"
+                  >
+                    <Unlock size={13} />
+                    <span>Publish Live</span>
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {selectedObjectForDetails.status === "archived" ? (
+                  <button
+                    type="button"
+                    onClick={() => handleRestoreObject(selectedObjectForDetails)}
+                    className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RotateCcw size={14} />
+                    <span>Restore to Live</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleSoftDeleteObject(selectedObjectForDetails)}
+                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 size={14} />
+                    <span>Move to Trash</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => handleHardDeleteObject(selectedObjectForDetails)}
+                  className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <AlertTriangle size={14} />
+                  <span>Hard Delete</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ServicesPage;

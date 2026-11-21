@@ -1,16 +1,19 @@
 import React, { useState } from "react";
-import { Film, Plus, X, UploadCloud, Trash2, CheckCircle2, AlertTriangle, RotateCcw, Eye } from "lucide-react";
+import { Film, Plus, X, UploadCloud, Trash2, CheckCircle2, AlertTriangle, RotateCcw, Eye, Loader2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axiosClient from "../api/axiosClient";
 import toast from "react-hot-toast";
 import { Req, RequiredNotice } from "../components/RequiredTag.jsx";
 import FormField from "../components/FormField.jsx";
 import { validators, runValidators, validateMediaType } from "../utils/validators.js";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadFileDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const IntroVideo = () => {
   const queryClient = useQueryClient();
   const [includeDeleted, setIncludeDeleted] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["introVideos", includeDeleted],
@@ -52,9 +55,10 @@ const IntroVideo = () => {
   };
 
   const createMutation = useMutation({
-    mutationFn: async (formData) => {
-      const res = await axiosClient.post("/admin/intro-video", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+    mutationFn: async (payload) => {
+      const isFormData = typeof FormData !== "undefined" && payload instanceof FormData;
+      const res = await axiosClient.post("/admin/intro-video", payload, {
+        ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
       });
       return res.data;
     },
@@ -104,7 +108,7 @@ const IntroVideo = () => {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setTouched({ title: true });
     const titleError = validate("title", title);
     setFieldErrors({ title: titleError });
@@ -115,14 +119,28 @@ const IntroVideo = () => {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("title", title);
-    formData.append("description", description);
-    formData.append("isActive", isActive);
-    formData.append("video", videoFile);
-    if (thumbnailFile) formData.append("thumbnail", thumbnailFile);
+    try {
+      setIsUploadingR2(true);
+      const videoAsset = await uploadFileDirectToR2(videoFile, "intro_videos", "video");
+      let thumbnailAsset = null;
+      if (thumbnailFile) {
+        thumbnailAsset = await uploadFileDirectToR2(thumbnailFile, "intro_video_thumbnails", "image");
+      }
 
-    createMutation.mutate(formData);
+      const payload = {
+        title,
+        description,
+        isActive,
+        video: videoAsset,
+        ...(thumbnailAsset && { thumbnail: thumbnailAsset }),
+      };
+
+      createMutation.mutate(payload);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to upload intro video directly to R2");
+    } finally {
+      setIsUploadingR2(false);
+    }
   };
 
   const videos = data?.data || data?.videos || [];
@@ -248,8 +266,23 @@ const IntroVideo = () => {
               </label>
             </div>
 
-            <button onClick={handleSubmit} disabled={createMutation.isPending} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-md">
-              {createMutation.isPending ? "Uploading Media..." : "Publish Intro Video"}
+            {(createMutation.isPending || isUploadingR2) && (
+              <UploadProgressBar isUploading={true} />
+            )}
+
+            <button
+              onClick={handleSubmit}
+              disabled={createMutation.isPending || isUploadingR2}
+              className="w-full bg-blue-600 hover:bg-blue-700 active:scale-98 text-white py-3 rounded-xl font-bold shadow-md transition disabled:bg-blue-300 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {createMutation.isPending || isUploadingR2 ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Uploading Media...</span>
+                </>
+              ) : (
+                <span>Publish Intro Video</span>
+              )}
             </button>
           </div>
         </div>

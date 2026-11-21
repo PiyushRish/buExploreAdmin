@@ -5,11 +5,10 @@ export const getTestimonials = async () => {
   return res.data;
 };
 
-export const addTestimonial = async (formData) => {
-  const res = await axiosClient.post("/testimonials/createTestimonial", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+export const addTestimonial = async (data) => {
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+  const res = await axiosClient.post("/testimonials/createTestimonial", data, {
+    ...(isFormData ? { headers: { "Content-Type": "multipart/form-data" } } : {}),
     timeout: 60000,
   });
   return res.data;

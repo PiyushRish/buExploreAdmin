@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useMemo } from "react";
 import {
   Heart,
   MapPin,
@@ -7,6 +7,10 @@ import {
   Check,
   RefreshCw,
   Tag,
+  Star,
+  Loader2,
+  Eye,
+  Share2,
 } from "lucide-react";
 import { GenericListHeader } from "../components/layout/GenericListHeader.jsx";
 import { PlaceContext } from "../contextApi/places.jsx";
@@ -16,6 +20,10 @@ import { useAddPlaceMutation } from "../mutations/placeMutation.js";
 import { Req, RequiredNotice } from "../components/RequiredTag.jsx";
 import FormField from "../components/FormField.jsx";
 import { validators, runValidators, validateMediaType } from "../utils/validators.js";
+import NotificationDraftSection from "../components/NotificationDraftSection.jsx";
+import { useNotificationDraft } from "../utils/useNotificationDraft.js";
+import UploadProgressBar from "../components/UploadProgressBar.jsx";
+import { uploadFileDirectToR2 } from "../utils/r2DirectUpload.js";
 
 const getImageUrl = (photo) => {
   if (!photo) return "https://picsum.photos/600/400";
@@ -32,7 +40,7 @@ const CATEGORIES = [
   "Treasures",
 ];
 
-const PlaceCard = ({ place }) => {
+const PlaceCard = ({ place, onNavigateToReviews }) => {
   const { setClickedPlaceHandler } = useContext(PlaceContext);
   const coverImage = getImageUrl(place?.photos?.[0]);
 
@@ -64,9 +72,19 @@ const PlaceCard = ({ place }) => {
           )}
         </div>
 
-        <div className="absolute bottom-3 right-3 z-20 bg-black/70 backdrop-blur-md text-white text-xs px-2.5 py-1 rounded-lg font-bold flex items-center gap-1">
-          <Heart size={12} className="text-red-500 fill-red-500" />
-          {place?.likes || 0}
+        <div className="absolute bottom-3 right-3 z-20 bg-black/75 backdrop-blur-md text-white text-[11px] px-2.5 py-1 rounded-xl font-bold flex items-center gap-2.5 border border-white/10 shadow-sm">
+          <span className="flex items-center gap-1" title="Views">
+            <Eye size={12} className="text-blue-400" />
+            <span>{Number(place?.views || 0).toLocaleString()}</span>
+          </span>
+          <span className="flex items-center gap-1" title="Likes">
+            <Heart size={12} className="text-rose-400 fill-rose-400" />
+            <span>{Number(place?.likes || 0).toLocaleString()}</span>
+          </span>
+          <span className="flex items-center gap-1" title="Shares">
+            <Share2 size={12} className="text-emerald-400" />
+            <span>{Number(place?.shares || 0).toLocaleString()}</span>
+          </span>
         </div>
       </div>
 
@@ -82,22 +100,54 @@ const PlaceCard = ({ place }) => {
           </span>
         </div>
 
+        {/* Engagement Stats Strip */}
+        <div className="grid grid-cols-3 gap-1.5 py-2 px-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 mb-2.5">
+          <div className="flex items-center gap-1">
+            <Eye size={13} className="text-blue-500 shrink-0" />
+            <span>{Number(place?.views || 0).toLocaleString()} views</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Heart size={13} className="text-rose-500 shrink-0" />
+            <span>{Number(place?.likes || 0).toLocaleString()} likes</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Share2 size={13} className="text-emerald-500 shrink-0" />
+            <span>{Number(place?.shares || 0).toLocaleString()} shares</span>
+          </div>
+        </div>
+
         <p className="text-gray-600 text-xs line-clamp-2 flex-grow leading-relaxed">
           {place?.description || "No description provided."}
         </p>
 
         <div className="pt-3 mt-3 border-t border-gray-100 flex justify-between items-center text-[10px] font-bold text-gray-400">
           <span>CITY: {place?.city || "Jhansi"}</span>
-          <span className="text-blue-600 font-bold hover:underline">
-            Manage All Fields →
-          </span>
+          <div className="flex items-center gap-2">
+            {onNavigateToReviews && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNavigateToReviews(place);
+                }}
+                className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-md transition font-bold cursor-pointer"
+                title="View & moderate reviews"
+              >
+                <Star size={11} className="text-amber-500 fill-amber-400" />
+                <span>Reviews {place.reviews?.length > 0 ? `(${place.reviews.length})` : ""}</span>
+              </button>
+            )}
+            <span className="text-blue-600 font-bold hover:underline">
+              Manage All Fields →
+            </span>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-const Places = () => {
+const Places = ({ onNavigateToReviews }) => {
   const [onlyDeleted, setOnlyDeleted] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [search, setSearch] = useState("");
@@ -106,8 +156,19 @@ const Places = () => {
   // Unified Query: Fetches places passing onlyDeleted flag explicitly
   const { data, isLoading } = usePlacesQuery({ onlyDeleted, limit: 1000 });
   const { mutateAsync: addPlace, isPending } = useAddPlaceMutation();
+  const { notif, setNotif, sendIfEnabled, resetNotif } = useNotificationDraft("place");
 
   const allPlaces = data?.places || [];
+
+  // Real-time Overview Statistics across all Destinations
+  const placeStats = useMemo(() => {
+    const totalCount = allPlaces.length;
+    const totalViews = allPlaces.reduce((sum, p) => sum + (Number(p.views) || 0), 0);
+    const totalLikes = allPlaces.reduce((sum, p) => sum + (Number(p.likes) || 0), 0);
+    const totalShares = allPlaces.reduce((sum, p) => sum + (Number(p.shares) || 0), 0);
+    const totalReviews = allPlaces.reduce((sum, p) => sum + (Array.isArray(p.reviews) ? p.reviews.length : 0), 0);
+    return { totalCount, totalViews, totalLikes, totalShares, totalReviews };
+  }, [allPlaces]);
 
   // Filter client-side by Category and Search Keyword
   const places = allPlaces.filter((place) => {
@@ -129,6 +190,7 @@ const Places = () => {
     category: "Heritage",
     city: "Jhansi",
     ytVideoLink: "",
+    bookingLink: "",
     address: "",
     lat: "",
     lng: "",
@@ -136,9 +198,7 @@ const Places = () => {
 
   const [photoFile, setPhotoFile] = useState(null);
   const [videoFile, setVideoFile] = useState(null);
-
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
 
   // Validation
   const RULES = {
@@ -148,6 +208,7 @@ const Places = () => {
     city:        [validators.required],
     address:     [validators.required],
     ytVideoLink: [validators.youtubeUrl],
+    bookingLink: [validators.httpUrl],
     lat:         [validators.required, validators.latitude],
     lng:         [validators.required, validators.longitude],
   };
@@ -163,7 +224,11 @@ const Places = () => {
 
   const handleChangeValidated = (e) => {
     const { name, value } = e.target;
-    setForm((p) => ({ ...p, [name]: value }));
+    setForm((p) => ({
+      ...p,
+      [name]: value,
+      ...(name === "category" && value !== "JhansiSmartCity" ? { bookingLink: "" } : {}),
+    }));
     if (touched[name]) {
       const result = runValidators(value, RULES[name] || [], name);
       setFieldErrors((p) => ({ ...p, [name]: result }));
@@ -172,7 +237,7 @@ const Places = () => {
 
   const handleSubmit = async () => {
     const requiredFields = ["name", "description", "category", "city", "address", "lat", "lng"];
-    const optionalValidated = ["ytVideoLink"];
+    const optionalValidated = ["ytVideoLink", "bookingLink"];
     const allFields = [...requiredFields, ...optionalValidated];
 
     const newTouched = {};
@@ -206,32 +271,42 @@ const Places = () => {
       return;
     }
 
-    const formData = new FormData();
-    const payload = {
-      name: form.name,
-      description: form.description,
-      category: form.category,
-      city: form.city,
-      ytVideoLink: form.ytVideoLink,
-      location: {
-        address: form.address,
-        lat: Number(form.lat) || 0,
-        lng: Number(form.lng) || 0,
-      },
-    };
-
-    formData.append("data", JSON.stringify(payload));
-    formData.append("placePhoto", photoFile);
-    if (videoFile) formData.append("placeVideo", videoFile);
-
     try {
-      await addPlace(formData);
+      setIsUploadingR2(true);
+      const [uploadedPhoto, uploadedVideo] = await Promise.all([
+        uploadFileDirectToR2(photoFile, "places/photos", "image"),
+        videoFile ? uploadFileDirectToR2(videoFile, "places/videos", "video") : null,
+      ]);
+
+      const payload = {
+        name: form.name,
+        description: form.description,
+        category: form.category,
+        city: form.city,
+        ytVideoLink: form.ytVideoLink,
+        ...(form.category === "JhansiSmartCity"
+          ? { bookingLink: form.bookingLink.trim() || null }
+          : {}),
+        location: {
+          address: form.address,
+          lat: Number(form.lat) || 0,
+          lng: Number(form.lng) || 0,
+        },
+        photos: uploadedPhoto ? [uploadedPhoto] : [],
+        videos: uploadedVideo ? [uploadedVideo] : [],
+      };
+
+      const result = await addPlace(payload);
+      await sendIfEnabled({ serviceId: result?.place?._id || result?._id });
       toast.success("Destination created successfully!");
       setShowModal(false);
       setPhotoFile(null);
       setVideoFile(null);
+      resetNotif();
+      setIsUploadingR2(false);
     } catch (_err) {
-      toast.error(_err?.response?.data?.message || "Failed to create destination");
+      setIsUploadingR2(false);
+      toast.error(_err?.response?.data?.message || _err?.message || "Failed to create destination");
     }
   };
 
@@ -264,6 +339,69 @@ const Places = () => {
           totalItemsCount={allPlaces.length}
         />
 
+        {/* ─── DESTINATIONS REAL-TIME EXECUTIVE STATS HUB ─── */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">
+                Destinations
+              </span>
+              <span className="text-2xl font-black text-slate-900">{placeStats.totalCount}</span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+              <MapPin size={18} />
+            </div>
+          </div>
+
+          <div className="bg-white border border-blue-100 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-blue-500 block mb-1">
+                Total Views
+              </span>
+              <span className="text-2xl font-black text-blue-900">{placeStats.totalViews.toLocaleString()}</span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Eye size={18} />
+            </div>
+          </div>
+
+          <div className="bg-white border border-rose-100 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-rose-500 block mb-1">
+                Total Likes
+              </span>
+              <span className="text-2xl font-black text-rose-900">{placeStats.totalLikes.toLocaleString()}</span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+              <Heart size={18} />
+            </div>
+          </div>
+
+          <div className="bg-white border border-emerald-100 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block mb-1">
+                Total Shares
+              </span>
+              <span className="text-2xl font-black text-emerald-900">{placeStats.totalShares.toLocaleString()}</span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Share2 size={18} />
+            </div>
+          </div>
+
+          <div className="bg-white border border-amber-100 rounded-2xl p-4 shadow-xs col-span-2 sm:col-span-1 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block mb-1">
+                Total Reviews
+              </span>
+              <span className="text-2xl font-black text-amber-900">{placeStats.totalReviews.toLocaleString()}</span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Star size={18} />
+            </div>
+          </div>
+        </div>
+
         {/* DESTINATIONS GRID */}
         {places.length === 0 ? (
           <div className="bg-white p-12 rounded-2xl text-center border text-gray-400 font-semibold">
@@ -272,7 +410,11 @@ const Places = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {places.map((place) => (
-              <PlaceCard key={place._id} place={place} />
+              <PlaceCard
+                key={place._id}
+                place={place}
+                onNavigateToReviews={onNavigateToReviews}
+              />
             ))}
           </div>
         )}
@@ -280,195 +422,360 @@ const Places = () => {
 
       {/* CREATE DESTINATION MODAL */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto space-y-4">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h2 className="text-xl font-bold text-gray-900">
-                Create New Destination Record
-              </h2>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-100">
+            {/* Sticky Header */}
+            <div className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 bg-white/95 backdrop-blur border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs">
+                  <MapPin size={22} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900">
+                    Create Destination Record
+                  </h2>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Add a tourist spot, heritage site, or landmark to BUXplore
+                  </p>
+                </div>
+              </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition"
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* Required fields notice */}
-            <RequiredNotice />
+            {/* Scrollable Modal Content */}
+            <div className="p-6 sm:p-8 space-y-6 overflow-y-auto flex-1">
+              <RequiredNotice />
 
-            <FormField label="Destination Name" required
-              error={fieldErrors.name?.error} hint={fieldErrors.name?.hint || "e.g. Jhansi Fort"}
-              touched={touched.name} valid={touched.name && !fieldErrors.name}>
-              <input
-                name="name"
-                value={form.name}
-                placeholder="e.g. Jhansi Fort"
-                onChange={handleChangeValidated}
-                onBlur={handleBlur}
-                className="w-full p-2.5 rounded-xl text-sm font-semibold"
-              />
-            </FormField>
+              {/* SECTION 1: Basic Information */}
+              <div className="bg-slate-50/60 border border-slate-200/80 rounded-2xl p-5 space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                  1. General Information
+                </h3>
 
-            <FormField label="Description" required error={fieldErrors.description?.error} touched={touched.description} valid={touched.description && !fieldErrors.description}>
-              <textarea
-                name="description"
-                value={form.description}
-                placeholder="Write full description..."
-                onChange={handleChangeValidated}
-                onBlur={handleBlur}
-                rows={3}
-                className="w-full p-2.5 rounded-xl text-sm resize-none"
-              />
-            </FormField>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="sm:col-span-2">
+                    <FormField
+                      label="Destination Name"
+                      required
+                      error={fieldErrors.name?.error}
+                      hint={fieldErrors.name?.hint || "e.g. Jhansi Fort"}
+                      touched={touched.name}
+                      valid={touched.name && !fieldErrors.name}
+                    >
+                      <input
+                        name="name"
+                        value={form.name}
+                        placeholder="e.g. Jhansi Fort"
+                        onChange={handleChangeValidated}
+                        onBlur={handleBlur}
+                        className="w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-hidden"
+                      />
+                    </FormField>
+                  </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField label="Category" required hint="Select a category">
-                <select
-                  name="category"
-                  value={form.category}
-                  onChange={handleChangeValidated}
-                  onBlur={handleBlur}
-                  className="w-full p-2.5 rounded-xl text-sm bg-white font-semibold"
+                  <div className="sm:col-span-1">
+                    <FormField label="Category" required hint="Select a category">
+                      <select
+                        name="category"
+                        value={form.category}
+                        onChange={handleChangeValidated}
+                        onBlur={handleBlur}
+                        className="w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-hidden"
+                      >
+                        {CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                    </FormField>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="sm:col-span-1">
+                    <FormField
+                      label="City"
+                      required
+                      error={fieldErrors.city?.error}
+                      touched={touched.city}
+                      valid={touched.city && !fieldErrors.city}
+                    >
+                      <input
+                        name="city"
+                        value={form.city}
+                        defaultValue="Jhansi"
+                        onChange={handleChangeValidated}
+                        onBlur={handleBlur}
+                        className="w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-hidden"
+                      />
+                    </FormField>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <FormField
+                      label="YouTube Video Link"
+                      optional
+                      error={fieldErrors.ytVideoLink?.error}
+                      hint={fieldErrors.ytVideoLink?.hint || "e.g. https://youtube.com/watch?v=..."}
+                      touched={touched.ytVideoLink}
+                      valid={touched.ytVideoLink && !fieldErrors.ytVideoLink}
+                    >
+                      <input
+                        name="ytVideoLink"
+                        value={form.ytVideoLink}
+                        placeholder="https://youtube.com/watch?v=..."
+                        onChange={handleChangeValidated}
+                        onBlur={handleBlur}
+                        className="w-full px-3.5 py-2.5 rounded-xl text-sm text-blue-600 border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-hidden"
+                      />
+                    </FormField>
+                  </div>
+                </div>
+
+                {form.category === "JhansiSmartCity" && (
+                  <FormField
+                    label="Booking Link"
+                    optional
+                    error={fieldErrors.bookingLink?.error}
+                    hint={fieldErrors.bookingLink?.hint || "HTTP or HTTPS link where visitors can book this place"}
+                    touched={touched.bookingLink}
+                    valid={touched.bookingLink && !fieldErrors.bookingLink}
+                  >
+                    <input
+                      type="url"
+                      name="bookingLink"
+                      value={form.bookingLink}
+                      placeholder="https://tickets.example.com/place"
+                      onChange={handleChangeValidated}
+                      onBlur={handleBlur}
+                      className="w-full px-3.5 py-2.5 rounded-xl text-sm text-blue-600 border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-hidden"
+                    />
+                  </FormField>
+                )}
+
+                <FormField
+                  label="Description"
+                  required
+                  error={fieldErrors.description?.error}
+                  touched={touched.description}
+                  valid={touched.description && !fieldErrors.description}
                 >
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-
-              <FormField label="City" required error={fieldErrors.city?.error} touched={touched.city} valid={touched.city && !fieldErrors.city}>
-                <input
-                  name="city"
-                  value={form.city}
-                  defaultValue="Jhansi"
-                  onChange={handleChangeValidated}
-                  onBlur={handleBlur}
-                  className="w-full p-2.5 rounded-xl text-sm font-semibold"
-                />
-              </FormField>
-            </div>
-
-            <FormField label="YouTube Video Link" optional
-              error={fieldErrors.ytVideoLink?.error} hint={fieldErrors.ytVideoLink?.hint || "e.g. https://youtube.com/watch?v=..."}
-              touched={touched.ytVideoLink} valid={touched.ytVideoLink && !fieldErrors.ytVideoLink}>
-              <input
-                name="ytVideoLink"
-                value={form.ytVideoLink}
-                placeholder="https://youtube.com/watch?v=..."
-                onChange={handleChangeValidated}
-                onBlur={handleBlur}
-                className="w-full p-2.5 rounded-xl text-sm text-blue-600"
-              />
-            </FormField>
-
-            <FormField label="Street Address / Landmark" required error={fieldErrors.address?.error} touched={touched.address} valid={touched.address && !fieldErrors.address}>
-              <input
-                name="address"
-                value={form.address}
-                placeholder="e.g. Fort Road, Near Civil Lines"
-                onChange={handleChangeValidated}
-                onBlur={handleBlur}
-                className="w-full p-2.5 rounded-xl text-sm"
-              />
-            </FormField>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField label="Latitude" required
-                error={fieldErrors.lat?.error} hint={fieldErrors.lat?.hint || "e.g. 25.4484"}
-                touched={touched.lat} valid={touched.lat && !fieldErrors.lat}>
-                <input
-                  type="number"
-                  step="any"
-                  name="lat"
-                  value={form.lat}
-                  placeholder="25.4484"
-                  onChange={handleChangeValidated}
-                  onBlur={handleBlur}
-                  className="w-full p-2.5 rounded-xl text-sm font-mono"
-                />
-              </FormField>
-
-              <FormField label="Longitude" required
-                error={fieldErrors.lng?.error} hint={fieldErrors.lng?.hint || "e.g. 78.5685"}
-                touched={touched.lng} valid={touched.lng && !fieldErrors.lng}>
-                <input
-                  type="number"
-                  step="any"
-                  name="lng"
-                  value={form.lng}
-                  placeholder="78.5685"
-                  onChange={handleChangeValidated}
-                  onBlur={handleBlur}
-                  className="w-full p-2.5 rounded-xl text-sm font-mono"
-                />
-              </FormField>
-            </div>
-
-            {/* FILE UPLOADS */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="border border-dashed border-gray-300 p-4 rounded-xl text-center bg-gray-50">
-                <input
-                  type="file"
-                  accept="image/*"
-                  id="photos"
-                  onChange={(e) => {
-                    const f = e.target.files[0];
-                    if (f) {
-                      const v = validateMediaType(f, "image");
-                      if (v !== true) return toast.error(v);
-                      setPhotoFile(f);
-                    }
-                  }}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="photos"
-                  className="cursor-pointer text-xs font-bold text-blue-600 flex flex-col items-center justify-center gap-2"
-                >
-                  <UploadCloud size={18} />
-                  {photoFile
-                    ? `Photo Selected: ${photoFile.name}`
-                    : <><span>Upload Place Photo</span><Req /><span className="text-red-400 text-[10px]">(1 Max)</span></>}
-                </label>
+                  <textarea
+                    name="description"
+                    value={form.description}
+                    placeholder="Provide a detailed description of the history, significance, and highlights of this destination..."
+                    onChange={handleChangeValidated}
+                    onBlur={handleBlur}
+                    rows={3}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition outline-hidden resize-none"
+                  />
+                </FormField>
               </div>
 
-              <div className="border border-dashed border-gray-300 p-4 rounded-xl text-center bg-purple-50">
-                <input
-                  type="file"
-                  accept="video/*"
-                  id="videoUpload"
-                  onChange={(e) => {
-                    const f = e.target.files[0];
-                    if (f) {
-                      const v = validateMediaType(f, "video");
-                      if (v !== true) return toast.error(v);
-                      setVideoFile(f);
-                    }
-                  }}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="videoUpload"
-                  className="cursor-pointer text-xs font-bold text-purple-600 flex flex-col items-center justify-center gap-2"
+              {/* SECTION 2: Location & Coordinates */}
+              <div className="bg-slate-50/60 border border-slate-200/80 rounded-2xl p-5 space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  2. Location & Coordinates
+                </h3>
+
+                <FormField
+                  label="Street Address / Landmark"
+                  required
+                  error={fieldErrors.address?.error}
+                  touched={touched.address}
+                  valid={touched.address && !fieldErrors.address}
                 >
-                  <UploadCloud size={18} />
-                  {videoFile
-                    ? `Video Selected: ${videoFile.name}`
-                    : <><span>Upload Place Video</span><Req /><span className="text-purple-400 text-[10px]">(1 Max)</span></>}
-                </label>
+                  <input
+                    name="address"
+                    value={form.address}
+                    placeholder="e.g. Fort Road, Near Civil Lines, Jhansi"
+                    onChange={handleChangeValidated}
+                    onBlur={handleBlur}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-sm border border-slate-200 bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition outline-hidden"
+                  />
+                </FormField>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField
+                    label="Latitude"
+                    required
+                    error={fieldErrors.lat?.error}
+                    hint={fieldErrors.lat?.hint || "e.g. 25.4484"}
+                    touched={touched.lat}
+                    valid={touched.lat && !fieldErrors.lat}
+                  >
+                    <input
+                      type="number"
+                      step="any"
+                      name="lat"
+                      value={form.lat}
+                      placeholder="25.4484"
+                      onChange={handleChangeValidated}
+                      onBlur={handleBlur}
+                      className="w-full px-3.5 py-2.5 rounded-xl text-sm font-mono border border-slate-200 bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition outline-hidden"
+                    />
+                  </FormField>
+
+                  <FormField
+                    label="Longitude"
+                    required
+                    error={fieldErrors.lng?.error}
+                    hint={fieldErrors.lng?.hint || "e.g. 78.5685"}
+                    touched={touched.lng}
+                    valid={touched.lng && !fieldErrors.lng}
+                  >
+                    <input
+                      type="number"
+                      step="any"
+                      name="lng"
+                      value={form.lng}
+                      placeholder="78.5685"
+                      onChange={handleChangeValidated}
+                      onBlur={handleBlur}
+                      className="w-full px-3.5 py-2.5 rounded-xl text-sm font-mono border border-slate-200 bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition outline-hidden"
+                    />
+                  </FormField>
+                </div>
               </div>
+
+              {/* SECTION 3: Media Uploads */}
+              <div className="bg-slate-50/60 border border-slate-200/80 rounded-2xl p-5 space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                  3. Media & Assets
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Photo Dropzone */}
+                  <div className="border-2 border-dashed border-blue-200 hover:border-blue-400 p-5 rounded-2xl text-center bg-blue-50/40 hover:bg-blue-50 transition cursor-pointer flex flex-col items-center justify-center">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      id="photos"
+                      onChange={(e) => {
+                        const f = e.target.files[0];
+                        if (f) {
+                          const v = validateMediaType(f, "image");
+                          if (v !== true) return toast.error(v);
+                          setPhotoFile(f);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="photos"
+                      className="cursor-pointer w-full text-xs font-bold text-blue-700 flex flex-col items-center justify-center gap-2"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                        <UploadCloud size={20} />
+                      </div>
+                      {photoFile ? (
+                        <div className="space-y-1">
+                          <p className="font-bold text-emerald-700">✓ Photo Selected</p>
+                          <p className="text-[11px] text-slate-600 truncate max-w-[200px]">{photoFile.name}</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm font-bold">Upload Place Photo <Req /></p>
+                          <p className="text-[10px] text-slate-400 font-normal mt-0.5">JPG, PNG, WebP up to 10MB (1 Max)</p>
+                        </div>
+                      )}
+                    </label>
+                  </div>
+
+                  {/* Video Dropzone */}
+                  <div className="border-2 border-dashed border-purple-200 hover:border-purple-400 p-5 rounded-2xl text-center bg-purple-50/40 hover:bg-purple-50 transition cursor-pointer flex flex-col items-center justify-center">
+                    <input
+                      type="file"
+                      accept="video/*"
+                      id="videoUpload"
+                      onChange={(e) => {
+                        const f = e.target.files[0];
+                        if (f) {
+                          const v = validateMediaType(f, "video");
+                          if (v !== true) return toast.error(v);
+                          setVideoFile(f);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="videoUpload"
+                      className="cursor-pointer w-full text-xs font-bold text-purple-700 flex flex-col items-center justify-center gap-2"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
+                        <UploadCloud size={20} />
+                      </div>
+                      {videoFile ? (
+                        <div className="space-y-1">
+                          <p className="font-bold text-emerald-700">✓ Video Selected</p>
+                          <p className="text-[11px] text-slate-600 truncate max-w-[200px]">{videoFile.name}</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm font-bold">Upload Place Video <Req /></p>
+                          <p className="text-[10px] text-slate-400 font-normal mt-0.5">MP4, WebM up to 50MB (1 Max)</p>
+                        </div>
+                      )}
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 4: Push Notification Broadcast */}
+              <NotificationDraftSection
+                serviceType="place"
+                entityName={form.name}
+                value={notif}
+                onChange={setNotif}
+              />
+
+              {/* Upload Progress Indicator when uploading */}
+              {(isPending || isUploadingR2) && (
+                <div className="pt-2">
+                  <UploadProgressBar isUploading={isPending || isUploadingR2} />
+                </div>
+              )}
             </div>
 
-            <button
-              onClick={handleSubmit}
-              disabled={isPending}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold text-sm shadow-md transition-all disabled:bg-blue-300"
-            >
-              {isPending ? "Creating..." : "Save Record"}
-            </button>
+            {/* Sticky Footer */}
+            <div className="sticky bottom-0 z-20 flex items-center justify-between px-6 py-4 bg-white/95 backdrop-blur border-t border-slate-100 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                disabled={isPending || isUploadingR2}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-sm transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={isPending || isUploadingR2}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-sm shadow-md transition disabled:bg-blue-300 flex items-center gap-2 cursor-pointer"
+              >
+                {isUploadingR2 ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Uploading directly to Cloudflare R2...</span>
+                  </>
+                ) : isPending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Saving Destination...</span>
+                  </>
+                ) : (
+                  <span>Save Destination</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
