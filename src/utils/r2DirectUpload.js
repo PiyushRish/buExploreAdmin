@@ -45,17 +45,26 @@ export const uploadFileDirectToR2 = async (file, category, mediaType = "image") 
   });
 
   // 3. Finalize on backend to verify R2 object and get asset metadata
+  notifyUploadProgress({
+    active: true,
+    percent: 100,
+    loaded: file.size,
+    total: file.size,
+    status: mediaType === "video"
+      ? "Upload complete. The backend is verifying and processing the video..."
+      : "Upload complete. The backend is verifying the image...",
+  });
   const completeRes = await axiosClient.post("/media/r2/complete", {
     key,
     mediaType,
     category,
-  });
+  }, { timeout: 15 * 60 * 1000 });
 
   notifyUploadProgress({
     active: false,
     finished: true,
     percent: 100,
-    status: "R2 direct upload complete! ✨",
+    status: "Upload and backend processing complete! ✨",
   });
 
   return completeRes.data?.data || completeRes.data;

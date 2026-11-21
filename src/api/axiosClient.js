@@ -10,9 +10,9 @@ const resolveBaseUrl = () => {
     (window.location.hostname === "localhost" ||
       window.location.hostname === "127.0.0.1")
   ) {
-    return "http://localhost:5500/api";
+    return "http://localhost:5000/api";
   }
-  return "https://buexplorebackend.onrender.com/api";
+  return "https://www.explorebundelkhand.com/api";
 };
 
 /* ─── GLOBAL UPLOAD PROGRESS LISTENER SYSTEM ───────────────────── */
@@ -77,7 +77,7 @@ axiosClient.interceptors.request.use(
 
         let statusText = `Uploading media (${percent}%)...`;
         if (percent >= 100) {
-          statusText = "Upload complete! Saving & processing on Cloudflare R2 / Server...";
+          statusText = "Upload complete. The backend is saving and processing the media...";
         } else if (percent > 85) {
           statusText = "Almost done uploading...";
         }

@@ -19,7 +19,7 @@ const Users = () => {
         import.meta.env?.VITE_SOCKET_URL ||
         (axiosClient?.defaults?.baseURL
           ? axiosClient.defaults.baseURL.replace(/\/api\/?$/, "")
-          : "http://localhost:5500");
+          : "http://localhost:5000");
 
       socket = io(socketServer, {
         transports: ["websocket", "polling"],

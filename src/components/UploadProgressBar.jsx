@@ -107,8 +107,8 @@ const UploadProgressBar = ({
       {/* Subtle Hint */}
       {!compact && !isFinished && !isError && (
         <div className="flex items-center justify-between text-[10px] font-medium opacity-65 mt-2">
-          <span>Target: Cloudflare R2 / Server</span>
-          <span>{percent < 100 ? "Uploading files..." : "Processing assets..."}</span>
+          <span>Upload: API or Cloudflare R2</span>
+          <span>{percent < 100 ? "Uploading files..." : "Backend processing..."}</span>
         </div>
       )}
     </div>

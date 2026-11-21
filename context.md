@@ -40,8 +40,8 @@ buExploreAdmin/src/
 ---
 
 ## 🌐 API Base URL
-- **Production:** `https://buexplorebackend.onrender.com/api`
-- **Local Dev:** `http://localhost:5500/api` (comment swap in `axiosClient.js`)
+- **Production:** `https://www.explorebundelkhand.com/api` (or `VITE_BACKEND_URL` when configured)
+- **Local Dev:** `http://localhost:5000/api`
 
 ---
 
@@ -92,7 +92,7 @@ The Notifications page (`pages/Notifications.jsx`) was upgraded to support:
 | 2026-10-09 | Place review word limit 50 words & latest one above | Unified with backend review validation rules |
 | 2026-10-09 | Top bar Online & Total Users count badges | Real-time Socket.IO (`userCountLatest`) + polling fallback (`/users/getUserCount`) in header with quick navigation to Users tab |
 | 2026-10-09 | Notification toggle button across all services, events, and places | Admin can toggle broadcast ON/OFF per place, hotel, restaurant, guide, tour, surprise event, vehicle |
-| 2026-10-09 | Dynamic API Base URL resolution in `axiosClient.js` | Automatically points to `localhost:5500` when admin runs on localhost/127.0.0.1, preventing Render 429 rate limit errors from blocking local data |
+| 2026-10-09 | Dynamic API Base URL resolution in `axiosClient.js` | Automatically points to the local backend on port 5000 or the DigitalOcean production domain, while allowing `VITE_BACKEND_URL` overrides |
 | 2026-10-09 | Surprise Events DB visibility fix | Connected local admin to local backend where surprise events exist; added `/all` endpoint support and cache flushing |
 | 2026-10-09 | Modern Slider Toggle Switch in `NotificationDraftSection` | Replaced plain pill with an iOS-style animated slider toggle switch (`translate-x-6` when active, gradient track) |
 | 2026-10-09 | Comprehensive Modal Redesign & Decongestion | Upgraded creation modals for Places, Surprise Events, Hotels, Restaurants, Guides, and Vehicles from cramped 500px single-column layouts to spacious `max-w-4xl` cards with organized visual sections, styled upload dropzones, sticky headers, and sticky footers |
@@ -104,7 +104,7 @@ The Notifications page (`pages/Notifications.jsx`) was upgraded to support:
   - **Online Users Badge:** Emerald glowing pill with live ping animation displaying real-time connected users (`onlineUsers`). Receives updates dynamically via Socket.IO `userCountLatest` event, falling back to TanStack Query polling (`useUserStatsQuery`).
   - **Total Users Badge:** Indigo pill with `Users` icon displaying total registered user count (`totalUsers`).
   - **Interactive Quick-Nav:** Clicking either counter seamlessly switches the active tab directly to `Users` management.
-  - **Socket Server Resiliency:** Dynamically resolves socket server URL from `import.meta.env.VITE_SOCKET_URL` or `axiosClient.defaults.baseURL`, automatically adapting between local dev (`localhost:5500`) and production (`onrender.com`).
+  - **Socket Server Resiliency:** Dynamically resolves socket server URL from `import.meta.env.VITE_SOCKET_URL` or `axiosClient.defaults.baseURL`, automatically adapting between local dev (`localhost:5000`) and production (`www.explorebundelkhand.com`).
 
 ---
 
